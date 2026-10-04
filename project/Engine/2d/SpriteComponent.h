@@ -52,7 +52,8 @@ public:
 		sprite_.reset();
 	}
 
-	Sprite* GetSprite() const { return sprite_.get(); }
+	Sprite* GetSprite() { return sprite_.get(); }
+	const Sprite* GetSprite() const { return sprite_.get(); }
 	void SetTexture(const std::string& textureFilePath) {
 		if (sprite_) {
 			sprite_->SetTexture(textureFilePath);

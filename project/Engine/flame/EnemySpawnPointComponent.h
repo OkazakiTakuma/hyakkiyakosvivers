@@ -90,14 +90,11 @@ public:
 	bool GetSpawnEnabled() const;
 	void ResetSpawnTimer();
 	float GetElapsedTimeSeconds() const;
-	std::vector<SpawnSchedule>& GetSpawnSchedules();
 	const std::vector<SpawnSchedule>& GetSpawnSchedules() const;
 	void SetSpawnSchedules(const std::vector<SpawnSchedule>& schedules);
-	std::vector<TimeScalingTier>& GetTimeScalingTiers();
 	const std::vector<TimeScalingTier>& GetTimeScalingTiers() const;
 	void SetTimeScalingTiers(const std::vector<TimeScalingTier>& tiers);
 	EnemyStatMultipliers GetCurrentTimeScaling() const;
-	BossEncounterSettings& GetBossEncounterSettings();
 	const BossEncounterSettings& GetBossEncounterSettings() const;
 	void SetBossEncounterSettings(const BossEncounterSettings& settings);
 	bool ConsumeBossEncounterRequest();

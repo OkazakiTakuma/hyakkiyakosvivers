@@ -19,8 +19,8 @@ public:
 	virtual void Draw3D() {}
 	virtual void Finalize() {}
 
-	void SetOwner(GameObject* owner) { owner_ = owner; }
-	GameObject* GetOwner() const { return owner_; }
+	GameObject* GetOwner() { return owner_; }
+	const GameObject* GetOwner() const { return owner_; }
 
 	void SetEnabled(bool enabled) { isEnabled_ = enabled; }
 	bool IsEnabled() const { return isEnabled_; }
@@ -89,6 +89,9 @@ public:
 	}
 
 private:
+	friend class GameObject;
+	void SetOwner(GameObject* owner) { owner_ = owner; }
+
 	// このコンポーネントを所有するGameObjectです。所有権はGameObject側が持ちます。
 	GameObject* owner_ = nullptr;
 	// falseの場合、GameObjectのUpdate/Draw系呼び出しからこのコンポーネントを除外します。

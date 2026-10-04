@@ -42,7 +42,8 @@ public:
 		followTarget_ = nullptr;
 	}
 
-	Camera* GetCamera() const { return camera_.get(); }
+	Camera* GetCamera() { return camera_.get(); }
+	const Camera* GetCamera() const { return camera_.get(); }
 
 	void SetFollowTarget(GameObject* target) {
 		followTarget_ = target;

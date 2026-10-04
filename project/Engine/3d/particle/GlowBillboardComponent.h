@@ -4,6 +4,7 @@
 #include "../../flame/Component.h"
 #include "../../flame/GameObject.h"
 #include "ParticleManager.h"
+#include <array>
 #include <cmath>
 #include <string>
 
@@ -21,37 +22,32 @@ public:
 
 	void Update() override {
 		EnsureParticleGroup();
-		ParticleManager::ParticleGroup* group = ParticleManager::GetInstance()->GetGroup(groupName_);
-		if (!group || !GetOwner()) {
+		if (!ParticleManager::GetInstance()->HasGroup(groupName_) || !GetOwner()) {
 			return;
 		}
 
-		// Emitを繰り返すと寿命の境界で個数や明るさが揺れるため、常に同じ2粒を直接更新する。
-		if (group->particles.size() != 2) {
-			group->particles.clear();
-			group->particles.resize(2);
-		}
+		// Emitを繰り返すと寿命の境界で個数や明るさが揺れるため、常に同じ2粒で置き換える。
+		std::array<Particle, 2> particles{};
 
 		pulseTime_ += GameTime::GetDeltaTime();
 		const float pulse = 1.0f + std::sin(pulseTime_ * pulseSpeed_) * pulseAmount_;
 		const Vector3 position = GetOwner()->GetTransform().translate + positionOffset_;
 
 		// 外側を先に登録し、その上へ内側の高輝度な光を加算する。
-		UpdateParticle(group->particles[0], position, outerSize_ * pulse, outerColor_, outerIntensity_);
-		UpdateParticle(group->particles[1], position, innerSize_ * pulse, innerColor_, innerIntensity_);
+		UpdateParticle(particles[0], position, outerSize_ * pulse, outerColor_, outerIntensity_);
+		UpdateParticle(particles[1], position, innerSize_ * pulse, innerColor_, innerIntensity_);
+		ParticleManager::GetInstance()->SetGroupParticles(groupName_, particles);
 	}
 
 	void Finalize() override {
 		// シーン再読込時に古いHaloが残らないよう、このComponentが所有する粒だけを除去する。
-		if (ParticleManager::ParticleGroup* group = ParticleManager::GetInstance()->GetGroup(groupName_)) {
-			group->particles.clear();
-		}
+		ParticleManager::GetInstance()->ClearGroupParticles(groupName_);
 		groupName_.clear();
 	}
 
 	void SetTexture(const std::string& textureFilePath) {
 		textureFilePath_ = textureFilePath;
-		if (!groupName_.empty() && ParticleManager::GetInstance()->GetGroup(groupName_)) {
+		if (!groupName_.empty() && ParticleManager::GetInstance()->HasGroup(groupName_)) {
 			ParticleManager::GetInstance()->SetGroupTexture(groupName_, textureFilePath_);
 		}
 	}
@@ -86,7 +82,7 @@ private:
 			return;
 		}
 		ParticleManager* particleManager = ParticleManager::GetInstance();
-		if (!particleManager->GetGroup(groupName_)) {
+		if (!particleManager->HasGroup(groupName_)) {
 			particleManager->CreateParticleGroup(groupName_, textureFilePath_, kMeshTypeQuad);
 		}
 		// 黒い部分を背景へ足さず、明るい部分だけを加えることで光のにじみに見せる。

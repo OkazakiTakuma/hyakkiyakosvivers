@@ -1,15 +1,18 @@
 #include "TitleScene.h"
 #include "SceneManager.h"
+#include "MathConstants.h"
 #include <model/ModelManager.h>
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <Xinput.h>
 
 namespace {
 constexpr float kSlashStartSeconds = 1.70f;
 constexpr float kLogoStartSeconds = 2.25f;
 constexpr float kPromptStartSeconds = 5.00f;
+constexpr int kMenuItemCount = 3;
 
 float SmoothStep(float start, float end, float value) {
 	const float rate = std::clamp((value - start) / (end - start), 0.0f, 1.0f);
@@ -175,10 +178,10 @@ void TitleScene::Update() {
 
 	// W/S、十字キー、左スティックを同じ上下選択操作として扱う。
 	if (input->TriggerKey(DIK_W) || input->TriggerKey(DIK_UP) || input->TriggerGamepadUp()) {
-		selectedMenuIndex_ = (selectedMenuIndex_ + 2) % 3;
+		selectedMenuIndex_ = (selectedMenuIndex_ + kMenuItemCount - 1) % kMenuItemCount;
 	}
 	if (input->TriggerKey(DIK_S) || input->TriggerKey(DIK_DOWN) || input->TriggerGamepadDown()) {
-		selectedMenuIndex_ = (selectedMenuIndex_ + 1) % 3;
+		selectedMenuIndex_ = (selectedMenuIndex_ + 1) % kMenuItemCount;
 	}
 	if (isConfirmTriggered) {
 		// Enter / Pad A は通常の決定操作として、現在選択中の項目を実行する。
@@ -207,7 +210,7 @@ void TitleScene::UpdateTitlePresentation() {
 	const float sunlightIntensity = 1.35f + (0.78f - 1.35f) * sunsetAmount;
 
 	// 戦闘ロジックを持たない配置モデルだけを、名前に応じて静かに動かす。
-	for (const auto& object : GetSceneObjects()) {
+	for (GameObject* object : GetMutableSceneObjects()) {
 		if (!object) continue;
 		const std::string& name = object->GetName();
 		if (Object3dComponent* object3d = object->GetComponent<Object3dComponent>()) {
@@ -219,7 +222,7 @@ void TitleScene::UpdateTitlePresentation() {
 		if (name.starts_with("TitleMagatama")) {
 			// 勾玉は個別の角度差を持つ円運動にし、4つが同じ場所へ重ならないようにする。
 			const int index = static_cast<int>(name.back() - 'A');
-			const float phase = static_cast<float>(index) * 1.5707963f;
+			const float phase = static_cast<float>(index) * MathConstants::kPi * 0.5f;
 			const float expansion = SmoothStep(0.75f, 2.70f, presentationTime_);
 			const float slashBurst = 1.0f - SmoothStep(2.10f, 3.20f, presentationTime_);
 			const float radiusX = 0.55f + expansion * (1.45f + slashBurst * 0.42f);
@@ -231,7 +234,7 @@ void TitleScene::UpdateTitlePresentation() {
 			transform.translate.y = 0.20f + std::sin(pulseTime_ * 1.7f + phase) * 0.16f;
 			transform.translate.z = 0.40f + std::sin(angle) * radiusZ;
 			// 軌道の接線方向へ向けると、回転していることが読み取りやすくなる。
-			transform.rotate.y = -angle + 1.5707963f;
+			transform.rotate.y = -angle + MathConstants::kPi * 0.5f;
 
 			// 勾玉を閾値以上の明るさへ寄せ、PostEffectのブルームで発光させる。
 			static const Vector4 glowColors[] = {
@@ -240,10 +243,11 @@ void TitleScene::UpdateTitlePresentation() {
 				{0.62f, 1.0f, 0.68f, 1.0f},
 				{1.0f, 0.78f, 0.28f, 1.0f}
 			};
+			const size_t glowColorIndex = static_cast<size_t>(index) % std::size(glowColors);
 			if (Object3dComponent* object3d = object->GetComponent<Object3dComponent>()) {
-				object3d->SetColor(glowColors[index % 4]);
+				object3d->SetColor(glowColors[glowColorIndex]);
 				// HDRの1.0を少し越える発光値を作り、太陽より弱いBloomだけを抽出させます。
-				const Vector4& glowColor = glowColors[index % 4];
+				const Vector4& glowColor = glowColors[glowColorIndex];
 				object3d->SetEmission({glowColor.x, glowColor.y, glowColor.z}, 0.55f);
 			}
 
@@ -253,17 +257,17 @@ void TitleScene::UpdateTitlePresentation() {
 				trail->SetWidth(0.12f);
 				trail->SetLifeTime(titlePhase_ == TitlePhase::Menu ? 0.18f : 0.34f);
 				trail->SetMinSegmentLength(0.035f);
-				trail->SetHeadColor(glowColors[index % 4]);
-				trail->SetTailColor({glowColors[index % 4].x * 0.35f, glowColors[index % 4].y * 0.20f,
-					glowColors[index % 4].z, 0.0f});
+				trail->SetHeadColor(glowColors[glowColorIndex]);
+				trail->SetTailColor({glowColors[glowColorIndex].x * 0.35f, glowColors[glowColorIndex].y * 0.20f,
+					glowColors[glowColorIndex].z, 0.0f});
 			} else {
 				trail = object->AddComponent<TrailRendererComponent>();
 				trail->SetWidth(0.12f);
 				trail->SetLifeTime(0.34f);
 				trail->SetMinSegmentLength(0.035f);
-				trail->SetHeadColor(glowColors[index % 4]);
-				trail->SetTailColor({glowColors[index % 4].x * 0.35f, glowColors[index % 4].y * 0.20f,
-					glowColors[index % 4].z, 0.0f});
+				trail->SetHeadColor(glowColors[glowColorIndex]);
+				trail->SetTailColor({glowColors[glowColorIndex].x * 0.35f, glowColors[glowColorIndex].y * 0.20f,
+					glowColors[glowColorIndex].z, 0.0f});
 			}
 		} else if (name.starts_with("TitleEnemy")) {
 			EulerTransform& transform = object->GetTransform();

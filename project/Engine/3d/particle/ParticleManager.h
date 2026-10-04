@@ -7,6 +7,7 @@
 #include "TextureManager.h"
 #include <numbers>
 #include <random>
+#include <span>
 #include <string>
 #include <vector>
 #include <list>
@@ -66,6 +67,11 @@ public:
 	/// <param name="groupName">対象となるパーティクルグループ名を指定します。</param>
 	/// <param name="blendMode">描画時に使用するブレンドモードを指定します。</param>
 	void SetGroupBlendMode(const std::string& groupName, BlendMode blendMode);
+	bool HasGroup(const std::string& groupName) const;
+	void SetGroupParticles(const std::string& groupName, std::span<const Particle> particles);
+	void ClearGroupParticles(const std::string& groupName);
+
+private:
 	struct ParticleGroup {
 		MaterialData material;
 		std::vector<Particle> particles;
@@ -84,10 +90,6 @@ public:
 		Matrix4x4 viewProjection;
 		Matrix4x4 billboard;
 	};
-	/// <param name="groupName">対象となるパーティクルグループ名を指定します。</param>
-	ParticleGroup* GetGroup(const std::string& groupName);
-
-private:
 	ParticleManager() = default;
 	~ParticleManager() = default;
 	ParticleManager(const ParticleManager&) = delete;

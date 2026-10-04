@@ -53,7 +53,8 @@ public:
 		object3d_.reset();
 	}
 
-	Object3d* GetObject3d() const { return object3d_.get(); }
+	Object3d* GetObject3d() { return object3d_.get(); }
+	const Object3d* GetObject3d() const { return object3d_.get(); }
 
 	void SetModel(Model* model) { object3d_->SetModel(model); }
 	void SetModel(const std::string& filePath) { object3d_->SetModel(filePath); }

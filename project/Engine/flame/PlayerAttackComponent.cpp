@@ -99,7 +99,7 @@ PlayerAttackLevelStats PlayerAttackComponent::FindCurrentLevelStats(const Attack
 	}
 
 Vector3 PlayerAttackComponent::RotateYaw(const Vector3& direction, float degrees) {
-		const float radians = degrees * 3.14159265358979323846f / 180.0f;
+		const float radians = degrees * MathConstants::kDegreesToRadians;
 		const float c = std::cos(radians);
 		const float s = std::sin(radians);
 		const Vector3 rotated = {direction.x * c + direction.z * s, 0.0f, -direction.x * s + direction.z * c};
@@ -193,7 +193,6 @@ void PlayerAttackComponent::CreateMagatamaAttack(GameObject* owner, const Player
 void PlayerAttackComponent::CreateOrbitAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
 		// 弾数分を円周上へ等間隔に配置し、以後の位置更新に使う中心・角度・半径を要求へ記録する。
 		const int shotCount = (std::max)(1, levelStats.shotCount);
-		constexpr float kTwoPi = 6.28318530717958647692f;
 		for (int index = 0; index < shotCount; ++index) {
 			QueueShot(owner, player, slot, levelStats, currentLevel, 0.0f, index);
 			PlayerAttackShotRequest& request = shotRequests_.back();
@@ -203,7 +202,7 @@ void PlayerAttackComponent::CreateOrbitAttack(GameObject* owner, const Player& p
 			// JSONに個別オフセットがあればその角度を優先し、未設定時は自動的に等間隔へ並べる。
 			const float localStartAngle = horizontalRadius > MathConstants::kDirectionEpsilon
 			    ? std::atan2(spawnOffset.z, spawnOffset.x)
-			    : kTwoPi * static_cast<float>(index) / static_cast<float>(shotCount);
+			    : MathConstants::kTwoPi * static_cast<float>(index) / static_cast<float>(shotCount);
 			request.motionType = PlayerProjectileMotionType::Orbit;
 			request.motionAnchor = owner;
 			// プレイヤーの現在回転を除き、保存したローカル開始角度をワールド周回角へ変換する。

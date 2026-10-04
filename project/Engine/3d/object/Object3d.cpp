@@ -6,6 +6,7 @@
 #include "../../base/SrvManager.h"
 #include "../../base/GameTime.h"
 #include "../../base/Logger.h"
+#include "../../math/MathConstants.h"
 #include "../model/Model.h"
 #include "../model/ModelManager.h"
 #include "../sky/AtmosphereSystem.h"
@@ -49,11 +50,10 @@ Matrix4x4 MakePlanarShadowMatrix(const Vector3& lightDirection, float planeY)
 void DrawDebugWireSphere(const Vector3& center, float radius, const Vector4& color, bool ignoreDepth = false)
 {
 	constexpr uint32_t kSegmentCount = 8;
-	constexpr float kTwoPi = 6.28318530718f;
 
 	for (uint32_t index = 0; index < kSegmentCount; ++index) {
-		const float currentAngle = kTwoPi * static_cast<float>(index) / static_cast<float>(kSegmentCount);
-		const float nextAngle = kTwoPi * static_cast<float>(index + 1) / static_cast<float>(kSegmentCount);
+		const float currentAngle = MathConstants::kTwoPi * static_cast<float>(index) / static_cast<float>(kSegmentCount);
+		const float nextAngle = MathConstants::kTwoPi * static_cast<float>(index + 1) / static_cast<float>(kSegmentCount);
 
 		const float currentCos = std::cos(currentAngle) * radius;
 		const float currentSin = std::sin(currentAngle) * radius;
