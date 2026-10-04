@@ -1,6 +1,7 @@
 #include "PlayerStatusRepository.h"
 #include "../helpers/SceneJsonUtility.h"
 #include "../../base/StringUtility.h"
+#include "../../math/MathConstants.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -377,10 +378,9 @@ PlayerAttackStats JsonToPlayerAttackStats(const nlohmann::json& json, const Play
 		if (stats.name == "Orbit" && !levelJson.contains("spawnOffsets") && !stats.levels.back().spawnOffsets.empty()) {
 			const Vector3 baseOffset = stats.levels.back().spawnOffsets.front();
 			const int shotCount = stats.levels.back().shotCount;
-			constexpr float kTwoPi = 6.28318530717958647692f;
 			stats.levels.back().spawnOffsets.clear();
 			for (int index = 0; index < shotCount; ++index) {
-				const float angle = kTwoPi * static_cast<float>(index) / static_cast<float>(shotCount);
+				const float angle = MathConstants::kTwoPi * static_cast<float>(index) / static_cast<float>(shotCount);
 				const float cosine = std::cos(angle);
 				const float sine = std::sin(angle);
 				stats.levels.back().spawnOffsets.push_back({

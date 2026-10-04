@@ -610,11 +610,21 @@ void ParticleManager::SetGroupBlendMode(const std::string& groupName, BlendMode 
 	}
 }
 
-/// <param name="groupName">対象となるパーティクルグループ名を指定します。</param>
-ParticleManager::ParticleGroup* ParticleManager::GetGroup(const std::string& groupName) {
+bool ParticleManager::HasGroup(const std::string& groupName) const {
+	return particleGroups_.contains(groupName);
+}
+
+void ParticleManager::SetGroupParticles(const std::string& groupName, std::span<const Particle> particles) {
+	auto it = particleGroups_.find(groupName);
+	if (it == particleGroups_.end()) {
+		return;
+	}
+	it->second.particles.assign(particles.begin(), particles.end());
+}
+
+void ParticleManager::ClearGroupParticles(const std::string& groupName) {
 	auto it = particleGroups_.find(groupName);
 	if (it != particleGroups_.end()) {
-		return &it->second;
+		it->second.particles.clear();
 	}
-	return nullptr;
 }

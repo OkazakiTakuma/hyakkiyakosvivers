@@ -152,14 +152,13 @@ public:
 
 		// 光柱の周囲を上昇する二本の螺旋で、静止した円柱ではなく流動するエネルギーを表現する。
 		constexpr int kHelixSegments = 28;
-		constexpr float kTwoPi = 6.28318530717958647692f;
 		for (int strand = 0; strand < 2; ++strand) {
 			std::vector<TrailRenderPoint> helix;
 			helix.reserve(kHelixSegments + 1);
 			for (int index = 0; index <= kHelixSegments; ++index) {
 				const float t = static_cast<float>(index) / kHelixSegments;
-				const float angle = t * kTwoPi * 2.5f + elapsedSeconds_ * 8.0f + strand * MathConstants::kPi;
-				const float radius = size_ * (0.80f + 0.10f * std::sin(t * kTwoPi));
+				const float angle = t * MathConstants::kTwoPi * 2.5f + elapsedSeconds_ * 8.0f + strand * MathConstants::kPi;
+				const float radius = size_ * (0.80f + 0.10f * std::sin(t * MathConstants::kTwoPi));
 				helix.push_back({
 				    impact + Vector3{std::cos(angle) * radius, (sky.y - impact.y) * t, std::sin(angle) * radius},
 				    envelope * std::sin(MathConstants::kPi * t)
@@ -176,7 +175,7 @@ public:
 		std::vector<TrailRenderPoint> ring;
 		ring.reserve(kRingSegments + 1);
 		for (int index = 0; index <= kRingSegments; ++index) {
-			const float angle = kTwoPi * static_cast<float>(index) / kRingSegments;
+			const float angle = MathConstants::kTwoPi * static_cast<float>(index) / kRingSegments;
 			ring.push_back({impact + Vector3{std::cos(angle) * ringRadius, 0.06f, std::sin(angle) * ringRadius}, envelope});
 		}
 		TrailRenderer::GetInstance()->Submit(
@@ -185,7 +184,7 @@ public:
 		// 放射状の短い火花を回転させ、着弾時の瞬間的な圧力を補強する。
 		constexpr int kSparkCount = 8;
 		for (int index = 0; index < kSparkCount; ++index) {
-			const float angle = kTwoPi * static_cast<float>(index) / kSparkCount + elapsedSeconds_ * 2.5f;
+			const float angle = MathConstants::kTwoPi * static_cast<float>(index) / kSparkCount + elapsedSeconds_ * 2.5f;
 			const Vector3 direction{std::cos(angle), 0.10f, std::sin(angle)};
 			const float inner = ringRadius * 0.45f;
 			const float outer = ringRadius * (0.85f + 0.18f * std::sin(elapsedSeconds_ * 35.0f + index));
@@ -242,7 +241,6 @@ public:
 		const float baseRadius = (std::max)(0.10f, size * 0.16f);
 		const float topRadius = (std::max)(0.65f, size * 1.45f);
 		const Vector3 center = owner->GetTransform().translate;
-		constexpr float kTwoPi = 6.28318530717958647692f;
 		constexpr int kHelixSegments = 30;
 
 		// 位相の異なる三本の螺旋を下から上へ巻き上げ、点群ではなく連続した風の筋として見せる。
@@ -252,9 +250,9 @@ public:
 			for (int index = 0; index <= kHelixSegments; ++index) {
 				const float t = static_cast<float>(index) / kHelixSegments;
 				const float angle = rotationDirection_ *
-				    (elapsedSeconds_ * 8.5f + t * kTwoPi * 2.7f) + strand * kTwoPi / 3.0f;
+				    (elapsedSeconds_ * 8.5f + t * MathConstants::kTwoPi * 2.7f) + strand * MathConstants::kTwoPi / 3.0f;
 				const float radius = baseRadius + (topRadius - baseRadius) * t;
-				const float flutter = 1.0f + 0.07f * std::sin(t * kTwoPi * 4.0f + elapsedSeconds_ * 11.0f + strand);
+				const float flutter = 1.0f + 0.07f * std::sin(t * MathConstants::kTwoPi * 4.0f + elapsedSeconds_ * 11.0f + strand);
 				const float taper = 0.22f + 0.78f * std::sin(MathConstants::kPi * t);
 				helix.push_back({
 				    center + Vector3{std::cos(angle) * radius * flutter, height * t, std::sin(angle) * radius * flutter},
@@ -283,7 +281,7 @@ public:
 			ring.reserve(kRingSegments + 1);
 			for (int index = 0; index <= kRingSegments; ++index) {
 				const float angle = rotationDirection_ * elapsedSeconds_ * (5.0f + bandIndex) +
-				    kTwoPi * static_cast<float>(index) / kRingSegments;
+				    MathConstants::kTwoPi * static_cast<float>(index) / kRingSegments;
 				const float verticalRipple = size * 0.05f * std::sin(angle * 3.0f + elapsedSeconds_ * 7.0f);
 				ring.push_back({
 				    center + Vector3{std::cos(angle) * radius, height * t + verticalRipple, std::sin(angle) * radius},
@@ -301,7 +299,7 @@ public:
 		baseRing.reserve(kRingSegments + 1);
 		const float dustRadius = (std::max)(size * 0.72f, baseRadius * 1.8f);
 		for (int index = 0; index <= kRingSegments; ++index) {
-			const float angle = kTwoPi * static_cast<float>(index) / kRingSegments - rotationDirection_ * elapsedSeconds_ * 5.5f;
+			const float angle = MathConstants::kTwoPi * static_cast<float>(index) / kRingSegments - rotationDirection_ * elapsedSeconds_ * 5.5f;
 			const float ripple = 1.0f + 0.10f * std::sin(angle * 4.0f + elapsedSeconds_ * 8.0f);
 			baseRing.push_back({center + Vector3{std::cos(angle) * dustRadius * ripple, 0.05f, std::sin(angle) * dustRadius * ripple}, 1.0f});
 		}
@@ -1537,7 +1535,7 @@ GameObject* BaseScene::CreateRuntimeEnemyProjectile(const EnemyShotRequest& requ
 		object->AddComponent<TornadoVisualComponent>(isContractingTornado, isGiantTornado);
 		// 全竜巻で同じ描画グループを共有し、竜巻ごとのGPUバッファ生成を避ける。
 		constexpr const char* kTornadoParticleGroup = "RuntimeTornadoWispParticle";
-		if (!ParticleManager::GetInstance()->GetGroup(kTornadoParticleGroup)) {
+		if (!ParticleManager::GetInstance()->HasGroup(kTornadoParticleGroup)) {
 			ParticleManager::GetInstance()->CreateParticleGroup(
 			    kTornadoParticleGroup, "Resources/tornado_wisp.png", kMeshTypeQuad);
 		}
@@ -1904,7 +1902,7 @@ GameObject* BaseScene::CreateRuntimePlayerProjectile(const PlayerAttackShotReque
 		// 環境反射ではなく、加算合成パーティクルを弾から漏れ出す光として連続発生させる。
 		constexpr const char* kGlowParticleGroup = "MagatamaGlow";
 		constexpr const char* kGlowTexture = "Resources/circle.png";
-		if (!ParticleManager::GetInstance()->GetGroup(kGlowParticleGroup)) {
+		if (!ParticleManager::GetInstance()->HasGroup(kGlowParticleGroup)) {
 			ParticleManager::GetInstance()->CreateParticleGroup(kGlowParticleGroup, kGlowTexture, kMeshTypeQuad);
 		}
 

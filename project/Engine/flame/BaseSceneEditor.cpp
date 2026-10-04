@@ -208,7 +208,7 @@ GameObject* BaseScene::CreateEditorObject(EditorCreateType type, const std::stri
 		std::string textureFilePath = "Resources/circle.png";
 		ParticleMeshType meshType = kMeshTypeQuad;
 		ParticlePresetRepository::GetResourceInfo(modelFilePath, textureFilePath, meshType);
-		if (!ParticleManager::GetInstance()->GetGroup(groupName)) {
+		if (!ParticleManager::GetInstance()->HasGroup(groupName)) {
 			ParticleManager::GetInstance()->CreateParticleGroup(groupName, textureFilePath, meshType);
 		}
 		emitter->SetGroupName(groupName);
@@ -1083,6 +1083,8 @@ void BaseScene::DrawEnemySpawnPointInspector(GameObject* selectedObject) {
 
 		ImGui::Separator();
 		if (ImGui::CollapsingHeader("Spawn Schedules", ImGuiTreeNodeFlags_DefaultOpen)) {
+			auto schedules = enemySpawnPoint->GetSpawnSchedules();
+			bool schedulesChanged = false;
 			ImGui::Text("Elapsed Time: %.2f sec", enemySpawnPoint->GetElapsedTimeSeconds());
 			if (ImGui::Button("Reset Schedule Time")) {
 				enemySpawnPoint->ResetSpawnTimer();
@@ -1091,13 +1093,11 @@ void BaseScene::DrawEnemySpawnPointInspector(GameObject* selectedObject) {
 			if (ImGui::Button("Add Schedule")) {
 				EnemySpawnPointComponent::SpawnSchedule schedule;
 				schedule.enemyTypeName = !enemyTypes.empty() ? enemyTypes.front() : enemySpawnPoint->GetEnemyTypeName();
-				enemySpawnPoint->GetSpawnSchedules().push_back(schedule);
-				enemySpawnPoint->ResetSpawnTimer();
+				schedules.push_back(schedule);
+				schedulesChanged = true;
 			}
 
-			auto& schedules = enemySpawnPoint->GetSpawnSchedules();
 			int removeScheduleIndex = -1;
-			bool scheduleChanged = false;
 			for (int scheduleIndex = 0; scheduleIndex < static_cast<int>(schedules.size()); ++scheduleIndex) {
 				auto& schedule = schedules[scheduleIndex];
 				ImGui::PushID(scheduleIndex);
@@ -1115,33 +1115,33 @@ void BaseScene::DrawEnemySpawnPointInspector(GameObject* selectedObject) {
 					std::vector<const char*> scheduleEnemyTypeLabels = MakeLabelPointers(enemyTypes);
 					if (ImGui::Combo("Enemy Type", &scheduleEnemyTypeIndex, scheduleEnemyTypeLabels.data(), static_cast<int>(scheduleEnemyTypeLabels.size()))) {
 						schedule.enemyTypeName = enemyTypes[scheduleEnemyTypeIndex];
-						scheduleChanged = true;
+						schedulesChanged = true;
 					}
 				}
 
 				if (ImGui::DragFloat("Start Time (sec)", &schedule.startTimeSeconds, 0.1f, 0.0f, 36000.0f)) {
 					schedule.startTimeSeconds = (std::max)(0.0f, schedule.startTimeSeconds);
 					schedule.endTimeSeconds = (std::max)(schedule.startTimeSeconds, schedule.endTimeSeconds);
-					scheduleChanged = true;
+					schedulesChanged = true;
 				}
 				if (ImGui::DragFloat("End Time (sec)", &schedule.endTimeSeconds, 0.1f, schedule.startTimeSeconds, 36000.0f)) {
 					schedule.endTimeSeconds = (std::max)(schedule.startTimeSeconds, schedule.endTimeSeconds);
-					scheduleChanged = true;
+					schedulesChanged = true;
 				}
 				if (ImGui::DragInt("Interval (frames)", &schedule.spawnIntervalFrames, 1.0f, 1, 360000)) {
 					schedule.spawnIntervalFrames = (std::max)(1, schedule.spawnIntervalFrames);
-					scheduleChanged = true;
+					schedulesChanged = true;
 				}
 				if (ImGui::DragInt("Amount Per Spawn", &schedule.spawnAmount, 1.0f, 1, 64)) {
 					schedule.spawnAmount = std::clamp(schedule.spawnAmount, 1, 64);
-					scheduleChanged = true;
+					schedulesChanged = true;
 				}
 				if (ImGui::Checkbox("Apply Time Scaling", &schedule.applyTimeScaling)) {
-					scheduleChanged = true;
+					schedulesChanged = true;
 				}
 				// 中ボスのような時刻イベントは、一度だけ生成する設定にできる。
 				if (ImGui::Checkbox("Spawn Once", &schedule.spawnOnce)) {
-					scheduleChanged = true;
+					schedulesChanged = true;
 				}
 				if (ImGui::Button("Remove Schedule")) {
 					removeScheduleIndex = scheduleIndex;
@@ -1151,9 +1151,10 @@ void BaseScene::DrawEnemySpawnPointInspector(GameObject* selectedObject) {
 
 			if (removeScheduleIndex >= 0) {
 				schedules.erase(schedules.begin() + removeScheduleIndex);
-				enemySpawnPoint->ResetSpawnTimer();
-			} else if (scheduleChanged) {
-				enemySpawnPoint->ResetSpawnTimer();
+				schedulesChanged = true;
+			}
+			if (schedulesChanged) {
+				enemySpawnPoint->SetSpawnSchedules(schedules);
 			}
 
 			if (schedules.empty()) {
@@ -1166,7 +1167,7 @@ void BaseScene::DrawEnemySpawnPointInspector(GameObject* selectedObject) {
 		ImGui::Separator();
 		if (ImGui::CollapsingHeader("Enemy Time Scaling", ImGuiTreeNodeFlags_DefaultOpen)) {
 			ImGui::TextDisabled("Multipliers are fixed when an enabled schedule spawns an enemy.");
-			auto& tiers = enemySpawnPoint->GetTimeScalingTiers();
+			auto tiers = enemySpawnPoint->GetTimeScalingTiers();
 			if (ImGui::Button("Add Scaling Tier")) {
 				EnemySpawnPointComponent::TimeScalingTier tier;
 				if (!tiers.empty()) {
@@ -1204,7 +1205,7 @@ void BaseScene::DrawEnemySpawnPointInspector(GameObject* selectedObject) {
 		ImGui::Separator();
 		// 最終ボス専用イベントの時刻、種類、出現座標、プレイヤーワープ座標を編集する。
 		if (ImGui::CollapsingHeader("Boss Encounter", ImGuiTreeNodeFlags_DefaultOpen)) {
-			auto& bossSettings = enemySpawnPoint->GetBossEncounterSettings();
+			auto bossSettings = enemySpawnPoint->GetBossEncounterSettings();
 			bool bossSettingsChanged = false;
 			bossSettingsChanged |= ImGui::Checkbox("Enable Boss Encounter", &bossSettings.enabled);
 			if (ImGui::DragFloat("Boss Trigger Time (sec)", &bossSettings.triggerTimeSeconds, 0.1f, 0.0f, 36000.0f)) {

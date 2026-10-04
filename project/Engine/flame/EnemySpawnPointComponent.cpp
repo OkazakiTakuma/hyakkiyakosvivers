@@ -105,8 +105,6 @@ void EnemySpawnPointComponent::ResetSpawnTimer() {
 
 float EnemySpawnPointComponent::GetElapsedTimeSeconds() const { return elapsedTimeSeconds_; }
 
-std::vector<EnemySpawnPointComponent::SpawnSchedule>& EnemySpawnPointComponent::GetSpawnSchedules() { return spawnSchedules_; }
-
 const std::vector<EnemySpawnPointComponent::SpawnSchedule>& EnemySpawnPointComponent::GetSpawnSchedules() const { return spawnSchedules_; }
 
 void EnemySpawnPointComponent::SetSpawnSchedules(const std::vector<SpawnSchedule>& schedules) {
@@ -124,13 +122,9 @@ void EnemySpawnPointComponent::SetSpawnSchedules(const std::vector<SpawnSchedule
 		ResetSpawnTimer();
 	}
 
-std::vector<EnemySpawnPointComponent::TimeScalingTier>& EnemySpawnPointComponent::GetTimeScalingTiers() {
-		return timeScalingTiers_;
-	}
-
 const std::vector<EnemySpawnPointComponent::TimeScalingTier>& EnemySpawnPointComponent::GetTimeScalingTiers() const {
-		return timeScalingTiers_;
-	}
+	return timeScalingTiers_;
+}
 
 void EnemySpawnPointComponent::SetTimeScalingTiers(const std::vector<TimeScalingTier>& tiers) {
 		timeScalingTiers_ = tiers;
@@ -155,8 +149,6 @@ EnemySpawnPointComponent::EnemyStatMultipliers EnemySpawnPointComponent::GetCurr
 		}
 		return result;
 	}
-
-EnemySpawnPointComponent::BossEncounterSettings& EnemySpawnPointComponent::GetBossEncounterSettings() { return bossEncounterSettings_; }
 
 const EnemySpawnPointComponent::BossEncounterSettings& EnemySpawnPointComponent::GetBossEncounterSettings() const { return bossEncounterSettings_; }
 

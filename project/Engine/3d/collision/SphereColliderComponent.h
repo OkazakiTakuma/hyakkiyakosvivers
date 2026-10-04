@@ -2,6 +2,7 @@
 #include "../../collision/CollisionPrimitive.h"
 #include "../../flame/Component.h"
 #include "../../flame/GameObject.h"
+#include "../../math/MathConstants.h"
 #include "LineDrawer.h"
 #include <algorithm>
 #include <cmath>
@@ -73,11 +74,10 @@ private:
 	/// <param name="color">描画色を指定します。</param>
 	static void DrawDebugSphere(const SphereColliderShape& sphere, const Vector4& color) {
 		constexpr uint32_t kSegmentCount = 16;
-		constexpr float kTwoPi = 6.28318530718f;
 
 		for (uint32_t index = 0; index < kSegmentCount; ++index) {
-			const float currentAngle = kTwoPi * static_cast<float>(index) / static_cast<float>(kSegmentCount);
-			const float nextAngle = kTwoPi * static_cast<float>(index + 1) / static_cast<float>(kSegmentCount);
+			const float currentAngle = MathConstants::kTwoPi * static_cast<float>(index) / static_cast<float>(kSegmentCount);
+			const float nextAngle = MathConstants::kTwoPi * static_cast<float>(index + 1) / static_cast<float>(kSegmentCount);
 
 			const float currentCos = std::cos(currentAngle) * sphere.radius;
 			const float currentSin = std::sin(currentAngle) * sphere.radius;

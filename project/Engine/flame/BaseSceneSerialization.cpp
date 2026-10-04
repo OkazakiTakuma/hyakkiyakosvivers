@@ -700,7 +700,7 @@ void BaseScene::LoadEditorObjects() {
 			const std::string textureFilePath = emitterJson.value("textureFilePath", std::string("Resources/circle.png"));
 			const ParticleMeshType meshType = static_cast<ParticleMeshType>(emitterJson.value("meshType", static_cast<int>(emitter->GetMeshType())));
 
-			if (!ParticleManager::GetInstance()->GetGroup(groupName)) {
+			if (!ParticleManager::GetInstance()->HasGroup(groupName)) {
 				ParticleManager::GetInstance()->CreateParticleGroup(groupName, textureFilePath, meshType);
 			}
 			emitter->SetGroupName(groupName);

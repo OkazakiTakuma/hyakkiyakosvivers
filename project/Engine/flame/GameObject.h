@@ -46,6 +46,18 @@ public:
 	}
 
 	template<class T>
+	const T* GetComponent() const {
+		static_assert(std::is_base_of_v<Component, T>, "T must inherit from Component.");
+
+		for (const auto& component : components_) {
+			if (const T* target = dynamic_cast<const T*>(component.get())) {
+				return target;
+			}
+		}
+		return nullptr;
+	}
+
+	template<class T>
 	/// <summary>
 	/// 指定した型のコンポーネントを削除します。
 	/// </summary>

@@ -41,7 +41,8 @@ public:
 		emitter_.reset();
 	}
 
-	ParticleEmitter* GetEmitter() const { return emitter_.get(); }
+	ParticleEmitter* GetEmitter() { return emitter_.get(); }
+	const ParticleEmitter* GetEmitter() const { return emitter_.get(); }
 
 	void EmitLightning(const Vector3& targetPosition) { emitter_->EmitLightning(targetPosition); }
 	void Emit() { emitter_->Emit(); }

@@ -98,26 +98,6 @@ public:
 	virtual void SetSceneManager(SceneManager* manager) { sceneManager = manager; }
 	/// SceneManagerが共通描画するパーティクルの表示可否を返します。
 	virtual bool IsParticleRenderingEnabled() const { return true; }
-/// <summary>
-/// シーン内オブジェクトの更新と当たり判定を行います。
-/// </summary>
-	void UpdateSceneObjects();
-/// <summary>
-/// エディタ用のカメラ操作とオブジェクト選択を更新します。
-/// </summary>
-	void UpdateEditorTools();
-/// <summary>
-/// シーン内オブジェクトの2D描画を行います。
-/// </summary>
-	void DrawSceneObjects2D();
-/// <summary>
-/// シーン内オブジェクトの3D描画を行います。
-/// </summary>
-	void DrawSceneObjects3D();
-/// <summary>
-/// エディタ用ImGuiウィンドウを描画します。
-/// </summary>
-	void DrawEditorImGui();
 	void SetSceneName(const std::string& sceneName) { sceneName_ = sceneName; }
 	/// <summary>
 	/// シーン名から決まる既定の配置JSONではなく、指定した配置JSONを使用します。
@@ -136,20 +116,43 @@ public:
 	bool IsPlayerDefeated() const;
 	/// <summary>現在の装備とプレイ戦績をリザルト表示用に取得します。</summary>
 	StageResultData GetStageResultData() const;
-/// <summary>
-/// エディタで配置したオブジェクト情報をJSONへ保存します。
-/// </summary>
-	void SaveEditorObjects();
-/// <summary>
-/// JSONからエディタ配置オブジェクトを読み込みます。
-/// </summary>
-	void LoadEditorObjects();
-
 protected:
-	/// <summary>派生シーン固有の演出で配置オブジェクトを参照するための読み取り専用一覧です。</summary>
-	const std::vector<std::unique_ptr<GameObject>>& GetSceneObjects() const { return sceneObjects_; }
+	/// <summary>派生シーン固有の演出で配置オブジェクトを変更するための非所有ポインタ一覧です。</summary>
+	std::vector<GameObject*> GetMutableSceneObjects() {
+		std::vector<GameObject*> objects;
+		objects.reserve(sceneObjects_.size());
+		for (const auto& object : sceneObjects_) {
+			objects.push_back(object.get());
+		}
+		return objects;
+	}
+	/// <summary>派生シーンから配置オブジェクトを読み取るための非所有ポインタ一覧です。</summary>
+	std::vector<const GameObject*> GetSceneObjects() const {
+		std::vector<const GameObject*> objects;
+		objects.reserve(sceneObjects_.size());
+		for (const auto& object : sceneObjects_) {
+			objects.push_back(object.get());
+		}
+		return objects;
+	}
 
 private:
+	friend class SceneManager;
+	/// <summary>シーン内オブジェクトの更新と当たり判定を行います。</summary>
+	void UpdateSceneObjects();
+	/// <summary>エディタ用のカメラ操作とオブジェクト選択を更新します。</summary>
+	void UpdateEditorTools();
+	/// <summary>シーン内オブジェクトの2D描画を行います。</summary>
+	void DrawSceneObjects2D();
+	/// <summary>シーン内オブジェクトの3D描画を行います。</summary>
+	void DrawSceneObjects3D();
+	/// <summary>エディタ用ImGuiウィンドウを描画します。</summary>
+	void DrawEditorImGui();
+	/// <summary>エディタで配置したオブジェクト情報をJSONへ保存します。</summary>
+	void SaveEditorObjects();
+	/// <summary>JSONからエディタ配置オブジェクトを読み込みます。</summary>
+	void LoadEditorObjects();
+
 	enum class LevelUpChoiceType {
 		AttackLevelUp,
 		AttackSuper,

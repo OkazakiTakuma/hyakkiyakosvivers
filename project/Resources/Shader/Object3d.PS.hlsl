@@ -129,8 +129,8 @@ PixelShaderOutput main(VertexShaderOutput input)
 
         // 環境マップによる反射
         float3 cameraTOPosition = normalize(input.worldPosition - gCamera.worldPosition);
-        float3 reflectedVetor = reflect(cameraTOPosition, N);
-        float3 environmentColor = gEnvironmentMap.Sample(gSampler, reflectedVetor).rgb;
+        float3 reflectedVector = reflect(cameraTOPosition, N);
+        float3 environmentColor = gEnvironmentMap.Sample(gSampler, reflectedVector).rgb;
         
         // ★修正：環境マップの色に強度（environmentMultiplier）を掛け合わせて足す
         output.color.rgb += environmentColor.rgb * gCamera.environmentMultiplier;
