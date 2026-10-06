@@ -463,6 +463,10 @@ void SceneManager::Draw3D() {
 	}
 }
 
+void SceneManager::DrawShadowMap() {
+	if (scene_) scene_->DrawSceneObjectShadowMaps();
+}
+
 void SceneManager::DrawEditorImGui() {
 #ifdef USE_IMGUI
 	Input* input = Input::GetInstance();

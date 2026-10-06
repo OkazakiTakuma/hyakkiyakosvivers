@@ -15,6 +15,8 @@ struct TransformationMatrix {
 	Matrix4x4 WVP;
 	Matrix4x4 world;
 	Matrix4x4 WorldInverseTranspose;
+	// 同じ頂点をライト空間へ変換し、影合成パスへ渡します。
+	Matrix4x4 lightWVP;
 };
 
 /// <summary>描画時に使用するカラー合成方式です。</summary>

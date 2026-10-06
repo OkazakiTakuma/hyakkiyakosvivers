@@ -233,6 +233,16 @@ void BaseScene::DrawSceneObjects3D() {
 	}
 }
 
+void BaseScene::DrawSceneObjectShadowMaps() {
+	for (const auto& object : sceneObjects_) {
+		// castShadow相当の既存設定を利用し、床など影を落とさない物体を除外できます。
+		if (auto* component = object->GetComponent<Object3dComponent>();
+		    component && component->GetShadowEnabled()) {
+			component->DrawShadowMap();
+		}
+	}
+}
+
 /// <summary>
 /// エディタ用ImGuiウィンドウを描画します。
 /// </summary>

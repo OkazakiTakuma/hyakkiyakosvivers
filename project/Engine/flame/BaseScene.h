@@ -146,6 +146,8 @@ private:
 	void DrawSceneObjects2D();
 	/// <summary>シーン内オブジェクトの3D描画を行います。</summary>
 	void DrawSceneObjects3D();
+	/// <summary>影を有効にした3Dオブジェクトを影生成パスへ描画します。</summary>
+	void DrawSceneObjectShadowMaps();
 	/// <summary>エディタ用ImGuiウィンドウを描画します。</summary>
 	void DrawEditorImGui();
 	/// <summary>エディタで配置したオブジェクト情報をJSONへ保存します。</summary>
