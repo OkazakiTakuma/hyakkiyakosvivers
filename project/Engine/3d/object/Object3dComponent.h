@@ -45,6 +45,8 @@ public:
 			object3d_->Draw();
 		}
 	}
+	/// <summary>所有する3Dオブジェクトを影生成パスへ描画します。</summary>
+	void DrawShadowMap() { if (object3d_) object3d_->DrawShadowMap(); }
 
 	/// <summary>
 	/// 確保したリソースを解放し、終了処理を行います。

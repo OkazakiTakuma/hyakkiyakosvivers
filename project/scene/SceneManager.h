@@ -93,6 +93,8 @@ public:
 	/// 3D 要素の描画処理を行います。
 	/// </summary>
 	void Draw3D();
+	/// <summary>現在のシーンをライト視点の影テクスチャへ描画します。</summary>
+	void DrawShadowMap();
 	void DrawEditorImGui();
 
 	void SetSceneFactory(AbstractSceneFactory* factory) { sceneFactory_ = factory; }

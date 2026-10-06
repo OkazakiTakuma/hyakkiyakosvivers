@@ -33,6 +33,19 @@ public:
 
 	void SetDraw();
 	void SetShadowDraw();
+	/// <summary>ライト視点の深度を書き込むPSOを設定します。</summary>
+	void SetShadowMapDraw();
+	/// <summary>通常描画済みの面へ影だけを合成するPSOを設定します。</summary>
+	void SetShadowReceiverDraw();
+	/// <summary>環境マップと同じt1スロットへ、影合成中だけシャドウマップを設定します。</summary>
+	void BindShadowMap();
+	/// <summary>影用テクスチャを描画先へ切り替え、毎フレーム初期化します。</summary>
+	void BeginShadowMapPass();
+	/// <summary>影用テクスチャを後続シェーダーから読める状態へ戻します。</summary>
+	void EndShadowMapPass();
+	/// <summary>平行光源が光を送る方向を設定します。</summary>
+	void SetShadowLightDirection(const Vector3& direction);
+	const Matrix4x4& GetLightViewProjectionMatrix() const { return lightViewProjectionMatrix_; }
 
 	DirectXCommon* GetDxCommon() const { return dxCommon_; }
 	void SetDefaultCamera(Camera* cmr) { defaultCamera = cmr; }
@@ -53,12 +66,27 @@ private:
 	/// PipelineState を作成し、利用できる状態にします。
 	/// </summary>
 	void CreatePipelineState();
+	/// <summary>シーンの床高に依存しない影情報を保存するテクスチャを作成します。</summary>
+	void CreateShadowMapResource();
+	/// <summary>現在のカメラを中心にライト用ビュー射影行列を更新します。</summary>
+	void UpdateLightViewProjectionMatrix();
 
 private:
 	DirectXCommon* dxCommon_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> shadowPipelineState = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> shadowMapPipelineState_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> shadowReceiverPipelineState_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> shadowMapResource_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> shadowDepthResource_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> shadowRtvHeap_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> shadowDsvHeap_ = nullptr;
+	uint32_t shadowSrvIndex_ = 0;
+	bool shadowMapIsShaderResource_ = true;
+	static constexpr uint32_t kShadowMapSize = 2048;
+	Vector3 shadowLightDirection_ = {0.0f, -1.0f, 0.0f};
+	Matrix4x4 lightViewProjectionMatrix_ = MakeIdentity4x4();
 
 	Camera* defaultCamera = nullptr;
 };

@@ -511,6 +511,15 @@
     <FxCompile Include="Resources\Shader\Object3d.VS.hlsl">
       <Filter>Resources\Shader</Filter>
     </FxCompile>
+    <FxCompile Include="Resources\Shader\ShadowMap.PS.hlsl">
+      <Filter>Resources\Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Resources\Shader\ShadowMap.VS.hlsl">
+      <Filter>Resources\Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Resources\Shader\ShadowReceiver.PS.hlsl">
+      <Filter>Resources\Shader</Filter>
+    </FxCompile>
     <FxCompile Include="Resources\Shader\Particle.PS.hlsl">
       <Filter>Resources\Shader</Filter>
     </FxCompile>

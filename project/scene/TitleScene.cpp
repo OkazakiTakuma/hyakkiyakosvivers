@@ -12,6 +12,10 @@ namespace {
 constexpr float kSlashStartSeconds = 1.70f;
 constexpr float kLogoStartSeconds = 2.25f;
 constexpr float kPromptStartSeconds = 5.00f;
+// リソースフォントを追加するまではWindows標準の和文明朝・UIゴシックを使用する。
+// Resources/Fontsへ同系統のフォントを追加した場合は、このファミリー名だけを差し替えればよい。
+constexpr const char* kTitleFontName = "Yu Mincho";
+constexpr const char* kUiFontName = "Yu Gothic UI";
 constexpr int kMenuItemCount = 3;
 
 float SmoothStep(float start, float end, float value) {
@@ -26,11 +30,13 @@ std::unique_ptr<Sprite> CreateColorSprite() {
 	return sprite;
 }
 
-std::unique_ptr<GameObject> CreateTextObject(const std::string& text, float fontSize, const Vector4& color) {
+std::unique_ptr<GameObject> CreateTextObject(
+	const std::string& text, float fontSize, const Vector4& color, const char* fontName = kUiFontName) {
 	// タイトルUIの文字はすべて中央基準で配置できるよう設定を統一する。
 	auto object = std::make_unique<GameObject>();
 	TextComponent* textComponent = object->AddComponent<TextComponent>();
 	textComponent->SetText(text);
+	textComponent->SetFontName(fontName);
 	textComponent->SetFontSize(fontSize);
 	textComponent->SetAnchor(TextComponent::Anchor::Center);
 	textComponent->SetColor(color);
@@ -119,8 +125,10 @@ void TitleScene::CreateUi() {
 	confirmationPanelSprite_ = CreateColorSprite();
 
 	// 表示文字と基本色はここへ集約し、Draw2Dでは配置と選択状態だけを更新する。
-	titleGlowTextObject_ = CreateTextObject("百鬼夜行サバイバーズ", 64.0f, {1.0f, 0.20f, 0.04f, 0.0f});
-	titleTextObject_ = CreateTextObject("百鬼夜行サバイバーズ", 58.0f, {1.0f, 0.93f, 0.78f, 0.0f});
+	titleGlowTextObject_ = CreateTextObject(
+		"百鬼夜行サバイバーズ", 64.0f, {0.86f, 0.08f, 0.025f, 0.0f}, kTitleFontName);
+	titleTextObject_ = CreateTextObject(
+		"百鬼夜行サバイバーズ", 58.0f, {1.0f, 0.94f, 0.79f, 0.0f}, kTitleFontName);
 	startTextObject_ = CreateTextObject("GAME START", 30.0f, {1.0f, 1.0f, 1.0f, 1.0f});
 	newGameTextObject_ = CreateTextObject("初めから", 30.0f, {0.82f, 0.87f, 0.94f, 1.0f});
 	shopTextObject_ = CreateTextObject("SHOP", 30.0f, {0.82f, 0.87f, 0.94f, 1.0f});
@@ -306,7 +314,7 @@ void TitleScene::Draw2D() {
 
 	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
 	// 紫の薄い色調を3Dへ重ね、導入時はさらに黒からフェードインする。
-	DrawColorSprite(backgroundSprite_.get(), 0.0f, 0.0f, width, height, {0.075f, 0.012f, 0.090f, 0.32f});
+	DrawColorSprite(backgroundSprite_.get(), 0.0f, 0.0f, width, height, {0.018f, 0.025f, 0.070f, 0.27f});
 	if (fadeAlpha > 0.0f) {
 		DrawColorSprite(fadeSprite_.get(), 0.0f, 0.0f, width, height, {0.0f, 0.0f, 0.0f, fadeAlpha});
 	}
@@ -329,25 +337,25 @@ void TitleScene::Draw2D() {
 	}
 
 	if (logoAlpha > 0.0f) {
-		const float glowPulse = 0.38f + 0.12f * std::sin(pulseTime_ * 2.3f);
+		const float glowPulse = 0.32f + 0.10f * std::sin(pulseTime_ * 2.3f);
 		titleGlowTextObject_->GetTransform().translate = {width * 0.5f, height * 0.115f + 2.0f, 0.0f};
 		titleGlowTextObject_->GetComponent<TextComponent>()->SetColor(
-			{1.0f, 0.16f, 0.025f, logoAlpha * glowPulse});
+			{0.90f, 0.075f, 0.025f, logoAlpha * glowPulse});
 		titleTextObject_->GetTransform().translate = {width * 0.5f, height * 0.115f, 0.0f};
 		titleTextObject_->GetComponent<TextComponent>()->SetColor(
-			{1.0f, 0.93f, 0.78f, logoAlpha});
+			{1.0f, 0.95f, 0.82f, logoAlpha});
 		titleGlowTextObject_->Draw2D();
 		titleTextObject_->Draw2D();
-		DrawColorSprite(accentSprite_.get(), 0.0f, 0.0f, width, 7.0f,
-			{0.58f, 0.12f, 0.20f, logoAlpha});
-		DrawColorSprite(accentSprite_.get(), 0.0f, height - 7.0f, width, 7.0f,
-			{1.0f, 0.43f, 0.08f, logoAlpha});
+		DrawColorSprite(accentSprite_.get(), 0.0f, 0.0f, width, 3.0f,
+			{0.52f, 0.035f, 0.025f, logoAlpha * 0.90f});
+		DrawColorSprite(accentSprite_.get(), 0.0f, height - 3.0f, width, 3.0f,
+			{0.92f, 0.32f, 0.055f, logoAlpha * 0.75f});
 	}
 
 	if (titlePhase_ == TitlePhase::WaitingForInput) {
 		const float promptAlpha = 0.58f + 0.38f * std::sin(pulseTime_ * 2.7f);
 		versionTextObject_->GetTransform().translate = {width * 0.5f, height - 58.0f, 0.0f};
-		versionTextObject_->GetComponent<TextComponent>()->SetColor({0.84f, 0.91f, 1.0f, promptAlpha});
+		versionTextObject_->GetComponent<TextComponent>()->SetColor({0.92f, 0.87f, 0.76f, promptAlpha});
 		versionTextObject_->Draw2D();
 	}
 
@@ -364,10 +372,10 @@ void TitleScene::Draw2D() {
 	const float buttonInterval = 50.0f;
 	const float pulse = 0.78f + std::sin(pulseTime_ * 4.0f) * 0.12f;
 
-	DrawColorSprite(menuPanelSprite_.get(), panelX, panelY, panelWidth, panelHeight, {0.070f, 0.018f, 0.075f, 0.78f});
+	DrawColorSprite(menuPanelSprite_.get(), panelX, panelY, panelWidth, panelHeight, {0.012f, 0.020f, 0.055f, 0.70f});
 
-	const Vector4 selectedColor = {0.68f, 0.16f, 0.10f, pulse};
-	const Vector4 idleColor = {0.12f, 0.035f, 0.11f, 0.90f};
+	const Vector4 selectedColor = {0.42f, 0.045f, 0.025f, pulse * 0.88f};
+	const Vector4 idleColor = {0.025f, 0.030f, 0.065f, 0.62f};
 	// 選択項目だけ背景色を明るくして、現在のフォーカスを視覚化する。
 	DrawColorSprite(startButtonSprite_.get(), buttonX, panelY + 16.0f, buttonWidth, buttonHeight,
 	    selectedMenuIndex_ == 0 ? selectedColor : idleColor);
@@ -375,6 +383,9 @@ void TitleScene::Draw2D() {
 	    selectedMenuIndex_ == 1 ? selectedColor : idleColor);
 	DrawColorSprite(shopButtonSprite_.get(), buttonX, panelY + 16.0f + buttonInterval * 2.0f, buttonWidth, buttonHeight,
 	    selectedMenuIndex_ == 2 ? selectedColor : idleColor);
+	// 選択項目の左端へ朱色の細線を置き、塗りだけに頼らず現在位置を示す。
+	DrawColorSprite(accentSprite_.get(), buttonX, panelY + 16.0f + buttonInterval * selectedMenuIndex_,
+		4.0f, buttonHeight, {0.92f, 0.16f, 0.055f, 0.95f});
 
 	const float menuCenterX = panelX + panelWidth * 0.5f;
 	startTextObject_->GetTransform().translate = {menuCenterX, panelY + 37.0f, 0.0f};
@@ -382,11 +393,11 @@ void TitleScene::Draw2D() {
 	shopTextObject_->GetTransform().translate = {menuCenterX, panelY + 37.0f + buttonInterval * 2.0f, 0.0f};
 	// ボタン背景だけでなく文字色も変え、選択状態を読み取りやすくする。
 	startTextObject_->GetComponent<TextComponent>()->SetColor(
-	    selectedMenuIndex_ == 0 ? Vector4{0.78f, 0.98f, 1.0f, 1.0f} : Vector4{0.70f, 0.76f, 0.84f, 1.0f});
+	    selectedMenuIndex_ == 0 ? Vector4{1.0f, 0.91f, 0.72f, 1.0f} : Vector4{0.72f, 0.76f, 0.84f, 1.0f});
 	newGameTextObject_->GetComponent<TextComponent>()->SetColor(
-	    selectedMenuIndex_ == 1 ? Vector4{0.78f, 0.98f, 1.0f, 1.0f} : Vector4{0.70f, 0.76f, 0.84f, 1.0f});
+	    selectedMenuIndex_ == 1 ? Vector4{1.0f, 0.91f, 0.72f, 1.0f} : Vector4{0.72f, 0.76f, 0.84f, 1.0f});
 	shopTextObject_->GetComponent<TextComponent>()->SetColor(
-	    selectedMenuIndex_ == 2 ? Vector4{0.78f, 0.98f, 1.0f, 1.0f} : Vector4{0.70f, 0.76f, 0.84f, 1.0f});
+	    selectedMenuIndex_ == 2 ? Vector4{1.0f, 0.91f, 0.72f, 1.0f} : Vector4{0.72f, 0.76f, 0.84f, 1.0f});
 
 	// ショップへ入る前に現在の共有所持金を確認できるよう、毎フレーム最新値を表示する。
 	moneyTextObject_->GetComponent<TextComponent>()->SetText("所持金: " + std::to_string(sceneManager->GetMoney()) + " G");
@@ -409,7 +420,7 @@ void TitleScene::Draw2D() {
 		SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
 		DrawColorSprite(confirmationBackdropSprite_.get(), 0.0f, 0.0f, width, height, {0.0f, 0.0f, 0.0f, 0.72f});
 		DrawColorSprite(confirmationPanelSprite_.get(), confirmationX, confirmationY,
-		    confirmationWidth, confirmationHeight, {0.055f, 0.085f, 0.14f, 1.0f});
+		    confirmationWidth, confirmationHeight, {0.018f, 0.026f, 0.065f, 0.98f});
 		confirmationTextObject_->GetTransform().translate = {width * 0.5f, confirmationY + 56.0f, 0.0f};
 		confirmationInstructionTextObject_->GetTransform().translate = {width * 0.5f, confirmationY + 112.0f, 0.0f};
 		confirmationTextObject_->Draw2D();

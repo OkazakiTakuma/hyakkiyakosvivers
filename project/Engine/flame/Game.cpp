@@ -117,6 +117,11 @@ void Game::Draw() {
 	};
 
 	PostEffect* postEffect = PostEffect::GetInstance();
+	// 第2段階: 通常描画より先に、ライト視点から各オブジェクトの深度を書き込みます。
+	Object3dCommon* object3dCommon = Object3dCommon::GetInstance();
+	object3dCommon->BeginShadowMapPass();
+	sceneManager->DrawShadowMap();
+	object3dCommon->EndShadowMapPass();
 	// 3Dは常にHDRへ描画します。Master OFF時も表示にはHDRからsRGBへの変換が必要です。
 	postEffect->PreDrawScene();
 	drawHdrScene();

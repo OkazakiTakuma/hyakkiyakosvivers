@@ -105,6 +105,10 @@ void Object3d::Initialize() {
 	shadowTransformationMatrix->WVP = MakeIdentity4x4();
 	shadowTransformationMatrix->world = MakeIdentity4x4();
 	shadowTransformationMatrix->WorldInverseTranspose = MakeIdentity4x4();
+	shadowTransformationMatrix->lightWVP = MakeIdentity4x4();
+	shadowMapWvpResource_ = dxCommon_->CreateBufferResource(sizeof(TransformationMatrix));
+	shadowMapWvpResource_->Map(0, nullptr, reinterpret_cast<void**>(&shadowMapTransformationMatrix_));
+	*shadowMapTransformationMatrix_ = *shadowTransformationMatrix;
 	shadowMaterialResource = dxCommon_->CreateBufferResource(sizeof(MaterialData));
 	shadowMaterialResource->Map(0, nullptr, reinterpret_cast<void**>(&shadowMaterialData));
 	shadowMaterialData->color = {0.0f, 0.0f, 0.0f, shadowAlpha_};
@@ -148,6 +152,7 @@ void Object3d::CreateWVPResource() {
 	transformationMatrix->WVP = MakeIdentity4x4();
 	transformationMatrix->world = MakeIdentity4x4();
 	transformationMatrix->WorldInverseTranspose = MakeIdentity4x4();
+	transformationMatrix->lightWVP = MakeIdentity4x4();
 }
 
 /// <summary>
@@ -520,6 +525,9 @@ void Object3d::Draw() {
 
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList = dxCommon_->GetCommandList();
 	SrvManager::GetInstance()->PreDraw();
+	Object3dCommon* common = Object3dCommon::GetInstance();
+	transformationMatrix->lightWVP = Multiply(
+	    transformationMatrix->world, common->GetLightViewProjectionMatrix());
 
 	commandList->SetGraphicsRootConstantBufferView(1, wvpResorceModel->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(2, lightResource->GetGPUVirtualAddress());
@@ -538,13 +546,6 @@ void Object3d::Draw() {
 
 	if (model) {
 		model->Draw(materialOverrideResource_.Get(), modelTextureOverridePath_);
-		if (isShadowEnabled_ && shadowWvpResource && shadowMaterialResource) {
-			Object3dCommon::GetInstance()->SetShadowDraw();
-			commandList->SetGraphicsRootConstantBufferView(1, shadowWvpResource->GetGPUVirtualAddress());
-			model->Draw(shadowMaterialResource.Get(), modelTextureOverridePath_);
-			Object3dCommon::GetInstance()->SetDraw();
-			commandList->SetGraphicsRootConstantBufferView(1, wvpResorceModel->GetGPUVirtualAddress());
-		}
 		DrawDebugSkeleton();
 	}
 	else if (cylinderIndexCount > 0) {
@@ -559,16 +560,46 @@ void Object3d::Draw() {
 		commandList->IASetVertexBuffers(0, 1, &vertexBufferViewCylinder);
 		commandList->IASetIndexBuffer(&indexBufferViewCylinder);
 		commandList->DrawIndexedInstanced(cylinderIndexCount, 1, 0, 0, 0);
-		if (isShadowEnabled_ && shadowWvpResource && shadowMaterialResource && isTextureSetCylinder) {
-			Object3dCommon::GetInstance()->SetShadowDraw();
-			commandList->SetGraphicsRootConstantBufferView(1, shadowWvpResource->GetGPUVirtualAddress());
-			commandList->SetGraphicsRootConstantBufferView(0, shadowMaterialResource->GetGPUVirtualAddress());
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewCylinder);
-			commandList->IASetIndexBuffer(&indexBufferViewCylinder);
-			commandList->DrawIndexedInstanced(cylinderIndexCount, 1, 0, 0, 0);
-			Object3dCommon::GetInstance()->SetDraw();
-			commandList->SetGraphicsRootConstantBufferView(1, wvpResorceModel->GetGPUVirtualAddress());
-		}
+	}
+
+	// 従来の平面影の代わりに、通常描画済みの形状へ影だけを合成します。
+	common->SetShadowReceiverDraw();
+	common->BindShadowMap();
+	if (model) {
+		model->Draw(materialOverrideResource_.Get(), modelTextureOverridePath_);
+	} else if (cylinderIndexCount > 0 && isTextureSetCylinder) {
+		commandList->SetGraphicsRootConstantBufferView(0, materialResourceCylinder->GetGPUVirtualAddress());
+		commandList->SetGraphicsRootDescriptorTable(3, textureHandleCylinder);
+		commandList->IASetVertexBuffers(0, 1, &vertexBufferViewCylinder);
+		commandList->IASetIndexBuffer(&indexBufferViewCylinder);
+		commandList->DrawIndexedInstanced(cylinderIndexCount, 1, 0, 0, 0);
+	}
+	common->SetDraw();
+}
+
+void Object3d::DrawShadowMap() {
+	if (!dxCommon_ || !isShadowEnabled_ || !shadowMapWvpResource_ || !transformationMatrix) return;
+	auto commandList = dxCommon_->GetCommandList();
+	SrvManager::GetInstance()->PreDraw();
+	Object3dCommon* common = Object3dCommon::GetInstance();
+	common->SetShadowMapDraw();
+	// 通常描画で確定したworldを使い、床高ではなくライト空間へ変換します。
+	shadowMapTransformationMatrix_->WVP = Multiply(
+	    transformationMatrix->world, common->GetLightViewProjectionMatrix());
+	shadowMapTransformationMatrix_->world = transformationMatrix->world;
+	shadowMapTransformationMatrix_->WorldInverseTranspose = transformationMatrix->WorldInverseTranspose;
+	shadowMapTransformationMatrix_->lightWVP = shadowMapTransformationMatrix_->WVP;
+	commandList->SetGraphicsRootConstantBufferView(1, shadowMapWvpResource_->GetGPUVirtualAddress());
+	if (!skinningPaletteResource) CreateSkinningPaletteResource(1);
+	commandList->SetGraphicsRootShaderResourceView(7, skinningPaletteResource->GetGPUVirtualAddress());
+	if (model) {
+		model->Draw(materialOverrideResource_.Get(), modelTextureOverridePath_);
+	} else if (cylinderIndexCount > 0 && isTextureSetCylinder) {
+		commandList->SetGraphicsRootConstantBufferView(0, materialResourceCylinder->GetGPUVirtualAddress());
+		commandList->SetGraphicsRootDescriptorTable(3, textureHandleCylinder);
+		commandList->IASetVertexBuffers(0, 1, &vertexBufferViewCylinder);
+		commandList->IASetIndexBuffer(&indexBufferViewCylinder);
+		commandList->DrawIndexedInstanced(cylinderIndexCount, 1, 0, 0, 0);
 	}
 }
 
@@ -638,6 +669,7 @@ void Object3d::SetModel(const std::string& filePath) {
 Object3d::~Object3d() {
 	if (wvpResorceModel) wvpResorceModel->Unmap(0, nullptr);
 	if (shadowWvpResource) shadowWvpResource->Unmap(0, nullptr);
+	if (shadowMapWvpResource_) shadowMapWvpResource_->Unmap(0, nullptr);
 	if (shadowMaterialResource) shadowMaterialResource->Unmap(0, nullptr);
 	if (materialOverrideResource_) materialOverrideResource_->Unmap(0, nullptr);
 	if (lightResource) lightResource->Unmap(0, nullptr);
@@ -646,6 +678,7 @@ Object3d::~Object3d() {
 
 	wvpResorceModel.Reset();
 	shadowWvpResource.Reset();
+	shadowMapWvpResource_.Reset();
 	shadowMaterialResource.Reset();
 	materialOverrideResource_.Reset();
 	lightResource.Reset();
@@ -658,6 +691,7 @@ Object3d::~Object3d() {
 
 	transformationMatrix = nullptr;
 	shadowTransformationMatrix = nullptr;
+	shadowMapTransformationMatrix_ = nullptr;
 	shadowMaterialData = nullptr;
 	materialOverrideData_ = nullptr;
 	cameraData = nullptr;
@@ -676,6 +710,8 @@ void Object3d::SetDirectionalLight(const Vector4& color, const Vector3& directio
 		directionallightData->color = color;
 		directionallightData->direction = NormalizeReturnVector(direction);
 		directionallightData->intensity = intensity;
+		// シーン内で共有する影パスも、通常描画と同じ太陽方向へ揃えます。
+		Object3dCommon::GetInstance()->SetShadowLightDirection(directionallightData->direction);
 	}
 }
 

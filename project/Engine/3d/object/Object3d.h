@@ -36,6 +36,8 @@ public:
 	/// 現在の状態をもとに描画処理を行います。
 	/// </summary>
 	void Draw();
+	/// <summary>このオブジェクトをライト視点の影テクスチャへ描画します。</summary>
+	void DrawShadowMap();
 	void SetModel(Model* model);
 	void SetModel(const std::string& filePath);
 	void DrawDebugSkeleton();
@@ -211,6 +213,9 @@ private:
 	MaterialData* shadowMaterialData = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> shadowWvpResource;
 	TransformationMatrix* shadowTransformationMatrix = nullptr;
+	// 既存の平面影と値を共有しない、シャドウマップ専用の変換バッファです。
+	Microsoft::WRL::ComPtr<ID3D12Resource> shadowMapWvpResource_;
+	TransformationMatrix* shadowMapTransformationMatrix_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> skinningPaletteResource;
 	Matrix4x4* skinningPaletteData = nullptr;
 	uint32_t skinningPaletteCapacity_ = 0;

@@ -5,6 +5,7 @@ struct TransformationMatrix
     float4x4 WVP;
     float4x4 world;
     float4x4 WorldInverseTranspose;
+    float4x4 lightWVP;
 };
 ConstantBuffer<TransformationMatrix> gTransformationMatrix : register(b1);
 StructuredBuffer<float4x4> gSkinningMatrices : register(t2);
@@ -48,6 +49,7 @@ VertexShaderOutput main(VertexShaderInput input)
     output.texcoord = input.texcoord;
     output.normal = normalize(mul(localNormal, (float3x3)gTransformationMatrix.WorldInverseTranspose));
     output.worldPosition = mul(localPosition, gTransformationMatrix.world).xyz;
+    output.shadowPosition = mul(localPosition, gTransformationMatrix.lightWVP);
 
     return output;
 }
