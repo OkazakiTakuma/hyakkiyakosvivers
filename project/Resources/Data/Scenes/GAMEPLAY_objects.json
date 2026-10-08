@@ -1,6 +1,38 @@
 {
     "activeCamera": "Player_5",
-    "nextObjectId": 416,
+    "atmosphere": {
+        "aerialPerspectiveStrength": 0.6800000071525574,
+        "atmosphereDensity": 0.9200000166893005,
+        "distanceFogDensity": 0.012000000104308128,
+        "enabled": true,
+        "heightFogDensity": 0.1599999964237213,
+        "horizonColor": [
+            0.8199999928474426,
+            0.18000000715255737,
+            0.054999999701976776
+        ],
+        "mieColor": [
+            1.0,
+            0.5600000023841858,
+            0.20000000298023224
+        ],
+        "mieG": 0.800000011920929,
+        "mieStrength": 0.07500000298023224,
+        "rayleighColor": [
+            0.20000000298023224,
+            0.41999998688697815,
+            1.0
+        ],
+        "rayleighStrength": 0.7200000286102295,
+        "sunAngularRadius": 0.02199999988079071,
+        "sunDirection": [
+            -0.09195856004953384,
+            0.030468260869383812,
+            0.9952965974807739
+        ],
+        "sunIntensity": 3.0490000247955322
+    },
+    "nextObjectId": 659,
     "objects": [
         {
             "camera": {
@@ -52,16 +84,32 @@
                 "pushBack": true
             },
             "object3d": {
-                "animationName": "Armature|mixamo.com|Layer0",
+                "animationName": "歩行",
                 "animationPlaying": false,
+                "castShadow": true,
                 "drawSkeleton": true,
                 "enabled": true,
                 "gravity": {
                     "enabled": true,
                     "strength": 9.800000190734863
                 },
-                "isPointLight": true,
-                "modelTextureFilePath": "",
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/human/miko_texture.png",
                 "pointLight": {
                     "color": [
                         1.0,
@@ -72,32 +120,32 @@
                     "decay": 1.0,
                     "intensity": 1.0,
                     "position": [
-                        0.0,
-                        -0.5533170700073242,
-                        0.0
+                        4.571544647216797,
+                        -0.6020424962043762,
+                        1.2615368366241455
                     ],
                     "radius": 10.0
                 }
             },
             "parent": "",
             "player": {
-                "currentHealth": 100.0,
+                "currentHealth": 150.0,
                 "enabled": true,
-                "experience": 0,
+                "experience": 60,
                 "gravity": {
                     "enabled": false,
                     "strength": 9.800000190734863
                 },
                 "isAnimationModel": true,
-                "level": 1,
-                "model": "walk.gltf",
-                "moveSpeed": 0.10000000149011612,
+                "level": 5,
+                "model": "miko.gltf",
+                "moveSpeed": 0.15000000596046448,
                 "spawnPoint": [
                     0.0,
                     0.0,
                     0.0
                 ],
-                "typeName": "walk.gltf"
+                "typeName": "巫女"
             },
             "playerAttack": {
                 "enabled": true,
@@ -109,18 +157,18 @@
             "transform": {
                 "rotate": [
                     0.0,
-                    0.0,
+                    3.1415927410125732,
                     0.0
                 ],
                 "scale": [
-                    1.0,
-                    1.0,
-                    1.0
+                    0.45500001311302185,
+                    0.45500001311302185,
+                    0.45500001311302185
                 ],
                 "translate": [
-                    0.0,
-                    -0.5452309250831604,
-                    0.0
+                    4.571544647216797,
+                    -0.5997310280799866,
+                    1.2615368366241455
                 ]
             },
             "type": "Player"
@@ -132,7 +180,7 @@
             "obbCollider": {
                 "centerOffset": [
                     0.0,
-                    -0.45,
+                    -0.44999998807907104,
                     0.0
                 ],
                 "drawDebug": true,
@@ -151,14 +199,30 @@
             "object3d": {
                 "animationName": "",
                 "animationPlaying": true,
+                "castShadow": true,
                 "drawSkeleton": false,
                 "enabled": true,
                 "gravity": {
                     "enabled": false,
                     "strength": 9.800000190734863
                 },
-                "isPointLight": true,
-                "modelTextureFilePath": "Resources/sand/sand.png",
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/terrain/grass.png",
                 "pointLight": {
                     "color": [
                         1.0,
@@ -197,60 +261,552 @@
             "type": "LoadedModel"
         },
         {
-            "children": [], "model": "sand.obj", "name": "terrain_loop_n",
-            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/sand/sand.png"},
-            "parent": "", "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [10.0, 1.0, 10.0], "translate": [0.0, -1.1952309608459473, 20.0]},
+            "children": [],
+            "model": "sand.obj",
+            "name": "terrain_loop_n",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/terrain/grass.png",
+                "pointLight": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 1.0,
+                    "position": [
+                        0.0,
+                        -1.1952309608459473,
+                        20.0
+                    ],
+                    "radius": 10.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    10.0,
+                    1.0,
+                    10.0
+                ],
+                "translate": [
+                    0.0,
+                    -1.1952309608459473,
+                    20.0
+                ]
+            },
             "type": "LoadedModel"
         },
         {
-            "children": [], "model": "sand.obj", "name": "terrain_loop_s",
-            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/sand/sand.png"},
-            "parent": "", "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [10.0, 1.0, 10.0], "translate": [0.0, -1.1952309608459473, -20.0]},
+            "children": [],
+            "model": "sand.obj",
+            "name": "terrain_loop_s",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/terrain/grass.png",
+                "pointLight": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 1.0,
+                    "position": [
+                        0.0,
+                        -1.1952309608459473,
+                        -20.0
+                    ],
+                    "radius": 10.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    10.0,
+                    1.0,
+                    10.0
+                ],
+                "translate": [
+                    0.0,
+                    -1.1952309608459473,
+                    -20.0
+                ]
+            },
             "type": "LoadedModel"
         },
         {
-            "children": [], "model": "sand.obj", "name": "terrain_loop_e",
-            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/sand/sand.png"},
-            "parent": "", "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [10.0, 1.0, 10.0], "translate": [20.0, -1.1952309608459473, 0.0]},
+            "children": [],
+            "model": "sand.obj",
+            "name": "terrain_loop_e",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/terrain/grass.png",
+                "pointLight": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 1.0,
+                    "position": [
+                        20.0,
+                        -1.1952309608459473,
+                        0.0
+                    ],
+                    "radius": 10.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    10.0,
+                    1.0,
+                    10.0
+                ],
+                "translate": [
+                    20.0,
+                    -1.1952309608459473,
+                    0.0
+                ]
+            },
             "type": "LoadedModel"
         },
         {
-            "children": [], "model": "sand.obj", "name": "terrain_loop_w",
-            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/sand/sand.png"},
-            "parent": "", "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [10.0, 1.0, 10.0], "translate": [-20.0, -1.1952309608459473, 0.0]},
+            "children": [],
+            "model": "sand.obj",
+            "name": "terrain_loop_w",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/terrain/grass.png",
+                "pointLight": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 1.0,
+                    "position": [
+                        -20.0,
+                        -1.1952309608459473,
+                        0.0
+                    ],
+                    "radius": 10.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    10.0,
+                    1.0,
+                    10.0
+                ],
+                "translate": [
+                    -20.0,
+                    -1.1952309608459473,
+                    0.0
+                ]
+            },
             "type": "LoadedModel"
         },
         {
-            "children": [], "model": "sand.obj", "name": "terrain_loop_ne",
-            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/sand/sand.png"},
-            "parent": "", "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [10.0, 1.0, 10.0], "translate": [20.0, -1.1952309608459473, 20.0]},
+            "children": [],
+            "model": "sand.obj",
+            "name": "terrain_loop_ne",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/terrain/grass.png",
+                "pointLight": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 1.0,
+                    "position": [
+                        20.0,
+                        -1.1952309608459473,
+                        20.0
+                    ],
+                    "radius": 10.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    10.0,
+                    1.0,
+                    10.0
+                ],
+                "translate": [
+                    20.0,
+                    -1.1952309608459473,
+                    20.0
+                ]
+            },
             "type": "LoadedModel"
         },
         {
-            "children": [], "model": "sand.obj", "name": "terrain_loop_nw",
-            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/sand/sand.png"},
-            "parent": "", "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [10.0, 1.0, 10.0], "translate": [-20.0, -1.1952309608459473, 20.0]},
+            "children": [],
+            "model": "sand.obj",
+            "name": "terrain_loop_nw",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/terrain/grass.png",
+                "pointLight": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 1.0,
+                    "position": [
+                        -20.0,
+                        -1.1952309608459473,
+                        20.0
+                    ],
+                    "radius": 10.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    10.0,
+                    1.0,
+                    10.0
+                ],
+                "translate": [
+                    -20.0,
+                    -1.1952309608459473,
+                    20.0
+                ]
+            },
             "type": "LoadedModel"
         },
         {
-            "children": [], "model": "sand.obj", "name": "terrain_loop_se",
-            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/sand/sand.png"},
-            "parent": "", "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [10.0, 1.0, 10.0], "translate": [20.0, -1.1952309608459473, -20.0]},
+            "children": [],
+            "model": "sand.obj",
+            "name": "terrain_loop_se",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/terrain/grass.png",
+                "pointLight": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 1.0,
+                    "position": [
+                        20.0,
+                        -1.1952309608459473,
+                        -20.0
+                    ],
+                    "radius": 10.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    10.0,
+                    1.0,
+                    10.0
+                ],
+                "translate": [
+                    20.0,
+                    -1.1952309608459473,
+                    -20.0
+                ]
+            },
             "type": "LoadedModel"
         },
         {
-            "children": [], "model": "sand.obj", "name": "terrain_loop_sw",
-            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/sand/sand.png"},
-            "parent": "", "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [10.0, 1.0, 10.0], "translate": [-20.0, -1.1952309608459473, -20.0]},
+            "children": [],
+            "model": "sand.obj",
+            "name": "terrain_loop_sw",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/terrain/grass.png",
+                "pointLight": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 1.0,
+                    "position": [
+                        -20.0,
+                        -1.1952309608459473,
+                        -20.0
+                    ],
+                    "radius": 10.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    10.0,
+                    1.0,
+                    10.0
+                ],
+                "translate": [
+                    -20.0,
+                    -1.1952309608459473,
+                    -20.0
+                ]
+            },
             "type": "LoadedModel"
         },
         {
             "children": [],
             "enemySpawnPoint": {
-                "cameraName": "",
-                "debugPointSize": 0.5,
-                "drawDebug": true,
-                "enabled": true,
                 "bossEncounter": {
                     "bossPosition": [
                         0.0,
@@ -266,6 +822,10 @@
                     ],
                     "triggerTime": 300.0
                 },
+                "cameraName": "",
+                "debugPointSize": 0.5,
+                "drawDebug": true,
+                "enabled": true,
                 "enemyTypeName": "Default",
                 "gravity": {
                     "enabled": false,
@@ -277,62 +837,70 @@
                 "pointHeight": 0.20000000298023224,
                 "schedules": [
                     {
+                        "applyTimeScaling": true,
                         "endTime": 59.9900016784668,
                         "enemyTypeName": "Default",
                         "intervalFrames": 160,
-                        "applyTimeScaling": true,
                         "spawnAmount": 1,
+                        "spawnOnce": false,
                         "startTime": 0.0
                     },
                     {
+                        "applyTimeScaling": true,
                         "endTime": 119.98999786376953,
                         "enemyTypeName": "Default",
                         "intervalFrames": 120,
-                        "applyTimeScaling": true,
                         "spawnAmount": 1,
+                        "spawnOnce": false,
                         "startTime": 60.0
                     },
                     {
+                        "applyTimeScaling": true,
                         "endTime": 179.99000549316406,
                         "enemyTypeName": "Default",
                         "intervalFrames": 133,
-                        "applyTimeScaling": true,
                         "spawnAmount": 2,
+                        "spawnOnce": false,
                         "startTime": 120.0
                     },
                     {
+                        "applyTimeScaling": true,
                         "endTime": 299.989990234375,
                         "enemyTypeName": "Default",
                         "intervalFrames": 100,
-                        "applyTimeScaling": true,
                         "spawnAmount": 2,
+                        "spawnOnce": false,
                         "startTime": 180.0
                     },
                     {
+                        "applyTimeScaling": true,
                         "endTime": 36000.0,
                         "enemyTypeName": "Default",
                         "intervalFrames": 80,
-                        "applyTimeScaling": true,
                         "spawnAmount": 2,
+                        "spawnOnce": false,
                         "startTime": 300.0
                     },
                     {
+                        "applyTimeScaling": true,
                         "endTime": 36000.0,
                         "enemyTypeName": "Shooter",
                         "intervalFrames": 240,
-                        "applyTimeScaling": true,
                         "spawnAmount": 1,
+                        "spawnOnce": false,
                         "startTime": 60.0
                     },
                     {
+                        "applyTimeScaling": true,
                         "endTime": 36000.0,
                         "enemyTypeName": "Charger",
                         "intervalFrames": 360,
-                        "applyTimeScaling": true,
                         "spawnAmount": 1,
+                        "spawnOnce": false,
                         "startTime": 120.0
                     },
                     {
+                        "applyTimeScaling": false,
                         "endTime": 36000.0,
                         "enemyTypeName": "ChaserMidBoss",
                         "intervalFrames": 1,
@@ -341,6 +909,7 @@
                         "startTime": 90.0
                     },
                     {
+                        "applyTimeScaling": false,
                         "endTime": 36000.0,
                         "enemyTypeName": "ShooterMidBoss",
                         "intervalFrames": 1,
@@ -349,6 +918,7 @@
                         "startTime": 180.0
                     },
                     {
+                        "applyTimeScaling": false,
                         "endTime": 36000.0,
                         "enemyTypeName": "ChargerMidBoss",
                         "intervalFrames": 1,
@@ -362,34 +932,34 @@
                 "targetName": "Player_5",
                 "timeScalingTiers": [
                     {
-                        "startTime": 0.0,
+                        "experienceMultiplier": 1.0,
                         "healthMultiplier": 1.0,
                         "speedMultiplier": 1.0,
-                        "experienceMultiplier": 1.0
+                        "startTime": 0.0
                     },
                     {
-                        "startTime": 60.0,
-                        "healthMultiplier": 1.2,
-                        "speedMultiplier": 1.05,
-                        "experienceMultiplier": 1.15
+                        "experienceMultiplier": 1.149999976158142,
+                        "healthMultiplier": 1.2000000476837158,
+                        "speedMultiplier": 1.0499999523162842,
+                        "startTime": 60.0
                     },
                     {
-                        "startTime": 120.0,
-                        "healthMultiplier": 1.4,
-                        "speedMultiplier": 1.1,
-                        "experienceMultiplier": 1.3
+                        "experienceMultiplier": 1.2999999523162842,
+                        "healthMultiplier": 1.399999976158142,
+                        "speedMultiplier": 1.100000023841858,
+                        "startTime": 120.0
                     },
                     {
-                        "startTime": 180.0,
-                        "healthMultiplier": 1.65,
-                        "speedMultiplier": 1.15,
-                        "experienceMultiplier": 1.5
+                        "experienceMultiplier": 1.5,
+                        "healthMultiplier": 1.649999976158142,
+                        "speedMultiplier": 1.149999976158142,
+                        "startTime": 180.0
                     },
                     {
-                        "startTime": 240.0,
-                        "healthMultiplier": 1.9,
-                        "speedMultiplier": 1.2,
-                        "experienceMultiplier": 1.7
+                        "experienceMultiplier": 1.7000000476837158,
+                        "healthMultiplier": 1.899999976158142,
+                        "speedMultiplier": 1.2000000476837158,
+                        "startTime": 240.0
                     }
                 ]
             },
@@ -407,12 +977,227 @@
                     1.0
                 ],
                 "translate": [
-                    0.0,
+                    4.571544647216797,
                     0.20000000298023224,
-                    0.0
+                    1.2615368366241455
                 ]
             },
             "type": "EnemySpawnPoint"
+        },
+        {
+            "children": [],
+            "name": "HealthItem_585",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        0.15000000596046448,
+                        1.0,
+                        0.25,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.07999999821186066,
+                        0.550000011920929,
+                        0.11999999731779099
+                    ],
+                    "emissionIntensity": 0.550000011920929,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/enemy_drop_texture.png",
+                "pointLight": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 1.0,
+                    "position": [
+                        16.603302001953125,
+                        0.550000011920929,
+                        0.5187656879425049
+                    ],
+                    "radius": 10.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    27.098915100097656,
+                    0.0
+                ],
+                "scale": [
+                    0.41999998688697815,
+                    0.41999998688697815,
+                    0.41999998688697815
+                ],
+                "translate": [
+                    16.603302001953125,
+                    0.550000011920929,
+                    0.5187656879425049
+                ]
+            },
+            "type": "HealthItem"
+        },
+        {
+            "children": [],
+            "name": "勾玉_653",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        0.07999999821186066,
+                        0.3499999940395355,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/magatama_palette.bmp",
+                "pointLight": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 1.0,
+                    "position": [
+                        3.37328839302063,
+                        -0.09973102807998657,
+                        10.429917335510254
+                    ],
+                    "radius": 10.0
+                }
+            },
+            "parent": "",
+            "particleEmitter": {
+                "blendMode": 2,
+                "enabled": true,
+                "frequency": 0.019999999552965164,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "groupName": "MagatamaGlow",
+                "isActive": true,
+                "meshType": 0,
+                "param": {
+                    "acceleration": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "baseRotate": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "baseVelocity": [
+                        0.0,
+                        0.00800000037997961,
+                        0.0
+                    ],
+                    "color": [
+                        0.1080000028014183,
+                        0.4724999964237213,
+                        1.350000023841858,
+                        0.550000011920929
+                    ],
+                    "count": 2,
+                    "endColor": [
+                        0.05940000340342522,
+                        0.25987499952316284,
+                        0.7425000071525574,
+                        0.0
+                    ],
+                    "endScale": [
+                        0.0806879997253418,
+                        0.0806879997253418,
+                        0.0806879997253418
+                    ],
+                    "isBillboard": true,
+                    "isRandomRotate": false,
+                    "isVortex": false,
+                    "lifeTime": 0.36000001430511475,
+                    "randomPositionRange": [
+                        0.34439998865127563,
+                        0.34439998865127563,
+                        0.34439998865127563
+                    ],
+                    "randomRotateRange": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "randomScaleRange": [
+                        0.14792799949645996,
+                        0.14792799949645996,
+                        0.14792799949645996
+                    ],
+                    "randomVelocityRange": [
+                        0.017999999225139618,
+                        0.017999999225139618,
+                        0.017999999225139618
+                    ],
+                    "scale": [
+                        0.6723999977111816,
+                        0.6723999977111816,
+                        0.6723999977111816
+                    ],
+                    "vortexAngularSpeed": 6.0,
+                    "vortexBaseRadius": 0.20000000298023224,
+                    "vortexHeight": 6.0,
+                    "vortexTopRadius": 3.0
+                },
+                "textureFilePath": "Resources/circle.png"
+            },
+            "transform": {
+                "rotate": [
+                    0.0,
+                    2.004119634628296,
+                    0.0
+                ],
+                "scale": [
+                    0.8199999928474426,
+                    0.8199999928474426,
+                    0.8199999928474426
+                ],
+                "translate": [
+                    3.37328839302063,
+                    -0.09973102807998657,
+                    10.429917335510254
+                ]
+            },
+            "type": "PlayerProjectile"
         }
     ],
     "scene": "GAMEPLAY",

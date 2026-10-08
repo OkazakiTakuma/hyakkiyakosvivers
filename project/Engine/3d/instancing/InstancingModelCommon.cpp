@@ -56,7 +56,7 @@ void InstancingModelCommon::CreateRootSignature() {
     descriptorRangeEnvMap[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     descriptorRangeEnvMap[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-    D3D12_ROOT_PARAMETER rootParameters[7] = {};
+    D3D12_ROOT_PARAMETER rootParameters[8] = {};
 
     // [0] b0: マテリアル
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -92,6 +92,11 @@ void InstancingModelCommon::CreateRootSignature() {
     rootParameters[6].DescriptorTable.pDescriptorRanges = descriptorRangeEnvMap;
     rootParameters[6].DescriptorTable.NumDescriptorRanges = _countof(descriptorRangeEnvMap);
 
+    // [7] b5: 草の風パラメータ
+    rootParameters[7].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[7].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+    rootParameters[7].Descriptor.ShaderRegister = 5;
+
     D3D12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
     staticSamplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
     staticSamplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -120,7 +125,7 @@ void InstancingModelCommon::CreatePipelineState() {
     HRESULT hr;
 
     auto vertexShaderBlob = dxCommon_->CompileShader(L"Resources/Shader/Instancing.VS.hlsl", L"vs_6_0");
-    auto pixelShaderBlob = dxCommon_->CompileShader(L"Resources/Shader/Object3d.PS.hlsl", L"ps_6_0");
+    auto pixelShaderBlob = dxCommon_->CompileShader(L"Resources/Shader/Grass.PS.hlsl", L"ps_6_0");
 
     assert(vertexShaderBlob != nullptr);
     assert(pixelShaderBlob != nullptr);
@@ -147,7 +152,8 @@ void InstancingModelCommon::CreatePipelineState() {
     inputLayoutDesc.NumElements = _countof(inputElementDescs);
 
     const D3D12_BLEND_DESC blendDesc = PipelineStateUtility::MakeBlendDesc();
-    const D3D12_RASTERIZER_DESC rasterizerDesc = PipelineStateUtility::MakeRasterizerDesc(D3D12_CULL_MODE_BACK);
+	// 草の板ポリゴンは裏面も表示する。視点によって草が消えるのを防ぐ。
+	const D3D12_RASTERIZER_DESC rasterizerDesc = PipelineStateUtility::MakeRasterizerDesc(D3D12_CULL_MODE_NONE);
     const D3D12_DEPTH_STENCIL_DESC depthStencilDesc =
         PipelineStateUtility::MakeDepthStencilDesc(TRUE, D3D12_DEPTH_WRITE_MASK_ALL);
 

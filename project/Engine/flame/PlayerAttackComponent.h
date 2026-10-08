@@ -1,7 +1,9 @@
 #pragma once
 #include "Component.h"
 #include "Vector.h"
+#include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 class Player;
@@ -102,6 +104,33 @@ struct PlayerAttackShotRequest {
 	int colorIndex = 0;
 };
 
+class PlayerAttackComponent;
+
+/// <summary>
+/// 攻撃名に対応する発射要求の組み立て方を差し替えるStrategyです。
+/// 攻撃値などのデータはJSON側に残し、特殊な弾配置や軌道指定だけを実装クラスへ分離します。
+/// </summary>
+class IPlayerAttackPattern {
+public:
+	virtual ~IPlayerAttackPattern() = default;
+
+	virtual void CreateShots(
+		PlayerAttackComponent& component,
+		GameObject* owner,
+		const Player& player,
+		const PlayerAttackStats& attackStats,
+		const PlayerAttackLevelStats& levelStats,
+		const std::string& currentLevel) const = 0;
+};
+
+class DefaultPlayerAttackPattern;
+class MagatamaPlayerAttackPattern;
+class OrbitPlayerAttackPattern;
+class SkyLaserPlayerAttackPattern;
+class BoomerangPlayerAttackPattern;
+class RicochetPlayerAttackPattern;
+class ClawSlashPlayerAttackPattern;
+
 /// <summary>装備中の攻撃スロットを更新し、発射タイミングごとに弾生成要求を作ります。</summary>
 class PlayerAttackComponent : public Component {
 public:
@@ -122,6 +151,14 @@ public:
 	std::vector<PlayerAttackShotRequest> ConsumeShotRequests();
 
 private:
+	friend class DefaultPlayerAttackPattern;
+	friend class MagatamaPlayerAttackPattern;
+	friend class OrbitPlayerAttackPattern;
+	friend class SkyLaserPlayerAttackPattern;
+	friend class BoomerangPlayerAttackPattern;
+	friend class RicochetPlayerAttackPattern;
+	friend class ClawSlashPlayerAttackPattern;
+
 	/// <summary>装備スロットごとのレベル、クールダウン、利用可否を保持します。</summary>
 	struct AttackSlotRuntime {
 		PlayerAttackStats stats;
@@ -138,32 +175,37 @@ private:
 
 	static Vector3 GetShotSpawnOffset(const PlayerAttackLevelStats& levelStats, int shotIndex);
 
-	void QueueShot(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel, float angleDegrees, int shotIndex, bool alignSpawnToShotAngle = false);
+	void QueueShot(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel, float angleDegrees, int shotIndex, bool alignSpawnToShotAngle = false);
 
-	void CreateStraightAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel);
+	void CreateStraightAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel);
 
-	void CreateSpreadAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel);
+	void CreateSpreadAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel);
 
-	void CreateHomingAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, PlayerAttackLevelStats levelStats, const std::string& currentLevel);
+	void CreateHomingAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, PlayerAttackLevelStats levelStats, const std::string& currentLevel);
 
-	void CreateMagatamaAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, PlayerAttackLevelStats levelStats, const std::string& currentLevel);
+	void CreateMagatamaAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, PlayerAttackLevelStats levelStats, const std::string& currentLevel);
 
-	void CreateOrbitAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel);
+	void CreateOrbitAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel);
 
-	void CreateSkyLaserAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel);
+	void CreateSkyLaserAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel);
 
-	void CreateBoomerangAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel);
+	void CreateBoomerangAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel);
 
-	void CreateRicochetAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel);
+	void CreateRicochetAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel);
 
-	void CreateClawSlashAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel);
+	void CreateClawSlashAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel);
 
-	void CreateAttackByName(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel);
+	void CreateAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel);
+	void RegisterAttackPatterns();
 
 	PlayerAttackStats emptyStats_;
 	std::string defaultLevel_ = "1";
 	/// <summary>同時に更新する攻撃スロットの実行時状態です。</summary>
 	std::vector<AttackSlotRuntime> slots_;
+	/// <summary>JSONの攻撃名から特殊な発射パターンを取得する登録表です。</summary>
+	std::unordered_map<std::string, std::unique_ptr<IPlayerAttackPattern>> attackPatterns_;
+	/// <summary>専用登録のない通常・拡散・追尾攻撃をデータ駆動で生成する既定Strategyです。</summary>
+	std::unique_ptr<IPlayerAttackPattern> defaultAttackPattern_;
 	/// <summary>次にシーンが回収する未処理の発射要求です。</summary>
 	std::vector<PlayerAttackShotRequest> shotRequests_;
 };

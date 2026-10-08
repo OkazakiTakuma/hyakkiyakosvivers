@@ -22,11 +22,11 @@ float NormalizeRawGamepadAxis(SHORT value) {
 	return normalized;
 }
 
-Vector3 NormalizeGamepadLeftStick(SHORT rawX, SHORT rawY) {
+Vector3 NormalizeGamepadStick(SHORT rawX, SHORT rawY, SHORT rawDeadZone) {
 	const float x = NormalizeRawGamepadAxis(rawX);
 	const float z = NormalizeRawGamepadAxis(rawY);
 	const float length = std::sqrt((x * x) + (z * z));
-	const float deadZone = static_cast<float>(XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE) / 32767.0f;
+	const float deadZone = static_cast<float>(rawDeadZone) / 32767.0f;
 	if (length <= deadZone) {
 		return {0.0f, 0.0f, 0.0f};
 	}
@@ -96,6 +96,7 @@ void Input::Update() {
 	mouseMoveY = 0;
 	isGamepadConnected_ = false;
 	gamepadLeftStick_ = {0.0f, 0.0f, 0.0f};
+	gamepadRightStick_ = {0.0f, 0.0f, 0.0f};
 	gamepadButtons_ = 0;
 
 	HRESULT hr = keyboard->Acquire();
@@ -127,7 +128,10 @@ void Input::Update() {
 	if (XInputGetState(0, &gamepadState) == ERROR_SUCCESS) {
 		isGamepadConnected_ = true;
 		const XINPUT_GAMEPAD& gamepad = gamepadState.Gamepad;
-		gamepadLeftStick_ = NormalizeGamepadLeftStick(gamepad.sThumbLX, gamepad.sThumbLY);
+		gamepadLeftStick_ = NormalizeGamepadStick(
+		    gamepad.sThumbLX, gamepad.sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
+		gamepadRightStick_ = NormalizeGamepadStick(
+		    gamepad.sThumbRX, gamepad.sThumbRY, XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
 		gamepadButtons_ = gamepad.wButtons;
 	}
 

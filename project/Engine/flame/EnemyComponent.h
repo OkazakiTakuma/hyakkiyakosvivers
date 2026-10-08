@@ -125,6 +125,26 @@ struct EnemyStats {
 	float sizeScale = 1.0f;
 };
 
+class EnemyComponent;
+
+/// <summary>行動Strategyがシーンへ公開する、敵のモデルと現在の表示状態です。</summary>
+struct EnemyBehaviorPresentation {
+	std::string modelFilePath;
+	Vector4 color{1.0f, 1.0f, 1.0f, 1.0f};
+	bool overrideColor = false;
+	bool addAttackTrail = false;
+	bool attackTrailEmitting = false;
+};
+
+class INightSlashState;
+class NightSlashApproachState;
+class NightSlashWindupState;
+class NightSlashDashingState;
+class NightSlashSlashingState;
+class NightSlashRangedWindupState;
+class NightSlashRangedFiringState;
+class NightSlashRecoveringState;
+
 /// <summary>敵の追跡、射撃、突進ステートと体力を管理します。</summary>
 class EnemyComponent : public Component {
 public:
@@ -166,8 +186,18 @@ public:
 	bool CanDealContactDamage() const;
 	/// <summary>現在の攻撃段階を考慮した接触ダメージを返します。</summary>
 	float GetContactAttackDamage() const;
+	/// <summary>現在の行動と攻撃段階に対応したモデル・色・軌跡設定を返します。</summary>
+	EnemyBehaviorPresentation GetBehaviorPresentation();
 
 private:
+	friend class NightSlashApproachState;
+	friend class NightSlashWindupState;
+	friend class NightSlashDashingState;
+	friend class NightSlashSlashingState;
+	friend class NightSlashRangedWindupState;
+	friend class NightSlashRangedFiringState;
+	friend class NightSlashRecoveringState;
+
 	/// <summary>接近、溜め、方向固定済みの突進、攻撃後硬直から成る突進敵の状態です。</summary>
 	enum class ChargeState { Approach, Charging, Dashing, Recovering };
 	/// <summary>接近、斬撃予兆、連続斬り、射撃予兆、射撃、硬直から成るボス行動状態です。</summary>
@@ -186,6 +216,8 @@ private:
 	void UpdateTornadoBoss(EulerTransform& transform, const Vector3& direction, float distance);
 
 	void UpdateNightSlashBoss(EulerTransform& transform, const Vector3& direction, float distance);
+	/// <summary>夜叉ボスの現在Stateを切り替え、状態固有タイマーを初期化します。</summary>
+	void ChangeNightSlashState(NightSlashState state);
 
 	/// <summary>猫ボスの姿勢と歩行アニメーションを現在の攻撃状態へ同期します。</summary>
 	void UpdateNightSlashBossMotion(EulerTransform& transform);
@@ -211,6 +243,11 @@ private:
 	Vector3 dashDirection_{0.0f, 0.0f, 1.0f};
 	ChargeState chargeState_ = ChargeState::Approach;
 	NightSlashState nightSlashState_ = NightSlashState::Approach;
+	/// <summary>
+	/// 夜叉ボスの状態固有処理です。Stateは共有可能なステートレスオブジェクトなので、
+	/// ボスごとのヒープ確保を行わず非所有ポインターで参照します。
+	/// </summary>
+	const INightSlashState* nightSlashStateObject_ = nullptr;
 	NightSlashState previousNightSlashMotionState_ = NightSlashState::Approach;
 	TornadoBossState tornadoBossState_ = TornadoBossState::Approach;
 	Vector3 nightSlashBaseScale_{1.0f, 1.0f, 1.0f};

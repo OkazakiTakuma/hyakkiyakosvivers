@@ -5,6 +5,7 @@
 #include "instancing/InstancingModelCommon.h"
 #include "GameTime.h"
 #include <Xinput.h>
+#include <cmath>
 
 namespace {
 #ifdef USE_IMGUI
@@ -149,7 +150,7 @@ void GamePlayScene::Initialize() {
 			"Resources/uvChecker.png",
 			"Resources/rostock_laage_airport_4k.dds",
 			"Resources/gradationLine.png",
-			"Resources/terrain/grass.png",
+			"Resources/terrain/grass_replacement.png",
 			"Resources/sand/sand.png"
 	};
 
@@ -186,6 +187,38 @@ void GamePlayScene::LoadSceneModels() {
 	ModelManager::GetInstance()->LoadModel("sand.obj", false, "/sand");
 	// 烏天狗の右手へ装備する刀を専用フォルダから事前読み込みする。
 	ModelManager::GetInstance()->LoadModel("brade.obj", false, "/brade");
+	ModelManager::GetInstance()->LoadModel("grass.obj");
+
+	// 草の板ポリゴンをインスタンシング描画用に一度だけ配置する。
+	// grass.obj の原点は地面側にあるため、translate.y = 0 で地面に接する。
+	Model* grassModel = ModelManager::GetInstance()->FindModel("grass.obj");
+	if (grassModel) {
+		// 草原の広さを維持したまま、従来の約5倍の密度にする。
+		constexpr int kGrassSide = 537;
+		constexpr int kGrassInstanceCount = kGrassSide * kGrassSide;
+		constexpr float kSpacing = 0.1427f;
+		instancingModel_ = std::make_unique<InstancingModel>();
+		instancingModel_->Initialize(grassModel, kGrassInstanceCount);
+
+		const float offset = (kGrassSide - 1) * kSpacing * 0.5f;
+		for (int z = 0; z < kGrassSide; ++z) {
+			for (int x = 0; x < kGrassSide; ++x) {
+				EulerTransform transform{};
+				// 格子を少し崩し、人工的な並びに見えないようにする。
+				const float jitterX = std::sin(x * 12.9898f + z * 78.233f) * 0.05f;
+				const float jitterZ = std::sin(x * 39.3467f + z * 11.135f) * 0.05f;
+				transform.translate = {
+					 x * kSpacing - offset + jitterX,
+					 0.0f,
+					 z * kSpacing - offset + jitterZ
+				};
+				transform.rotate = {0.0f, std::sin(x * 4.1f + z * 7.3f) * 3.14159265f, 0.0f};
+				const float scale = 0.65f + (std::sin(x * 3.7f + z * 5.9f) * 0.10f + 0.10f);
+				transform.scale = {scale, scale, scale};
+				instancingModel_->AddInstance(transform);
+			}
+		}
+	}
 }
 
 /// <summary>
@@ -194,6 +227,8 @@ void GamePlayScene::LoadSceneModels() {
 void GamePlayScene::Update() {
 	// クリアと死亡のどちらでも、シーン破棄前に最終戦績を確定してリザルトへ渡す。
 	if (IsStageCleared() || IsPlayerDefeated()) {
+		// 終了処理の多重実行を避けるため、結果を確定するフレームで入力モードも終了へ移す。
+		SetGameplayMode(GameplayMode::Finished);
 		const StageResultData resultData = GetStageResultData();
 		if (resultData.stageCleared) {
 			// クリア時だけ履歴と新規開放を記録する。死亡終了はクリア条件を満たさない。
@@ -210,7 +245,7 @@ void GamePlayScene::Update() {
 		return;
 	}
 	Input* input = Input::GetInstance();
-	if (isPauseMenuOpen_) {
+	if (GetGameplayMode() == GameplayMode::Paused) {
 		UpdatePauseMenu();
 		ImGuiUpdate();
 		return;
@@ -271,7 +306,7 @@ void GamePlayScene::Update() {
 }
 
 void GamePlayScene::InitializePauseMenu() {
-	isPauseMenuOpen_ = false;
+	SetGameplayMode(GameplayMode::Playing);
 	selectedPauseMenuItem_ = static_cast<int>(PauseMenuItem::Resume);
 	pauseOverlaySprite_ = CreatePauseColorSprite();
 	pausePanelSprite_ = CreatePauseColorSprite();
@@ -286,11 +321,11 @@ void GamePlayScene::InitializePauseMenu() {
 }
 
 void GamePlayScene::SetPauseMenuOpen(bool isOpen) {
-	isPauseMenuOpen_ = isOpen;
 	if (isOpen) {
 		selectedPauseMenuItem_ = static_cast<int>(PauseMenuItem::Resume);
 	}
-	GameTime::SetPaused(isOpen);
+	// ポーズ状態も共通GameplayModeへ集約し、レベルアップ画面との同時成立を防ぐ。
+	SetGameplayMode(isOpen ? GameplayMode::Paused : GameplayMode::Playing);
 }
 
 void GamePlayScene::UpdatePauseMenu() {
@@ -355,7 +390,7 @@ void GamePlayScene::Draw2D() {
 }
 
 void GamePlayScene::DrawOverlay2D() {
-	if (!isPauseMenuOpen_ || !pauseOverlaySprite_ || !pausePanelSprite_ || !pauseSelectionSprite_) {
+	if (GetGameplayMode() != GameplayMode::Paused || !pauseOverlaySprite_ || !pausePanelSprite_ || !pauseSelectionSprite_) {
 		return;
 	}
 	DirectXCommon* dxCommon = SpriteCommon::GetInstance()->GetDxCommon();
@@ -472,7 +507,7 @@ void GamePlayScene::ImGuiUpdate() {
 		ImGui::Checkbox("Show Main Sprite", &isShowSprite_);
 		ImGui::Checkbox("Show Array Sprites", &isShowSprites_);
 		ImGui::Checkbox("Show Plane", &isShowObject3D_);
-		ImGui::Checkbox("Show InstancingModel", &isShowInstancing_);
+		ImGui::Checkbox("Show Grass", &isShowInstancing_);
 		ImGui::Checkbox("Show Sphere", &isShowSphere_);
 		ImGui::Checkbox("Show Cylinder", &isShowCylinder_);
 		ImGui::Checkbox("Show Particles", &isShowParticles_);

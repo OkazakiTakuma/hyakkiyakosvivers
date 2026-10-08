@@ -49,6 +49,8 @@ public:
 	bool GetJointSkeletonSpaceMatrix(const std::string& jointName, Matrix4x4& jointMatrix) const;
 	/// <summary>指定ボーンへObject3d自身の変換を合成したワールド行列を取得します。</summary>
 	bool GetJointWorldMatrix(const std::string& jointName, Matrix4x4& jointWorldMatrix) const;
+	/// <summary>現在のスケルトンに含まれるボーン名を返します。</summary>
+	std::vector<std::string> GetJointNames() const;
 	/// <summary>通常のTransform計算を使わず、外部で合成したワールド行列を描画へ使用します。</summary>
 	void SetWorldMatrixOverride(const Matrix4x4& worldMatrix) {
 		worldMatrixOverride_ = worldMatrix;
@@ -105,6 +107,27 @@ public:
 			materialOverrideData_->emissiveColor = color;
 			materialOverrideData_->emissiveIntensity = intensity;
 		}
+	}
+	/// <summary>指定ボーンへ、モデルのバインド姿勢へ加える回転オフセットを設定します。</summary>
+	void SetJointRotationOffset(const std::string& jointName, const Quaternion& rotationOffset) {
+		jointRotationOffsets_[jointName] = rotationOffset;
+	}
+	/// <summary>エディター用にボーン回転オフセットをオイラー角（ラジアン）で設定します。</summary>
+	void SetJointRotationOffsetEuler(const std::string& jointName, const Vector3& rotation) {
+		jointRotationOffsetEuler_[jointName] = rotation;
+		const Quaternion x = MakeRotateAxisAngleQuaternion({1.0f, 0.0f, 0.0f}, rotation.x);
+		const Quaternion y = MakeRotateAxisAngleQuaternion({0.0f, 1.0f, 0.0f}, rotation.y);
+		const Quaternion z = MakeRotateAxisAngleQuaternion({0.0f, 0.0f, 1.0f}, rotation.z);
+		jointRotationOffsets_[jointName] = Normalize(Multiply(Multiply(x, y), z));
+	}
+	Vector3 GetJointRotationOffsetEuler(const std::string& jointName) const {
+		const auto iterator = jointRotationOffsetEuler_.find(jointName);
+		return iterator != jointRotationOffsetEuler_.end() ? iterator->second : Vector3{};
+	}
+	/// <summary>登録済みのボーン回転オフセットをすべて解除します。</summary>
+	void ClearJointRotationOffsets() {
+		jointRotationOffsets_.clear();
+		jointRotationOffsetEuler_.clear();
 	}
 	Vector3 GetEmissionColor() const {
 		return materialOverrideData_ ? materialOverrideData_->emissiveColor : Vector3{0.0f, 0.0f, 0.0f};
@@ -227,7 +250,7 @@ private:
 	Model* model = nullptr;
 	// 同じModelを使う別オブジェクトの見た目を変えずに、個別の色表現を行うための上書きパス。
 	std::string modelTextureOverridePath_;
-	bool isPointLightSet = true;
+	bool isPointLightSet = false;
 	float environmentMultiplier = 1.0f;
 
 	EulerTransform transform = {
@@ -247,6 +270,9 @@ private:
 	bool isDrawSkeleton_ = false;
 	bool isAnimationPlaying_ = true;
 	bool useInitialSkinningPose_ = false;
+	/// <summary>アニメーション適用後に合成する演出用ボーン回転です。</summary>
+	std::map<std::string, Quaternion> jointRotationOffsets_;
+	std::map<std::string, Vector3> jointRotationOffsetEuler_;
 	bool isShadowEnabled_ = true;
 	float shadowPlaneY_ = 0.01f;
 	float shadowAlpha_ = 0.35f;

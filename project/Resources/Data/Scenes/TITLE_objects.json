@@ -1,97 +1,1013 @@
 {
-  "activeCamera": "TitleCamera",
-  "nextObjectId": 16,
-  "scene": "TITLE",
-  "skyBox": {"enabled": false, "textureFilePath": ""},
-  "atmosphere": {
-    "enabled": true,
-    "sunDirection": [-0.1806, 0.0301, 0.9831],
-    "sunAngularRadius": 0.022,
-    "sunIntensity": 5.5,
-    "rayleighColor": [0.20, 0.42, 1.0],
-    "rayleighStrength": 0.72,
-    "mieColor": [1.0, 0.56, 0.20],
-    "mieStrength": 0.075,
-    "mieG": 0.80,
-    "atmosphereDensity": 0.92,
-    "horizonColor": [0.82, 0.18, 0.055],
-    "distanceFogDensity": 0.012,
-    "heightFogDensity": 0.16,
-    "aerialPerspectiveStrength": 0.68
-  },
-  "objects": [
-    {
-      "name": "TitleCamera", "type": "Camera", "parent": "", "children": [],
-      "transform": {"translate": [0.0, 3.75, -14.2], "rotate": [0.16, 0.0, 0.0], "scale": [1.0, 1.0, 1.0]},
-      "camera": {"enabled": true, "fovY": 0.58, "nearClip": 0.1, "farClip": 200.0, "followTarget": "", "followOffset": [0.0, 0.0, 0.0], "localOffset": [0.0, 0.0, 0.0], "overrideRotationEnabled": false, "overrideRotation": [0.0, 0.0, 0.0]}
+    "activeCamera": "TitleCamera",
+    "atmosphere": {
+        "aerialPerspectiveStrength": 0.6800000071525574,
+        "atmosphereDensity": 0.9200000166893005,
+        "distanceFogDensity": 0.012000000104308128,
+        "enabled": true,
+        "heightFogDensity": 0.1599999964237213,
+        "horizonColor": [
+            0.8199999928474426,
+            0.18000000715255737,
+            0.054999999701976776
+        ],
+        "mieColor": [
+            1.0,
+            0.5600000023841858,
+            0.20000000298023224
+        ],
+        "mieG": 0.800000011920929,
+        "mieStrength": 0.07500000298023224,
+        "rayleighColor": [
+            0.20000000298023224,
+            0.41999998688697815,
+            1.0
+        ],
+        "rayleighStrength": 0.7200000286102295,
+        "sunAngularRadius": 0.02199999988079071,
+        "sunDirection": [
+            -0.18059928715229034,
+            0.030099879950284958,
+            0.9830961227416992
+        ],
+        "sunIntensity": 5.5
     },
-    {
-      "name": "TitlePlain", "type": "LoadedModel", "model": "sand.obj", "parent": "", "children": [],
-      "transform": {"translate": [0.0, -1.2, 4.0], "rotate": [0.0, 0.0, 0.0], "scale": [15.0, 1.0, 15.0]},
-      "object3d": {"enabled": true, "modelTextureFilePath": "Resources/sand/sand.png", "drawSkeleton": false, "animationPlaying": false, "isPointLight": false}
-    },
-    {
-      "name": "TitleMiko", "type": "AnimatedModel", "model": "miko.gltf", "parent": "", "children": [],
-      "transform": {"translate": [0.0, -1.15, 0.4], "rotate": [0.0, 0.0, 0.0], "scale": [1.2, 1.2, 1.2]},
-      "object3d": {"enabled": true, "modelTextureFilePath": "", "drawSkeleton": false, "animationPlaying": false, "isPointLight": false}
-    },
-    {
-      "name": "TitleEnemyA", "type": "LoadedModel", "model": "enemy_chaser.gltf", "parent": "", "children": [],
-      "transform": {"translate": [-4.6, -1.15, 2.4], "rotate": [0.0, 0.38, 0.0], "scale": [1.45, 1.45, 1.45]},
-      "object3d": {"enabled": true, "modelTextureFilePath": "", "isPointLight": false}
-    },
-    {
-      "name": "TitleEnemyB", "type": "LoadedModel", "model": "enemy_shooter.gltf", "parent": "", "children": [],
-      "transform": {"translate": [4.6, -1.15, 2.7], "rotate": [0.0, -0.42, 0.0], "scale": [1.2, 1.2, 1.2]},
-      "object3d": {"enabled": true, "modelTextureFilePath": "", "isPointLight": false}
-    },
-    {
-      "name": "TitleEnemyC", "type": "LoadedModel", "model": "enemy_charger.gltf", "parent": "", "children": [],
-      "transform": {"translate": [-6.0, -1.15, -0.5], "rotate": [0.0, 0.72, 0.0], "scale": [1.25, 1.25, 1.25]},
-      "object3d": {"enabled": true, "modelTextureFilePath": "", "isPointLight": false}
-    },
-    {
-      "name": "TitleEnemyD", "type": "LoadedModel", "model": "enemy_bomber.gltf", "parent": "", "children": [],
-      "transform": {"translate": [6.0, -1.15, -0.35], "rotate": [0.0, -0.75, 0.0], "scale": [1.45, 1.45, 1.45]},
-      "object3d": {"enabled": true, "modelTextureFilePath": "", "isPointLight": false}
-    },
-    {
-      "name": "TitleEnemyE", "type": "LoadedModel", "model": "enemy_chaser.gltf", "parent": "", "children": [],
-      "transform": {"translate": [-2.8, -1.15, 5.2], "rotate": [0.0, 0.08, 0.0], "scale": [1.20, 1.20, 1.20]},
-      "object3d": {"enabled": true, "modelTextureFilePath": "", "isPointLight": false}
-    },
-    {
-      "name": "TitleEnemyF", "type": "LoadedModel", "model": "enemy_shooter.gltf", "parent": "", "children": [],
-      "transform": {"translate": [2.8, -1.15, 5.4], "rotate": [0.0, -0.08, 0.0], "scale": [1.20, 1.20, 1.20]},
-      "object3d": {"enabled": true, "modelTextureFilePath": "", "isPointLight": false}
-    },
-    {
-      "name": "TitleMagatamaA", "type": "LoadedModel", "model": "magatama.gltf", "parent": "", "children": [],
-      "transform": {"translate": [2.0, 0.20, 0.40], "rotate": [0.0, 1.5707963, 0.0], "scale": [0.58, 0.58, 0.58]},
-      "object3d": {"enabled": true, "modelTextureFilePath": "", "isPointLight": false}
-    },
-    {
-      "name": "TitleMagatamaB", "type": "LoadedModel", "model": "magatama.gltf", "parent": "", "children": [],
-      "transform": {"translate": [0.0, 0.20, 0.95], "rotate": [0.0, 3.1415927, 0.0], "scale": [0.58, 0.58, 0.58]},
-      "object3d": {"enabled": true, "modelTextureFilePath": "", "isPointLight": false}
-    },
-    {
-      "name": "TitleMagatamaC", "type": "LoadedModel", "model": "magatama.gltf", "parent": "", "children": [],
-      "transform": {"translate": [-2.0, 0.20, 0.40], "rotate": [0.0, -1.5707963, 0.0], "scale": [0.46, 0.46, 0.46]},
-      "object3d": {"enabled": true, "modelTextureFilePath": "", "isPointLight": false}
-    },
-    {
-      "name": "TitleMagatamaD", "type": "LoadedModel", "model": "magatama.gltf", "parent": "", "children": [],
-      "transform": {"translate": [0.0, 0.20, -0.15], "rotate": [0.0, 0.0, 0.0], "scale": [0.46, 0.46, 0.46]},
-      "object3d": {"enabled": true, "modelTextureFilePath": "", "isPointLight": false}
-    },
-    {
-      "name": "TitleEmbers", "type": "ParticleEmitter", "parent": "", "children": [],
-      "transform": {"translate": [0.0, -0.3, 2.0], "rotate": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0]},
-      "particleEmitter": {
-        "enabled": true, "groupName": "TitleEmbers", "textureFilePath": "Resources/circle.png", "isActive": true, "frequency": 0.05, "blendMode": 2, "meshType": 0,
-        "param": {"count": 80, "lifeTime": 2.8, "scale": [0.13, 0.13, 0.13], "endScale": [0.02, 0.02, 0.02], "baseVelocity": [0.0, 0.7, 0.0], "randomVelocityRange": [0.35, 0.35, 0.2], "randomPositionRange": [5.5, 0.25, 3.0], "color": [1.0, 0.42, 0.08, 0.8], "endColor": [0.5, 0.05, 0.0, 0.0], "acceleration": [0.0, 0.03, 0.0], "isBillboard": true, "isRandomRotate": false, "baseRotate": [0.0, 0.0, 0.0], "randomRotateRange": [0.0, 0.0, 0.0], "randomScaleRange": [0.09, 0.09, 0.0]}
-      }
+    "nextObjectId": 16,
+    "objects": [
+        {
+            "camera": {
+                "enabled": true,
+                "farClip": 200.0,
+                "followOffset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "followTarget": "",
+                "fovY": 0.5799999833106995,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "localOffset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "nearClip": 0.10000000149011612,
+                "overrideRotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "overrideRotationEnabled": false
+            },
+            "children": [],
+            "name": "TitleCamera",
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.1599999964237213,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translate": [
+                    0.0,
+                    3.75,
+                    -14.199999809265137
+                ]
+            },
+            "type": "Camera"
+        },
+        {
+            "children": [],
+            "model": "sand.obj",
+            "name": "TitlePlain",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": false,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/terrain/grass.png",
+                "pointLight": {
+                    "color": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 0.0,
+                    "position": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "radius": 1.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    50.0,
+                    1.0,
+                    50.0
+                ],
+                "translate": [
+                    0.0,
+                    -1.2000000476837158,
+                    4.0
+                ]
+            },
+            "type": "LoadedModel"
+        },
+        {
+            "children": [],
+            "model": "miko.gltf",
+            "name": "TitleMiko",
+            "object3d": {
+                "animationName": "歩行",
+                "animationPlaying": false,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/human/miko_texture.png",
+                "pointLight": {
+                    "color": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 0.0,
+                    "position": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "radius": 1.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.2000000476837158,
+                    1.2000000476837158,
+                    1.2000000476837158
+                ],
+                "translate": [
+                    0.0,
+                    -1.149999976158142,
+                    0.4000000059604645
+                ]
+            },
+            "type": "AnimatedModel"
+        },
+        {
+            "children": [],
+            "model": "enemy_chaser.gltf",
+            "name": "TitleEnemyA",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/enemy_chaser_texture.bmp",
+                "pointLight": {
+                    "color": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 0.0,
+                    "position": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "radius": 1.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    0.3799999952316284,
+                    0.0
+                ],
+                "scale": [
+                    1.4500000476837158,
+                    1.4500000476837158,
+                    1.4500000476837158
+                ],
+                "translate": [
+                    -4.599999904632568,
+                    -1.083297610282898,
+                    2.4000000953674316
+                ]
+            },
+            "type": "LoadedModel"
+        },
+        {
+            "children": [],
+            "model": "enemy_shooter.gltf",
+            "name": "TitleEnemyB",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/enemy_shooter_texture.bmp",
+                "pointLight": {
+                    "color": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 0.0,
+                    "position": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "radius": 1.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    -0.41999998688697815,
+                    0.0
+                ],
+                "scale": [
+                    1.2000000476837158,
+                    1.2000000476837158,
+                    1.2000000476837158
+                ],
+                "translate": [
+                    4.599999904632568,
+                    -1.1352115869522095,
+                    2.700000047683716
+                ]
+            },
+            "type": "LoadedModel"
+        },
+        {
+            "children": [],
+            "model": "enemy_charger.gltf",
+            "name": "TitleEnemyC",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/enemy_charger_texture.bmp",
+                "pointLight": {
+                    "color": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 0.0,
+                    "position": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "radius": 1.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    0.7200000286102295,
+                    0.0
+                ],
+                "scale": [
+                    1.25,
+                    1.25,
+                    1.25
+                ],
+                "translate": [
+                    -6.0,
+                    -1.196096420288086,
+                    -0.5
+                ]
+            },
+            "type": "LoadedModel"
+        },
+        {
+            "children": [],
+            "model": "enemy_bomber.gltf",
+            "name": "TitleEnemyD",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/enemy_bomber_texture.bmp",
+                "pointLight": {
+                    "color": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 0.0,
+                    "position": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "radius": 1.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    -0.75,
+                    0.0
+                ],
+                "scale": [
+                    1.4500000476837158,
+                    1.4500000476837158,
+                    1.4500000476837158
+                ],
+                "translate": [
+                    6.0,
+                    -1.0718439817428589,
+                    -0.3499999940395355
+                ]
+            },
+            "type": "LoadedModel"
+        },
+        {
+            "children": [],
+            "model": "enemy_chaser.gltf",
+            "name": "TitleEnemyE",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/enemy_chaser_texture.bmp",
+                "pointLight": {
+                    "color": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 0.0,
+                    "position": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "radius": 1.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    0.07999999821186066,
+                    0.0
+                ],
+                "scale": [
+                    1.2000000476837158,
+                    1.2000000476837158,
+                    1.2000000476837158
+                ],
+                "translate": [
+                    -2.799999952316284,
+                    -1.083297610282898,
+                    5.199999809265137
+                ]
+            },
+            "type": "LoadedModel"
+        },
+        {
+            "children": [],
+            "model": "enemy_shooter.gltf",
+            "name": "TitleEnemyF",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "emissionIntensity": 0.0,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/enemy_shooter_texture.bmp",
+                "pointLight": {
+                    "color": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 0.0,
+                    "position": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "radius": 1.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    -0.07999999821186066,
+                    0.0
+                ],
+                "scale": [
+                    1.2000000476837158,
+                    1.2000000476837158,
+                    1.2000000476837158
+                ],
+                "translate": [
+                    2.799999952316284,
+                    -1.1352115869522095,
+                    5.400000095367432
+                ]
+            },
+            "type": "LoadedModel"
+        },
+        {
+            "children": [],
+            "model": "magatama.gltf",
+            "name": "TitleMagatamaA",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        0.6200000047683716,
+                        0.9399999976158142,
+                        1.0,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.6200000047683716,
+                        0.9399999976158142,
+                        1.0
+                    ],
+                    "emissionIntensity": 0.550000011920929,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/magatama_palette.bmp",
+                "pointLight": {
+                    "color": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 0.0,
+                    "position": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "radius": 1.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    -44.92996597290039,
+                    0.0
+                ],
+                "scale": [
+                    0.5799999833106995,
+                    0.5799999833106995,
+                    0.5799999833106995
+                ],
+                "translate": [
+                    -1.6241153478622437,
+                    0.1734197437763214,
+                    0.7384747862815857
+                ]
+            },
+            "type": "LoadedModel"
+        },
+        {
+            "children": [],
+            "model": "magatama.gltf",
+            "name": "TitleMagatamaB",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        0.5199999809265137,
+                        0.7200000286102295,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        1.0,
+                        0.5199999809265137,
+                        0.7200000286102295
+                    ],
+                    "emissionIntensity": 0.550000011920929,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/magatama_palette.bmp",
+                "pointLight": {
+                    "color": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 0.0,
+                    "position": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "radius": 1.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    -46.500762939453125,
+                    0.0
+                ],
+                "scale": [
+                    0.5799999833106995,
+                    0.5799999833106995,
+                    0.5799999833106995
+                ],
+                "translate": [
+                    -1.1671533584594727,
+                    0.3577766418457031,
+                    -0.07099363207817078
+                ]
+            },
+            "type": "LoadedModel"
+        },
+        {
+            "children": [],
+            "model": "magatama.gltf",
+            "name": "TitleMagatamaC",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        0.6200000047683716,
+                        1.0,
+                        0.6800000071525574,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        0.6200000047683716,
+                        1.0,
+                        0.6800000071525574
+                    ],
+                    "emissionIntensity": 0.550000011920929,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/magatama_palette.bmp",
+                "pointLight": {
+                    "color": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 0.0,
+                    "position": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "radius": 1.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    -48.07155990600586,
+                    0.0
+                ],
+                "scale": [
+                    0.46000000834465027,
+                    0.46000000834465027,
+                    0.46000000834465027
+                ],
+                "translate": [
+                    1.6241167783737183,
+                    0.22658005356788635,
+                    0.0615258514881134
+                ]
+            },
+            "type": "LoadedModel"
+        },
+        {
+            "children": [],
+            "model": "magatama.gltf",
+            "name": "TitleMagatamaD",
+            "object3d": {
+                "animationName": "",
+                "animationPlaying": true,
+                "castShadow": true,
+                "drawSkeleton": false,
+                "enabled": true,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "isPointLight": false,
+                "material": {
+                    "color": [
+                        1.0,
+                        0.7799999713897705,
+                        0.2800000011920929,
+                        1.0
+                    ],
+                    "emissionColor": [
+                        1.0,
+                        0.7799999713897705,
+                        0.2800000011920929
+                    ],
+                    "emissionIntensity": 0.550000011920929,
+                    "receiveLighting": true
+                },
+                "modelTextureFilePath": "Resources/magatama_palette.bmp",
+                "pointLight": {
+                    "color": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "decay": 1.0,
+                    "intensity": 0.0,
+                    "position": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "radius": 1.0
+                }
+            },
+            "parent": "",
+            "transform": {
+                "rotate": [
+                    0.0,
+                    -49.64235305786133,
+                    0.0
+                ],
+                "scale": [
+                    0.46000000834465027,
+                    0.46000000834465027,
+                    0.46000000834465027
+                ],
+                "translate": [
+                    1.167157530784607,
+                    0.04222334921360016,
+                    0.8709927797317505
+                ]
+            },
+            "type": "LoadedModel"
+        },
+        {
+            "children": [],
+            "name": "TitleEmbers",
+            "parent": "",
+            "particleEmitter": {
+                "blendMode": 2,
+                "enabled": true,
+                "frequency": 0.05000000074505806,
+                "gravity": {
+                    "enabled": false,
+                    "strength": 9.800000190734863
+                },
+                "groupName": "TitleEmbers",
+                "isActive": true,
+                "meshType": 0,
+                "param": {
+                    "acceleration": [
+                        0.0,
+                        0.029999999329447746,
+                        0.0
+                    ],
+                    "baseRotate": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "baseVelocity": [
+                        0.0,
+                        0.699999988079071,
+                        0.0
+                    ],
+                    "color": [
+                        1.0,
+                        0.41999998688697815,
+                        0.07999999821186066,
+                        0.800000011920929
+                    ],
+                    "count": 80,
+                    "endColor": [
+                        0.5,
+                        0.05000000074505806,
+                        0.0,
+                        0.0
+                    ],
+                    "endScale": [
+                        0.019999999552965164,
+                        0.019999999552965164,
+                        0.019999999552965164
+                    ],
+                    "isBillboard": true,
+                    "isRandomRotate": false,
+                    "isVortex": false,
+                    "lifeTime": 2.799999952316284,
+                    "randomPositionRange": [
+                        5.5,
+                        0.25,
+                        3.0
+                    ],
+                    "randomRotateRange": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "randomScaleRange": [
+                        0.09000000357627869,
+                        0.09000000357627869,
+                        0.0
+                    ],
+                    "randomVelocityRange": [
+                        0.3499999940395355,
+                        0.3499999940395355,
+                        0.20000000298023224
+                    ],
+                    "scale": [
+                        0.12999999523162842,
+                        0.12999999523162842,
+                        0.12999999523162842
+                    ],
+                    "vortexAngularSpeed": 6.0,
+                    "vortexBaseRadius": 0.20000000298023224,
+                    "vortexHeight": 6.0,
+                    "vortexTopRadius": 3.0
+                },
+                "textureFilePath": "Resources/circle.png"
+            },
+            "transform": {
+                "rotate": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translate": [
+                    0.0,
+                    -0.30000001192092896,
+                    2.0
+                ]
+            },
+            "type": "ParticleEmitter"
+        }
+    ],
+    "scene": "TITLE",
+    "skyBox": {
+        "enabled": false,
+        "textureFilePath": ""
     }
-  ]
 }

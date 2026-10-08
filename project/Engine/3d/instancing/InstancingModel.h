@@ -3,6 +3,7 @@
 #include "../camera/Camera.h"
 #include "struct.h"
 #include <vector>
+#include <unordered_map>
 #include <d3d12.h>
 #include <wrl.h>
 
@@ -10,6 +11,13 @@ struct InstancingMatrixData {
     Matrix4x4 WVP;
     Matrix4x4 world;
     Matrix4x4 WorldInverseTranspose;
+};
+
+struct GrassParameter {
+	float time;
+	float windStrength;
+	float windFrequency;
+	float padding;
 };
 
 class InstancingModel {
@@ -32,11 +40,24 @@ public:
     /// </summary>
     ~InstancingModel();
     void SetEnvironmentMapPath(const std::string& path) { envMapTexturePath_ = path; }
+    /// <summary>カメラからインスタンスを表示する最大距離を設定します。</summary>
+    void SetMaxDrawDistance(float distance) { maxDrawDistance_ = distance; }
 private:
     Model* model_ = nullptr;
     uint32_t maxInstanceCount_ = 1000;
+    float maxDrawDistance_ = 35.0f;
 
-    std::vector<EulerTransform> transforms_;
+    struct InstanceChunk {
+        int32_t x = 0;
+        int32_t z = 0;
+        Vector3 center{};
+        std::vector<EulerTransform> transforms;
+    };
+
+    static constexpr float kChunkSize = 8.0f;
+    std::vector<InstanceChunk> chunks_;
+    std::unordered_map<uint64_t, size_t> chunkLookup_;
+    uint32_t instanceCount_ = 0;
 
     Microsoft::WRL::ComPtr<ID3D12Resource> instanceBuffer_;
     InstancingMatrixData* mappedData_ = nullptr;
@@ -62,6 +83,8 @@ private:
     CameraForGPU* cameraData_ = nullptr;
     Microsoft::WRL::ComPtr<ID3D12Resource> pointLightResource_;
     PointLight* pointLightData_ = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12Resource> grassResource_;
+    GrassParameter* grassData_ = nullptr;
     std::string envMapTexturePath_;
     /// <summary>
     /// ConstantBuffers を作成し、利用できる状態にします。

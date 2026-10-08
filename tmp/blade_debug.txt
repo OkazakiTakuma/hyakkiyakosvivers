@@ -1,1 +1,0 @@
-type=KarasuTengu blade=1 hand=0.391058,0.622877,-0.00617107

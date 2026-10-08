@@ -19,11 +19,14 @@ PixelShaderOutput main(VertexShaderOutput input)
     // 頂点色とテクスチャ色を乗算
     float4 textureColor = gTexture.Sample(gSampler, input.texcoord);
     output.color = textureColor * input.color;
-    if (textureColor.a <= 0.5)
+
+    // 0.5固定では円形・煙テクスチャの柔らかい外周まで破棄され、明るい背景上で
+    // 実際の表示面積が極端に小さくなる。ほぼ透明な画素だけを除外する。
+    if (textureColor.a <= 0.01f)
         discard;
 
     // アルファテスト（透明なら描画しない）
-    if (output.color.a == 0.0)
+    if (output.color.a <= 0.001f)
     {
         discard;
     }

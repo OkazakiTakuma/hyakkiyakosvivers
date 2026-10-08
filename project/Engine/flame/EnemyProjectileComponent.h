@@ -22,6 +22,7 @@ enum class EnemyProjectileMotionType {
 /// <summary>敵弾の移動、攻撃力、寿命、命中状態を管理します。</summary>
 class EnemyProjectileComponent : public Component {
 public:
+	void Initialize() override;
 	void Update() override;
 
 	void SetDirection(const Vector3& direction);

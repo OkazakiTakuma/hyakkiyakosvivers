@@ -5,73 +5,60 @@
 #include <algorithm>
 #include <cmath>
 
+void PlayerProjectileComponent::Initialize() {}
+
 void PlayerProjectileComponent::Update() {
-		// 移動方式ごとの位置更新後に、追尾補正と寿命更新を適用する。
-		GameObject* owner = GetOwner();
-		if (!owner) {
-			return;
-		}
-
-		const float deltaTime = GameTime::GetDeltaTime();
-		const float frameScale = GameTime::GetFrameScale60();
-		UpdateHitCooldowns(deltaTime);
-		if (motionType_ == PlayerProjectileMotionType::Orbit) {
-			// 周回中心は所有しないため、プレイヤーが先に破棄された場合は弾も即座に終了する。
-			if (!motionAnchor_) {
-				lifeTime_ = 0.0f;
-				return;
-			}
-			orbitAngleRadians_ += orbitAngularSpeed_ * deltaTime;
-			const Vector3 anchorPosition = motionAnchor_->GetTransform().translate;
-			// 発射時に弾ごとに算出した半径・高さ・開始角度を保ち、移動中のプレイヤーを中心に周回する。
-			owner->GetTransform().translate = {
-				anchorPosition.x + std::cos(orbitAngleRadians_) * orbitRadius_,
-				anchorPosition.y + orbitHeight_,
-				anchorPosition.z + std::sin(orbitAngleRadians_) * orbitRadius_
-			};
-			owner->GetTransform().rotate.y = -orbitAngleRadians_;
-			lifeTime_ -= deltaTime;
-			// 寿命の最後0.75秒は表示と当たり判定を同じ割合で縮小し、自然に消滅させる。
-			constexpr float kOrbitShrinkDurationSeconds = 0.75f;
-			visualScaleRate_ = (std::clamp)(lifeTime_ / kOrbitShrinkDurationSeconds, 0.0f, 1.0f);
-			const float visualSize = size_ * visualScaleRate_;
-			owner->GetTransform().scale = {visualSize, visualSize, visualSize};
-			return;
-		}
-		if (motionType_ == PlayerProjectileMotionType::SkyLaser) {
-			lifeTime_ -= deltaTime;
-			return;
-		}
-		if (motionType_ == PlayerProjectileMotionType::Boomerang) {
-			UpdateBoomerang(owner, deltaTime, frameScale);
-			return;
-		}
-		if (motionType_ == PlayerProjectileMotionType::ClawSlash) {
-			UpdateClawSlash(owner, deltaTime);
-			return;
-		}
-		if (homingEnabled_ && homingTarget_) {
-			Vector3 toTarget = homingTarget_->GetTransform().translate - owner->GetTransform().translate;
-			toTarget.y = 0.0f;
-			if (Length(toTarget) > MathConstants::kDirectionEpsilon) {
-				const Vector3 targetDirection = NormalizeReturnVector(toTarget);
-				float homingRate = (std::clamp)(homingAccuracy_, 0.0f, 1.0f);
-				if (motionType_ == PlayerProjectileMotionType::Magatama) {
-					magatamaElapsedSeconds_ += deltaTime;
-					// 発射直後からある程度旋回させ、短時間で追尾力を最大にして
-					// 大きな発射角でも画面外へ流れる前に敵へ収束させる。
-					const float turnRamp = (std::clamp)(magatamaElapsedSeconds_ / 0.45f, 0.32f, 1.0f);
-					homingRate *= turnRamp;
-				}
-				const float accuracy = 1.0f - std::pow(1.0f - homingRate, frameScale);
-				direction_ = NormalizeReturnVector(Leap(direction_, targetDirection, accuracy));
-			}
-		}
-
-		owner->GetTransform().translate = owner->GetTransform().translate + (speed_ * frameScale) * direction_;
-		owner->GetTransform().rotate.y = std::atan2(direction_.x, direction_.z);
-		lifeTime_ -= deltaTime;
+	GameObject* owner = GetOwner();
+	if (!owner) {
+		return;
 	}
+
+	const float deltaTime = GameTime::GetDeltaTime();
+	UpdateHitCooldowns(deltaTime);
+	const float frameScale = GameTime::GetFrameScale60();
+
+	// プレイヤー弾も大量生成されるため、弾ごとのStrategy確保を行わず種類で直接振り分ける。
+	switch (motionType_) {
+	case PlayerProjectileMotionType::Magatama:
+		UpdateLinearMotion(owner, deltaTime, frameScale, true);
+		break;
+	case PlayerProjectileMotionType::Orbit: {
+		if (!motionAnchor_) {
+			lifeTime_ = 0.0f;
+			break;
+		}
+		orbitAngleRadians_ += orbitAngularSpeed_ * deltaTime;
+		const Vector3 anchorPosition = motionAnchor_->GetTransform().translate;
+		owner->GetTransform().translate = {
+			anchorPosition.x + std::cos(orbitAngleRadians_) * orbitRadius_,
+			anchorPosition.y + orbitHeight_,
+			anchorPosition.z + std::sin(orbitAngleRadians_) * orbitRadius_};
+		owner->GetTransform().rotate.y = -orbitAngleRadians_;
+		lifeTime_ -= deltaTime;
+		constexpr float kShrinkDurationSeconds = 0.75f;
+		visualScaleRate_ = (std::clamp)(lifeTime_ / kShrinkDurationSeconds, 0.0f, 1.0f);
+		const float visualSize = size_ * visualScaleRate_;
+		owner->GetTransform().scale = {visualSize, visualSize, visualSize};
+		break;
+	}
+	case PlayerProjectileMotionType::SkyLaser:
+		lifeTime_ -= deltaTime;
+		break;
+	case PlayerProjectileMotionType::Boomerang:
+		UpdateBoomerang(owner, deltaTime, frameScale);
+		break;
+	case PlayerProjectileMotionType::Ricochet:
+		UpdateLinearMotion(owner, deltaTime, frameScale, false);
+		break;
+	case PlayerProjectileMotionType::ClawSlash:
+		UpdateClawSlash(owner, deltaTime);
+		break;
+	case PlayerProjectileMotionType::Linear:
+	default:
+		UpdateLinearMotion(owner, deltaTime, frameScale, false);
+		break;
+	}
+}
 
 void PlayerProjectileComponent::SetAttackName(const std::string& attackName) { attackName_ = attackName; }
 
@@ -105,9 +92,77 @@ void PlayerProjectileComponent::SetHomingAccuracy(float homingAccuracy) { homing
 
 float PlayerProjectileComponent::GetHomingAccuracy() const { return homingAccuracy_; }
 
-void PlayerProjectileComponent::SetMotionType(PlayerProjectileMotionType motionType) { motionType_ = motionType; }
+void PlayerProjectileComponent::SetMotionType(PlayerProjectileMotionType motionType) {
+	motionType_ = motionType;
+}
 
 PlayerProjectileMotionType PlayerProjectileComponent::GetMotionType() const { return motionType_; }
+
+PlayerProjectilePresentation PlayerProjectileComponent::GetMotionPresentation() const {
+	PlayerProjectilePresentation result;
+	switch (motionType_) {
+	case PlayerProjectileMotionType::Magatama:
+		result.useMagatamaPalette = true;
+		result.addGlowEmitter = true;
+		break;
+	case PlayerProjectileMotionType::Orbit:
+		result.overrideModelColor = true;
+		result.modelColor = {0.35f, 0.75f, 1.0f, 1.0f};
+		result.overrideTrailColors = true;
+		result.trailHeadColor = {0.45f, 0.90f, 1.0f, 0.9f};
+		result.trailTailColor = {0.10f, 0.30f, 1.0f, 0.0f};
+		result.trailLifeTime = 0.45f;
+		result.trailUsesMotionAnchor = true;
+		result.repeatHitInterval = 0.75f;
+		result.expiresOutsideView = false;
+		break;
+	case PlayerProjectileMotionType::SkyLaser:
+		result.scaleMultiplier = {0.30f, 5.0f, 0.30f};
+		result.modelVisible = false;
+		result.addSkyLaserVisual = true;
+		result.addTrail = false;
+		result.usesVerticalHitArea = true;
+		result.expiresOutsideView = false;
+		break;
+	case PlayerProjectileMotionType::Boomerang:
+		result.overrideModelColor = true;
+		result.modelColor = {1.0f, 0.65f, 0.20f, 1.0f};
+		result.overrideTrailColors = true;
+		result.trailHeadColor = {1.0f, 0.72f, 0.20f, 0.95f};
+		result.trailTailColor = {1.0f, 0.12f, 0.02f, 0.0f};
+		result.aimAtNearestEnemyOnSpawn = true;
+		result.expiresOutsideView = false;
+		break;
+	case PlayerProjectileMotionType::Ricochet:
+		result.overrideModelColor = true;
+		result.modelColor = {0.45f, 1.0f, 0.30f, 1.0f};
+		result.overrideTrailColors = true;
+		result.trailHeadColor = {0.65f, 1.0f, 0.30f, 0.95f};
+		result.trailTailColor = {0.05f, 0.80f, 0.15f, 0.0f};
+		result.ricochets = true;
+		result.expiresOutsideView = false;
+		break;
+	case PlayerProjectileMotionType::ClawSlash:
+		result.scaleMultiplier = {0.18f, 0.18f, 0.18f};
+		result.modelVisible = false;
+		result.overrideModelColor = true;
+		result.modelColor = {1.0f, 0.22f, 0.10f, 1.0f};
+		result.trailWidthMultiplier = 0.30f;
+		result.minimumTrailWidth = 0.14f;
+		result.trailLifeTime = 0.24f;
+		result.trailUsesMotionAnchor = true;
+		result.overrideTrailColors = true;
+		result.trailHeadColor = {1.0f, 0.30f, 0.04f, 0.92f};
+		result.trailTailColor = {0.70f, 0.01f, 0.00f, 0.0f};
+		result.addCoreTrail = true;
+		result.expiresOutsideView = false;
+		break;
+	case PlayerProjectileMotionType::Linear:
+	default:
+		break;
+	}
+	return result;
+}
 
 void PlayerProjectileComponent::SetMotionAnchor(GameObject* motionAnchor) { motionAnchor_ = motionAnchor; }
 
@@ -188,6 +243,29 @@ void PlayerProjectileComponent::UpdateHitCooldowns(float deltaTime) {
 			}),
 			hitRecords_.end());
 	}
+
+void PlayerProjectileComponent::UpdateLinearMotion(GameObject* owner, float deltaTime, float frameScale, bool rampHoming) {
+	if (homingEnabled_ && homingTarget_) {
+		Vector3 toTarget = homingTarget_->GetTransform().translate - owner->GetTransform().translate;
+		toTarget.y = 0.0f;
+		if (Length(toTarget) > MathConstants::kDirectionEpsilon) {
+			const Vector3 targetDirection = NormalizeReturnVector(toTarget);
+			float homingRate = (std::clamp)(homingAccuracy_, 0.0f, 1.0f);
+			if (rampHoming) {
+				magatamaElapsedSeconds_ += deltaTime;
+				// 勾玉は短時間で追尾力を最大まで上げ、大きな発射角から敵へ収束させる。
+				const float turnRamp = (std::clamp)(magatamaElapsedSeconds_ / 0.45f, 0.32f, 1.0f);
+				homingRate *= turnRamp;
+			}
+			const float accuracy = 1.0f - std::pow(1.0f - homingRate, frameScale);
+			direction_ = NormalizeReturnVector(Leap(direction_, targetDirection, accuracy));
+		}
+	}
+
+	owner->GetTransform().translate = owner->GetTransform().translate + (speed_ * frameScale) * direction_;
+	owner->GetTransform().rotate.y = std::atan2(direction_.x, direction_.z);
+	lifeTime_ -= deltaTime;
+}
 
 void PlayerProjectileComponent::UpdateBoomerang(GameObject* owner, float deltaTime, float frameScale) {
 		if (!motionAnchor_) {

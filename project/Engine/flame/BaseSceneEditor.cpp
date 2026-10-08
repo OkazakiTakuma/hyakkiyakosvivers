@@ -6,6 +6,8 @@
 #include "repositories/ParticlePresetRepository.h"
 #include "repositories/PlayerStatusRepository.h"
 
+#include <array>
+
 #ifdef USE_IMGUI
 #include "../../../imgui/ImGuizmo.h"
 #include <cctype>
@@ -13,6 +15,39 @@
 
 namespace {
 constexpr float kProjectThumbnailSize = 64.0f;
+
+/// <summary>Inspectorへ公開するComponentの取得方法と共通UI機能をまとめた型消去登録です。</summary>
+struct EditorComponentRegistration {
+	const char* label;
+	Component* (*find)(GameObject* object);
+	bool supportsGravity;
+};
+
+template<class T>
+Component* FindEditorComponent(GameObject* object) {
+	return object ? object->GetComponent<T>() : nullptr;
+}
+
+const std::array<EditorComponentRegistration, 13>& GetEditorComponentRegistrations() {
+	// 新しいComponentをInspectorへ追加するときは、この表へ1行登録するだけで
+	// 選択リスト・有効状態・共通重力UIへ同時に反映される。
+	static const std::array<EditorComponentRegistration, 13> registrations = {{
+		{"Object3d", &FindEditorComponent<Object3dComponent>, true},
+		{"PointLight", &FindEditorComponent<PointLightComponent>, false},
+		{"GlowBillboard", &FindEditorComponent<GlowBillboardComponent>, false},
+		{"Sprite", &FindEditorComponent<SpriteComponent>, true},
+		{"Text", &FindEditorComponent<TextComponent>, true},
+		{"Camera", &FindEditorComponent<CameraComponent>, true},
+		{"ParticleEmitter", &FindEditorComponent<ParticleEmitterComponent>, true},
+		{"Player", &FindEditorComponent<Player>, true},
+		{"PlayerAttack", &FindEditorComponent<PlayerAttackComponent>, true},
+		{"EnemySpawnPoint", &FindEditorComponent<EnemySpawnPointComponent>, true},
+		{"Enemy", &FindEditorComponent<EnemyComponent>, true},
+		{"OBBCollider", &FindEditorComponent<OBBColliderComponent>, true},
+		{"SphereCollider", &FindEditorComponent<SphereColliderComponent>, true}
+	}};
+	return registrations;
+}
 
 bool InputTextMultilineString(const char* label, std::string& value, const ImVec2& size = ImVec2(0.0f, 72.0f)) {
 	std::array<char, 1024> buffer{};
@@ -114,189 +149,199 @@ GameObject* BaseScene::CreateEditorObject(EditorCreateType type, const std::stri
 	auto object = std::make_unique<GameObject>();
 	object->SetEditorType(BaseSceneEditorGeometry::EditorCreateTypeName(type));
 
-	switch (type) {
-	case EditorCreateType::Empty:
-		object->SetName(MakeUniqueObjectName("Empty"));
-		break;
-	case EditorCreateType::Object3dSphere: {
-		object->SetName(MakeUniqueObjectName("Sphere"));
-		ModelManager::GetInstance()->LoadModel("sphere.obj");
-		Object3dComponent* object3d = object->AddComponent<Object3dComponent>();
-		object3d->SetModel("sphere.obj");
-		break;
-	}
-	case EditorCreateType::Object3dCylinder: {
-		object->SetName(MakeUniqueObjectName("Cylinder"));
-		Object3dComponent* object3d = object->AddComponent<Object3dComponent>();
-		object3d->CreateCylinder(1.0f, 2.0f, 16, true, true);
-		object3d->SetTexture("Resources/gradationLine.png");
-		break;
-	}
-	case EditorCreateType::Object3dCylinderOpen: {
-		object->SetName(MakeUniqueObjectName("OpenCylinder"));
-		Object3dComponent* object3d = object->AddComponent<Object3dComponent>();
-		object3d->CreateCylinder(1.0f, 2.0f, 16, false, false);
-		object3d->SetTexture("Resources/gradationLine.png");
-		break;
-	}
-	case EditorCreateType::Sprite: {
-		const std::string spriteBaseName = modelFilePath.empty() ? "Sprite" : StringUtility::PathToUtf8(StringUtility::Utf8ToPath(modelFilePath).stem());
-		object->SetName(MakeUniqueObjectName(spriteBaseName.empty() ? "Sprite" : spriteBaseName));
-		SpriteComponent* sprite = object->AddComponent<SpriteComponent>();
-		const std::vector<std::string> textures = CollectResourceTexturePaths();
-		const std::string textureFilePath = !modelFilePath.empty() ? modelFilePath : (textures.empty() ? "Resources/uvChecker.png" : textures[std::min(selectedTextureIndex_, static_cast<int>(textures.size()) - 1)]);
-		TextureManager::GetInstance()->LoadTexture(textureFilePath);
-		sprite->Initialize(textureFilePath);
-		EulerTransform transform = object->GetTransform();
-		transform.scale = {100.0f, 100.0f, 1.0f};
-		object->GetTransform() = transform;
-		sprite->SetSize({100.0f, 100.0f});
-		break;
-	}
-	case EditorCreateType::Text: {
-		object->SetName(MakeUniqueObjectName("Text"));
-		TextComponent* text = object->AddComponent<TextComponent>();
-		text->SetText("Text");
-		text->SetFontName("Default");
-		text->SetFontSize(32.0f);
-		object->GetTransform().translate = {100.0f, 100.0f, 0.0f};
-		break;
-	}
-	case EditorCreateType::LoadedModel: {
-		if (modelFilePath.empty() || !ModelManager::GetInstance()->FindModel(modelFilePath)) {
-			return nullptr;
-		}
-		object->SetName(MakeUniqueObjectName(StringUtility::PathToUtf8(StringUtility::Utf8ToPath(modelFilePath).stem())));
-		object->SetEditorType("LoadedModel:" + modelFilePath);
-		Object3dComponent* object3d = object->AddComponent<Object3dComponent>();
-		object3d->SetModel(modelFilePath);
-		break;
-	}
-	case EditorCreateType::AnimatedModel: {
-		if (modelFilePath.empty() || !ModelManager::GetInstance()->FindModel(modelFilePath)) {
-			return nullptr;
-		}
-		object->SetName(MakeUniqueObjectName(StringUtility::PathToUtf8(StringUtility::Utf8ToPath(modelFilePath).stem())));
-		object->SetEditorType("AnimatedModel:" + modelFilePath);
-		Object3dComponent* object3d = object->AddComponent<Object3dComponent>();
-		object3d->SetModel(modelFilePath);
-		object3d->SetDrawSkeleton(true);
-		break;
-	}
-	case EditorCreateType::Camera: {
-		object->SetName(MakeUniqueObjectName("Camera"));
-		CameraComponent* camera = object->AddComponent<CameraComponent>();
-		camera->SetFovY(0.45f);
-		EulerTransform& transform = object->GetTransform();
-		transform.translate = {0.0f, 4.0f, -10.0f};
-		break;
-	}
-	case EditorCreateType::PointLight: {
-		object->SetName(MakeUniqueObjectName("PointLight"));
-		Object3dComponent* object3d = object->AddComponent<Object3dComponent>();
-		ModelManager::GetInstance()->LoadModel("sphere.obj");
-		object3d->SetModel("sphere.obj");
-		object3d->IsPointLightSet(true);
-		object3d->SetPointLight({1.0f, 1.0f, 1.0f, 1.0f}, object->GetTransform().translate, 1.0f, 10.0f, 1.0f);
-		object->GetTransform().scale = {0.25f, 0.25f, 0.25f};
-		break;
-	}
-	case EditorCreateType::ParticleEmitter: {
-		object->SetName(MakeUniqueObjectName("ParticleEmitter"));
-		ParticleEmitterComponent* emitter = object->AddComponent<ParticleEmitterComponent>();
-		const std::string groupName = object->GetName();
-		std::string textureFilePath = "Resources/circle.png";
-		ParticleMeshType meshType = kMeshTypeQuad;
-		ParticlePresetRepository::GetResourceInfo(modelFilePath, textureFilePath, meshType);
-		if (!ParticleManager::GetInstance()->HasGroup(groupName)) {
-			ParticleManager::GetInstance()->CreateParticleGroup(groupName, textureFilePath, meshType);
-		}
-		emitter->SetGroupName(groupName);
-		emitter->SetTexture(textureFilePath);
-		emitter->SetMeshType(meshType);
-		if (!modelFilePath.empty()) {
-			ParticlePresetRepository::Apply(modelFilePath, emitter);
-		} else {
-			emitter->SetFrequency(0.0f);
-			ParticleEmitParam param = emitter->GetParam();
-			param.count = 10;
-			param.lifeTime = 1.0f;
-			param.scale = {1.0f, 1.0f, 1.0f};
-			param.endScale = {0.0f, 0.0f, 0.0f};
-			param.randomPositionRange = {0.5f, 0.5f, 0.5f};
-			param.randomVelocityRange = {0.5f, 0.5f, 0.5f};
-			emitter->SetParam(param);
-		}
-		break;
-	}
-	case EditorCreateType::Player: {
-		const std::string playerTypeName = modelFilePath.empty() ? "Default" : modelFilePath;
-		PlayerStats playerStats = LoadPlayerStats(playerTypeName);
-		object->SetName(MakeUniqueObjectName(playerTypeName.empty() ? "Player" : playerTypeName));
-		Player* player = object->AddComponent<Player>();
-		player->SetPlayerTypeName(playerTypeName);
-		player->ApplyStats(playerStats, ApplyPlayerStatusItems(playerStats));
-		object->GetTransform().scale = {playerStats.sizeScale, playerStats.sizeScale, playerStats.sizeScale};
-		player->SetSpawnPoint(object->GetTransform().translate);
-		PlayerAttackComponent* attack = object->AddComponent<PlayerAttackComponent>();
-		ApplyPlayerAttackSlots(attack, playerStats);
+	/// <summary>生成タイプと初期化処理を対応付ける型消去登録です。</summary>
+	struct EditorObjectRegistration {
+		EditorCreateType type;
+		bool (*initialize)(BaseScene& scene, GameObject& object, const std::string& resourceName);
+	};
 
-		Object3dComponent* object3d = object->AddComponent<Object3dComponent>();
-		std::string playerModelFilePath = playerStats.modelFilePath;
-		if (!playerModelFilePath.empty() && !ModelManager::GetInstance()->FindModel(playerModelFilePath)) {
-			ModelManager::GetInstance()->LoadModel(playerModelFilePath);
-		}
-		if (playerModelFilePath.empty() || !ModelManager::GetInstance()->FindModel(playerModelFilePath)) {
+	// 新しい生成タイプはこの表へ登録し、継承階層を増やさず生成手順だけを差し替える。
+	static const std::array<EditorObjectRegistration, 14> registrations = {{
+		{EditorCreateType::Empty, [](BaseScene& scene, GameObject& object, const std::string&) {
+			object.SetName(scene.MakeUniqueObjectName("Empty"));
+			return true;
+		}},
+		{EditorCreateType::Object3dSphere, [](BaseScene& scene, GameObject& object, const std::string&) {
+			object.SetName(scene.MakeUniqueObjectName("Sphere"));
 			ModelManager::GetInstance()->LoadModel("sphere.obj");
-			playerModelFilePath = "sphere.obj";
-			playerStats.modelFilePath = playerModelFilePath;
+			object.AddComponent<Object3dComponent>()->SetModel("sphere.obj");
+			return true;
+		}},
+		{EditorCreateType::Object3dCylinder, [](BaseScene& scene, GameObject& object, const std::string&) {
+			object.SetName(scene.MakeUniqueObjectName("Cylinder"));
+			Object3dComponent* object3d = object.AddComponent<Object3dComponent>();
+			object3d->CreateCylinder(1.0f, 2.0f, 16, true, true);
+			object3d->SetTexture("Resources/gradationLine.png");
+			return true;
+		}},
+		{EditorCreateType::Object3dCylinderOpen, [](BaseScene& scene, GameObject& object, const std::string&) {
+			object.SetName(scene.MakeUniqueObjectName("OpenCylinder"));
+			Object3dComponent* object3d = object.AddComponent<Object3dComponent>();
+			object3d->CreateCylinder(1.0f, 2.0f, 16, false, false);
+			object3d->SetTexture("Resources/gradationLine.png");
+			return true;
+		}},
+		{EditorCreateType::Sprite, [](BaseScene& scene, GameObject& object, const std::string& resourceName) {
+			const std::string spriteBaseName = resourceName.empty()
+				? "Sprite" : StringUtility::PathToUtf8(StringUtility::Utf8ToPath(resourceName).stem());
+			object.SetName(scene.MakeUniqueObjectName(spriteBaseName.empty() ? "Sprite" : spriteBaseName));
+			SpriteComponent* sprite = object.AddComponent<SpriteComponent>();
+			const std::vector<std::string> textures = CollectResourceTexturePaths();
+			const std::string textureFilePath = !resourceName.empty()
+				? resourceName
+				: textures.empty() ? "Resources/uvChecker.png"
+					: textures[(std::min)(scene.selectedTextureIndex_, static_cast<int>(textures.size()) - 1)];
+			TextureManager::GetInstance()->LoadTexture(textureFilePath);
+			sprite->Initialize(textureFilePath);
+			object.GetTransform().scale = {100.0f, 100.0f, 1.0f};
+			sprite->SetSize({100.0f, 100.0f});
+			return true;
+		}},
+		{EditorCreateType::Text, [](BaseScene& scene, GameObject& object, const std::string&) {
+			object.SetName(scene.MakeUniqueObjectName("Text"));
+			TextComponent* text = object.AddComponent<TextComponent>();
+			text->SetText("Text");
+			text->SetFontName("Default");
+			text->SetFontSize(32.0f);
+			object.GetTransform().translate = {100.0f, 100.0f, 0.0f};
+			return true;
+		}},
+		{EditorCreateType::LoadedModel, [](BaseScene& scene, GameObject& object, const std::string& resourceName) {
+			if (resourceName.empty() || !ModelManager::GetInstance()->FindModel(resourceName)) {
+				return false;
+			}
+			object.SetName(scene.MakeUniqueObjectName(StringUtility::PathToUtf8(StringUtility::Utf8ToPath(resourceName).stem())));
+			object.SetEditorType("LoadedModel:" + resourceName);
+			object.AddComponent<Object3dComponent>()->SetModel(resourceName);
+			return true;
+		}},
+		{EditorCreateType::AnimatedModel, [](BaseScene& scene, GameObject& object, const std::string& resourceName) {
+			if (resourceName.empty() || !ModelManager::GetInstance()->FindModel(resourceName)) {
+				return false;
+			}
+			object.SetName(scene.MakeUniqueObjectName(StringUtility::PathToUtf8(StringUtility::Utf8ToPath(resourceName).stem())));
+			object.SetEditorType("AnimatedModel:" + resourceName);
+			Object3dComponent* object3d = object.AddComponent<Object3dComponent>();
+			object3d->SetModel(resourceName);
+			object3d->SetDrawSkeleton(true);
+			return true;
+		}},
+		{EditorCreateType::Camera, [](BaseScene& scene, GameObject& object, const std::string&) {
+			object.SetName(scene.MakeUniqueObjectName("Camera"));
+			object.AddComponent<CameraComponent>()->SetFovY(0.45f);
+			object.GetTransform().translate = {0.0f, 4.0f, -10.0f};
+			return true;
+		}},
+		{EditorCreateType::PointLight, [](BaseScene& scene, GameObject& object, const std::string&) {
+			object.SetName(scene.MakeUniqueObjectName("PointLight"));
+			ModelManager::GetInstance()->LoadModel("sphere.obj");
+			Object3dComponent* object3d = object.AddComponent<Object3dComponent>();
+			object3d->SetModel("sphere.obj");
+			object3d->IsPointLightSet(true);
+			object3d->SetPointLight({1.0f, 1.0f, 1.0f, 1.0f}, object.GetTransform().translate, 1.0f, 10.0f, 1.0f);
+			object.GetTransform().scale = {0.25f, 0.25f, 0.25f};
+			return true;
+		}},
+		{EditorCreateType::ParticleEmitter, [](BaseScene& scene, GameObject& object, const std::string& resourceName) {
+			object.SetName(scene.MakeUniqueObjectName("ParticleEmitter"));
+			ParticleEmitterComponent* emitter = object.AddComponent<ParticleEmitterComponent>();
+			const std::string groupName = object.GetName();
+			std::string textureFilePath = "Resources/circle.png";
+			ParticleMeshType meshType = kMeshTypeQuad;
+			ParticlePresetRepository::GetResourceInfo(resourceName, textureFilePath, meshType);
+			if (!ParticleManager::GetInstance()->HasGroup(groupName)) {
+				ParticleManager::GetInstance()->CreateParticleGroup(groupName, textureFilePath, meshType);
+			}
+			emitter->SetGroupName(groupName);
+			emitter->SetTexture(textureFilePath);
+			emitter->SetMeshType(meshType);
+			if (!resourceName.empty()) {
+				ParticlePresetRepository::Apply(resourceName, emitter);
+			} else {
+				emitter->SetFrequency(0.0f);
+				ParticleEmitParam param = emitter->GetParam();
+				param.count = 10;
+				param.lifeTime = 1.0f;
+				param.scale = {1.0f, 1.0f, 1.0f};
+				param.endScale = {0.0f, 0.0f, 0.0f};
+				param.randomPositionRange = {0.5f, 0.5f, 0.5f};
+				param.randomVelocityRange = {0.5f, 0.5f, 0.5f};
+				emitter->SetParam(param);
+			}
+			return true;
+		}},
+		{EditorCreateType::Player, [](BaseScene& scene, GameObject& object, const std::string& resourceName) {
+			const std::string playerTypeName = resourceName.empty() ? "Default" : resourceName;
+			PlayerStats playerStats = LoadPlayerStats(playerTypeName);
+			object.SetName(scene.MakeUniqueObjectName(playerTypeName.empty() ? "Player" : playerTypeName));
+			Player* player = object.AddComponent<Player>();
+			player->SetPlayerTypeName(playerTypeName);
 			player->ApplyStats(playerStats, ApplyPlayerStatusItems(playerStats));
+			object.GetTransform().scale = {playerStats.sizeScale, playerStats.sizeScale, playerStats.sizeScale};
+			player->SetSpawnPoint(object.GetTransform().translate);
+			ApplyPlayerAttackSlots(object.AddComponent<PlayerAttackComponent>(), playerStats);
+
+			Object3dComponent* object3d = object.AddComponent<Object3dComponent>();
+			std::string playerModelFilePath = playerStats.modelFilePath;
+			if (!playerModelFilePath.empty() && !ModelManager::GetInstance()->FindModel(playerModelFilePath)) {
+				ModelManager::GetInstance()->LoadModel(playerModelFilePath);
+			}
+			if (playerModelFilePath.empty() || !ModelManager::GetInstance()->FindModel(playerModelFilePath)) {
+				ModelManager::GetInstance()->LoadModel("sphere.obj");
+				playerModelFilePath = "sphere.obj";
+				playerStats.modelFilePath = playerModelFilePath;
+				player->ApplyStats(playerStats, ApplyPlayerStatusItems(playerStats));
+			}
+			object3d->SetModel(playerModelFilePath);
+			Model* playerModel = ModelManager::GetInstance()->FindModel(playerModelFilePath);
+			const bool isAnimationModel = playerModel && playerModel->GetIsAnimation();
+			object3d->SetDrawSkeleton(isAnimationModel);
+			player->SetModelFilePath(playerModelFilePath, isAnimationModel);
+
+			OBBColliderComponent* collider = object.AddComponent<OBBColliderComponent>();
+			collider->SetHalfSize({0.5f, 1.0f, 0.5f});
+			collider->SetCenterOffset({0.0f, 1.0f, 0.0f});
+			collider->SetPushBackEnabled(true);
+			CameraComponent* camera = object.AddComponent<CameraComponent>();
+			camera->SetLocalOffset({0.0f, 15.0f, 0.0f});
+			camera->SetOverrideRotationEnabled(true);
+			camera->SetOverrideRotation({MathConstants::kPi * 0.5f, 0.0f, 0.0f});
+			camera->SetFovY(0.75f);
+			camera->SetFarClip(1000.0f);
+			return true;
+		}},
+		{EditorCreateType::EnemySpawnPoint, [](BaseScene& scene, GameObject& object, const std::string&) {
+			object.SetName(scene.MakeUniqueObjectName("EnemySpawnPoint"));
+			object.AddComponent<EnemySpawnPointComponent>();
+			return true;
+		}},
+		{EditorCreateType::Enemy, [](BaseScene& scene, GameObject& object, const std::string& resourceName) {
+			const std::string enemyTypeName = resourceName.empty() ? "Default" : resourceName;
+			const EnemyStats enemyStats = LoadEnemyStats(enemyTypeName);
+			object.SetName(scene.MakeUniqueObjectName(enemyTypeName));
+			object.SetEditorType("Enemy");
+			EnemyComponent* enemy = object.AddComponent<EnemyComponent>();
+			enemy->SetEnemyTypeName(enemyTypeName);
+			enemy->ApplyStats(enemyStats);
+			ModelManager::GetInstance()->LoadModel("sphere.obj");
+			object.AddComponent<Object3dComponent>()->SetModel("sphere.obj");
+			const float enemyScale = 0.75f * enemyStats.sizeScale;
+			object.GetTransform().scale = {enemyScale, enemyScale, enemyScale};
+			OBBColliderComponent* collider = object.AddComponent<OBBColliderComponent>();
+			collider->SetHalfSize({0.4f, 0.4f, 0.4f});
+			collider->SetPushBackEnabled(true);
+			return true;
+		}}
+	}};
+
+	const EditorObjectRegistration* selectedRegistration = nullptr;
+	for (const EditorObjectRegistration& registration : registrations) {
+		if (registration.type == type) {
+			selectedRegistration = &registration;
+			break;
 		}
-		object3d->SetModel(playerModelFilePath);
-		Model* playerModel = ModelManager::GetInstance()->FindModel(playerModelFilePath);
-		const bool isAnimationModel = playerModel && playerModel->GetIsAnimation();
-		object3d->SetDrawSkeleton(isAnimationModel);
-		player->SetModelFilePath(playerModelFilePath, isAnimationModel);
-
-		OBBColliderComponent* collider = object->AddComponent<OBBColliderComponent>();
-		collider->SetHalfSize({0.5f, 1.0f, 0.5f});
-		collider->SetCenterOffset({0.0f, 1.0f, 0.0f});
-		collider->SetPushBackEnabled(true);
-
-		CameraComponent* camera = object->AddComponent<CameraComponent>();
-		camera->SetLocalOffset({0.0f, 15.0f, 0.0f});
-		camera->SetOverrideRotationEnabled(true);
-		camera->SetOverrideRotation({MathConstants::kPi * 0.5f, 0.0f, 0.0f});
-		camera->SetFovY(0.75f);
-		camera->SetFarClip(1000.0f);
-		break;
 	}
-	case EditorCreateType::EnemySpawnPoint: {
-		object->SetName(MakeUniqueObjectName("EnemySpawnPoint"));
-		object->AddComponent<EnemySpawnPointComponent>();
-		break;
-	}
-	case EditorCreateType::Enemy: {
-		const std::string enemyTypeName = modelFilePath.empty() ? "Default" : modelFilePath;
-		const EnemyStats enemyStats = LoadEnemyStats(enemyTypeName);
-		object->SetName(MakeUniqueObjectName(enemyTypeName));
-		object->SetEditorType("Enemy");
-		EnemyComponent* enemy = object->AddComponent<EnemyComponent>();
-		enemy->SetEnemyTypeName(enemyTypeName);
-		enemy->ApplyStats(enemyStats);
-
-		ModelManager::GetInstance()->LoadModel("sphere.obj");
-		Object3dComponent* object3d = object->AddComponent<Object3dComponent>();
-		object3d->SetModel("sphere.obj");
-		const float enemyScale = 0.75f * enemyStats.sizeScale;
-		object->GetTransform().scale = {enemyScale, enemyScale, enemyScale};
-
-		OBBColliderComponent* collider = object->AddComponent<OBBColliderComponent>();
-		collider->SetHalfSize({0.4f, 0.4f, 0.4f});
-		collider->SetPushBackEnabled(true);
-		break;
-	}
-	default:
+	if (!selectedRegistration || !selectedRegistration->initialize(*this, *object, modelFilePath)) {
 		return nullptr;
 	}
 
@@ -679,45 +724,13 @@ void BaseScene::DrawEditorInspector() {
 	}
 
 	std::vector<std::string> componentLabels;
+	std::vector<std::pair<const EditorComponentRegistration*, Component*>> registeredComponents;
 	componentLabels.push_back("Transform");
-	if (selectedObject->GetComponent<Object3dComponent>()) {
-		componentLabels.push_back("Object3d");
-	}
-	if (selectedObject->GetComponent<PointLightComponent>()) {
-		componentLabels.push_back("PointLight");
-	}
-	if (selectedObject->GetComponent<GlowBillboardComponent>()) {
-		componentLabels.push_back("GlowBillboard");
-	}
-	if (selectedObject->GetComponent<SpriteComponent>()) {
-		componentLabels.push_back("Sprite");
-	}
-	if (selectedObject->GetComponent<TextComponent>()) {
-		componentLabels.push_back("Text");
-	}
-	if (selectedObject->GetComponent<CameraComponent>()) {
-		componentLabels.push_back("Camera");
-	}
-	if (selectedObject->GetComponent<ParticleEmitterComponent>()) {
-		componentLabels.push_back("ParticleEmitter");
-	}
-	if (selectedObject->GetComponent<Player>()) {
-		componentLabels.push_back("Player");
-	}
-	if (selectedObject->GetComponent<PlayerAttackComponent>()) {
-		componentLabels.push_back("PlayerAttack");
-	}
-	if (selectedObject->GetComponent<EnemySpawnPointComponent>()) {
-		componentLabels.push_back("EnemySpawnPoint");
-	}
-	if (selectedObject->GetComponent<EnemyComponent>()) {
-		componentLabels.push_back("Enemy");
-	}
-	if (selectedObject->GetComponent<OBBColliderComponent>()) {
-		componentLabels.push_back("OBBCollider");
-	}
-	if (selectedObject->GetComponent<SphereColliderComponent>()) {
-		componentLabels.push_back("SphereCollider");
+	for (const EditorComponentRegistration& registration : GetEditorComponentRegistrations()) {
+		if (Component* component = registration.find(selectedObject)) {
+			componentLabels.push_back(registration.label);
+			registeredComponents.push_back({&registration, component});
+		}
 	}
 	if (selectedInspectorComponentIndex_ >= static_cast<int>(componentLabels.size())) {
 		selectedInspectorComponentIndex_ = 0;
@@ -757,32 +770,19 @@ void BaseScene::DrawEditorInspector() {
 	};
 	ImGui::Separator();
 	ImGui::Text("Component Enabled");
-	drawComponentEnabledCheckbox("Object3d Enabled", selectedObject->GetComponent<Object3dComponent>());
-	drawComponentEnabledCheckbox("PointLight Enabled", selectedObject->GetComponent<PointLightComponent>());
-	drawComponentEnabledCheckbox("GlowBillboard Enabled", selectedObject->GetComponent<GlowBillboardComponent>());
-	drawComponentEnabledCheckbox("Sprite Enabled", selectedObject->GetComponent<SpriteComponent>());
-	drawComponentEnabledCheckbox("Text Enabled", selectedObject->GetComponent<TextComponent>());
-	drawComponentEnabledCheckbox("Camera Enabled", selectedObject->GetComponent<CameraComponent>());
-	drawComponentEnabledCheckbox("ParticleEmitter Enabled", selectedObject->GetComponent<ParticleEmitterComponent>());
-	drawComponentEnabledCheckbox("Player Enabled", selectedObject->GetComponent<Player>());
-	drawComponentEnabledCheckbox("PlayerAttack Enabled", selectedObject->GetComponent<PlayerAttackComponent>());
-	drawComponentEnabledCheckbox("EnemySpawnPoint Enabled", selectedObject->GetComponent<EnemySpawnPointComponent>());
-	drawComponentEnabledCheckbox("Enemy Enabled", selectedObject->GetComponent<EnemyComponent>());
-	drawComponentEnabledCheckbox("OBBCollider Enabled", selectedObject->GetComponent<OBBColliderComponent>());
-	drawComponentEnabledCheckbox("SphereCollider Enabled", selectedObject->GetComponent<SphereColliderComponent>());
+	for (const auto& [registration, component] : registeredComponents) {
+		const std::string label = std::string(registration->label) + " Enabled";
+		drawComponentEnabledCheckbox(label.c_str(), component);
+	}
 	ImGui::Separator();
 	ImGui::Text("Component Gravity");
-	drawComponentGravityControls("Object3d Gravity", selectedObject->GetComponent<Object3dComponent>());
-	drawComponentGravityControls("Sprite Gravity", selectedObject->GetComponent<SpriteComponent>());
-	drawComponentGravityControls("Text Gravity", selectedObject->GetComponent<TextComponent>());
-	drawComponentGravityControls("Camera Gravity", selectedObject->GetComponent<CameraComponent>());
-	drawComponentGravityControls("ParticleEmitter Gravity", selectedObject->GetComponent<ParticleEmitterComponent>());
-	drawComponentGravityControls("Player Gravity", selectedObject->GetComponent<Player>());
-	drawComponentGravityControls("PlayerAttack Gravity", selectedObject->GetComponent<PlayerAttackComponent>());
-	drawComponentGravityControls("EnemySpawnPoint Gravity", selectedObject->GetComponent<EnemySpawnPointComponent>());
-	drawComponentGravityControls("Enemy Gravity", selectedObject->GetComponent<EnemyComponent>());
-	drawComponentGravityControls("OBBCollider Gravity", selectedObject->GetComponent<OBBColliderComponent>());
-	drawComponentGravityControls("SphereCollider Gravity", selectedObject->GetComponent<SphereColliderComponent>());
+	for (const auto& [registration, component] : registeredComponents) {
+		if (!registration->supportsGravity) {
+			continue;
+		}
+		const std::string label = std::string(registration->label) + " Gravity";
+		drawComponentGravityControls(label.c_str(), component);
+	}
 
 	if (componentLabels.size() == 1) {
 		ImGui::Text("No optional components");
@@ -910,6 +910,36 @@ void BaseScene::DrawSelectedComponentInspector(GameObject* selectedObject, const
 					pointChanged |= ImGui::DragFloat("Point Decay", &pointDecay, 0.01f, 0.0f, 10.0f);
 					if (pointChanged) {
 						object3dComponent->SetPointLight(pointColor, pointPosition, pointIntensity, pointRadius, pointDecay);
+					}
+				}
+			}
+			// ボーンポーズ編集はモデル設定に埋め込まず、右側インスペクターの独立セクションとして表示する。
+			// これによりモデル設定を閉じても、選択中モデルのポーズ操作へすぐアクセスできる。
+			if (object3dComponent->HasSkeleton()) {
+				ImGui::Separator();
+				if (ImGui::CollapsingHeader("Bone Pose Editor", ImGuiTreeNodeFlags_DefaultOpen)) {
+					const std::vector<std::string> jointNames = object3dComponent->GetJointNames();
+					static int selectedJointIndex = 0;
+					if (selectedJointIndex >= static_cast<int>(jointNames.size())) {
+						selectedJointIndex = 0;
+					}
+					if (!jointNames.empty()) {
+						std::vector<const char*> jointLabels = MakeLabelPointers(jointNames);
+						ImGui::Combo("Bone", &selectedJointIndex, jointLabels.data(), static_cast<int>(jointLabels.size()));
+						const std::string& selectedJointName = jointNames[selectedJointIndex];
+						Vector3 jointRotation = object3dComponent->GetJointRotationOffsetEuler(selectedJointName);
+						bool rotationChanged = false;
+						rotationChanged |= ImGui::SliderAngle("Bone Rotate X", &jointRotation.x, -180.0f, 180.0f);
+						rotationChanged |= ImGui::SliderAngle("Bone Rotate Y", &jointRotation.y, -180.0f, 180.0f);
+						rotationChanged |= ImGui::SliderAngle("Bone Rotate Z", &jointRotation.z, -180.0f, 180.0f);
+						if (rotationChanged) {
+							object3dComponent->SetJointRotationOffsetEuler(selectedJointName, jointRotation);
+						}
+						if (ImGui::Button("Clear Bone Pose Overrides")) {
+							object3dComponent->ClearJointRotationOffsets();
+						}
+					} else {
+						ImGui::TextDisabled("No joints found");
 					}
 				}
 			}

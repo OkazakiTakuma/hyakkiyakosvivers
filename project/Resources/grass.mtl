@@ -1,0 +1,11 @@
+# Blender 5.1.2 MTL File: 'None'
+
+newmtl Material
+Ns 10.000000
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+d 1.000000
+illum 2
+map_Kd terrain/grass.png
+# www.blender.org

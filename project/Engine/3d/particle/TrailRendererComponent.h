@@ -43,15 +43,24 @@ public:
 	}
 
 	void Draw3D() override {
-		if (points_.size() < 2 || lifeTime_ <= 0.0f) {
+		if (points_.empty() || !GetOwner() || lifeTime_ <= 0.0f) {
 			return;
 		}
 		// 点の寿命を0～1の残存率へ変換してレンダラーへ渡す。
 		std::vector<TrailRenderPoint> renderPoints;
-		renderPoints.reserve(points_.size());
+		renderPoints.reserve(points_.size() + 1);
 		const Vector3 referenceOrigin = GetReferenceOrigin();
 		for (const Point& point : points_) {
 			renderPoints.push_back({point.position + referenceOrigin, 1.0f - (std::clamp)(point.age / lifeTime_, 0.0f, 1.0f)});
+		}
+		// 履歴点は一定距離ごとに間引く一方、描画時だけ現在位置を終端へ足す。
+		// これにより低速弾でも2点未満になりにくく、軌跡の先端が弾本体から離れない。
+		const Vector3 currentPosition = GetOwner()->GetTransform().translate + offset_;
+		if (Length(currentPosition - renderPoints.back().position) > kPositionEpsilon) {
+			renderPoints.push_back({currentPosition, 1.0f});
+		}
+		if (renderPoints.size() < 2) {
+			return;
 		}
 		TrailRenderer::GetInstance()->Submit(renderPoints, width_, headColor_, tailColor_);
 	}
@@ -91,6 +100,8 @@ public:
 	GameObject* GetPositionReference() const { return referenceObject_; }
 
 private:
+	static constexpr float kPositionEpsilon = 0.00001f;
+
 	/// <summary>軌跡を構成する点の相対位置と生成後の経過時間です。</summary>
 	struct Point {
 		Vector3 position{};

@@ -6,6 +6,69 @@
 #include <algorithm>
 #include <cmath>
 
+// 専用パターンが不要な攻撃は、JSONの homing と shotCount だけで従来どおり生成する。
+class DefaultPlayerAttackPattern final : public IPlayerAttackPattern {
+public:
+	void CreateShots(
+		PlayerAttackComponent& component,
+		GameObject* owner,
+		const Player& player,
+		const PlayerAttackStats& attackStats,
+		const PlayerAttackLevelStats& levelStats,
+		const std::string& currentLevel) const override {
+		if (levelStats.homing) {
+			component.CreateHomingAttack(owner, player, attackStats, levelStats, currentLevel);
+		} else if (levelStats.shotCount > 1) {
+			component.CreateSpreadAttack(owner, player, attackStats, levelStats, currentLevel);
+		} else {
+			component.CreateStraightAttack(owner, player, attackStats, levelStats, currentLevel);
+		}
+	}
+};
+
+// 以下のStrategyは特殊攻撃固有の要求生成だけを選択し、数値設定は共通のJSONデータを利用する。
+class MagatamaPlayerAttackPattern final : public IPlayerAttackPattern {
+public:
+	void CreateShots(PlayerAttackComponent& component, GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) const override {
+		component.CreateMagatamaAttack(owner, player, attackStats, levelStats, currentLevel);
+	}
+};
+
+class OrbitPlayerAttackPattern final : public IPlayerAttackPattern {
+public:
+	void CreateShots(PlayerAttackComponent& component, GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) const override {
+		component.CreateOrbitAttack(owner, player, attackStats, levelStats, currentLevel);
+	}
+};
+
+class SkyLaserPlayerAttackPattern final : public IPlayerAttackPattern {
+public:
+	void CreateShots(PlayerAttackComponent& component, GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) const override {
+		component.CreateSkyLaserAttack(owner, player, attackStats, levelStats, currentLevel);
+	}
+};
+
+class BoomerangPlayerAttackPattern final : public IPlayerAttackPattern {
+public:
+	void CreateShots(PlayerAttackComponent& component, GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) const override {
+		component.CreateBoomerangAttack(owner, player, attackStats, levelStats, currentLevel);
+	}
+};
+
+class RicochetPlayerAttackPattern final : public IPlayerAttackPattern {
+public:
+	void CreateShots(PlayerAttackComponent& component, GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) const override {
+		component.CreateRicochetAttack(owner, player, attackStats, levelStats, currentLevel);
+	}
+};
+
+class ClawSlashPlayerAttackPattern final : public IPlayerAttackPattern {
+public:
+	void CreateShots(PlayerAttackComponent& component, GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) const override {
+		component.CreateClawSlashAttack(owner, player, attackStats, levelStats, currentLevel);
+	}
+};
+
 void PlayerAttackComponent::Update() {
 		// 各攻撃スロットのクールダウンを進め、発射可能な攻撃を要求へ変換する。
 		GameObject* owner = GetOwner();
@@ -31,7 +94,7 @@ void PlayerAttackComponent::Update() {
 			}
 			const std::string currentLevel = slot.level;
 			const PlayerAttackLevelStats levelStats = FindCurrentLevelStats(slot, currentLevel);
-			CreateAttackByName(owner, *player, slot, levelStats, currentLevel);
+			CreateAttack(owner, *player, slot, levelStats, currentLevel);
 			slot.attackTimer = levelStats.attackInterval / playerAttackSpeedRate;
 		}
 	}
@@ -118,7 +181,7 @@ Vector3 PlayerAttackComponent::GetShotSpawnOffset(const PlayerAttackLevelStats& 
 		return {0.0f, 0.5f, 1.2f};
 	}
 
-void PlayerAttackComponent::QueueShot(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel, float angleDegrees, int shotIndex, bool alignSpawnToShotAngle) {
+void PlayerAttackComponent::QueueShot(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel, float angleDegrees, int shotIndex, bool alignSpawnToShotAngle) {
 		const float playerAttackRate = player.GetStats().attack / 100.0f;
 		const float playerAttackSizeRate = player.GetStats().attackSize / 100.0f;
 		const Vector3 spawnOffset = GetShotSpawnOffset(levelStats, shotIndex);
@@ -140,7 +203,7 @@ void PlayerAttackComponent::QueueShot(GameObject* owner, const Player& player, c
 		const Vector3& spawnRight = alignSpawnToShotAngle ? shotRight : right;
 
 		PlayerAttackShotRequest request;
-		request.attackName = slot.stats.name;
+		request.attackName = attackStats.name;
 		request.level = currentLevel;
 		// ローカルオフセットをプレイヤーの右・上・前ベクトルへ分解してワールド座標へ変換する。
 		request.position = owner->GetTransform().translate +
@@ -161,40 +224,40 @@ void PlayerAttackComponent::QueueShot(GameObject* owner, const Player& player, c
 		shotRequests_.push_back(request);
 	}
 
-void PlayerAttackComponent::CreateStraightAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
-		QueueShot(owner, player, slot, levelStats, currentLevel, 0.0f, 0);
+void PlayerAttackComponent::CreateStraightAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
+		QueueShot(owner, player, attackStats, levelStats, currentLevel, 0.0f, 0);
 	}
 
-void PlayerAttackComponent::CreateSpreadAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
+void PlayerAttackComponent::CreateSpreadAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
 		const int shotCount = (std::max)(1, levelStats.shotCount);
 		for (int index = 0; index < shotCount; ++index) {
 			const float angle = index < static_cast<int>(levelStats.angles.size()) ? levelStats.angles[index] : 0.0f;
-			QueueShot(owner, player, slot, levelStats, currentLevel, angle, index);
+			QueueShot(owner, player, attackStats, levelStats, currentLevel, angle, index);
 		}
 	}
 
-void PlayerAttackComponent::CreateHomingAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, PlayerAttackLevelStats levelStats, const std::string& currentLevel) {
+void PlayerAttackComponent::CreateHomingAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, PlayerAttackLevelStats levelStats, const std::string& currentLevel) {
 		levelStats.homing = true;
-		CreateSpreadAttack(owner, player, slot, levelStats, currentLevel);
+		CreateSpreadAttack(owner, player, attackStats, levelStats, currentLevel);
 	}
 
-void PlayerAttackComponent::CreateMagatamaAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, PlayerAttackLevelStats levelStats, const std::string& currentLevel) {
+void PlayerAttackComponent::CreateMagatamaAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, PlayerAttackLevelStats levelStats, const std::string& currentLevel) {
 		levelStats.homing = true;
 		const int shotCount = (std::max)(1, levelStats.shotCount);
 		for (int index = 0; index < shotCount; ++index) {
 			// JSONの角度配列により、3発=120度、4発=90度、6発=60度間隔で全周へ発射する。
 			const float angle = index < static_cast<int>(levelStats.angles.size()) ? levelStats.angles[index] : 0.0f;
-			QueueShot(owner, player, slot, levelStats, currentLevel, angle, index, true);
+			QueueShot(owner, player, attackStats, levelStats, currentLevel, angle, index, true);
 			PlayerAttackShotRequest& request = shotRequests_.back();
 			request.motionType = PlayerProjectileMotionType::Magatama;
 		}
 	}
 
-void PlayerAttackComponent::CreateOrbitAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
+void PlayerAttackComponent::CreateOrbitAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
 		// 弾数分を円周上へ等間隔に配置し、以後の位置更新に使う中心・角度・半径を要求へ記録する。
 		const int shotCount = (std::max)(1, levelStats.shotCount);
 		for (int index = 0; index < shotCount; ++index) {
-			QueueShot(owner, player, slot, levelStats, currentLevel, 0.0f, index);
+			QueueShot(owner, player, attackStats, levelStats, currentLevel, 0.0f, index);
 			PlayerAttackShotRequest& request = shotRequests_.back();
 			const Vector3 spawnOffset = GetShotSpawnOffset(levelStats, index);
 			const float horizontalRadius = std::sqrt(
@@ -214,11 +277,11 @@ void PlayerAttackComponent::CreateOrbitAttack(GameObject* owner, const Player& p
 		}
 	}
 
-void PlayerAttackComponent::CreateSkyLaserAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
+void PlayerAttackComponent::CreateSkyLaserAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
 		// 実際の敵座標への置き換えは、画面内の敵を列挙できるBaseScene側で行う。
 		const int targetCount = (std::max)(1, levelStats.shotCount);
 		for (int index = 0; index < targetCount; ++index) {
-			QueueShot(owner, player, slot, levelStats, currentLevel, 0.0f, index);
+			QueueShot(owner, player, attackStats, levelStats, currentLevel, 0.0f, index);
 			PlayerAttackShotRequest& request = shotRequests_.back();
 			request.motionType = PlayerProjectileMotionType::SkyLaser;
 			request.direction = {0.0f, -1.0f, 0.0f};
@@ -226,9 +289,9 @@ void PlayerAttackComponent::CreateSkyLaserAttack(GameObject* owner, const Player
 		}
 	}
 
-void PlayerAttackComponent::CreateBoomerangAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
+void PlayerAttackComponent::CreateBoomerangAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
 		// 発射時の進行方向はBaseSceneで最寄りの敵へ向けるが、飛行中は追尾しない。
-		QueueShot(owner, player, slot, levelStats, currentLevel, 0.0f, 0);
+		QueueShot(owner, player, attackStats, levelStats, currentLevel, 0.0f, 0);
 		PlayerAttackShotRequest& request = shotRequests_.back();
 		request.motionType = PlayerProjectileMotionType::Boomerang;
 		request.motionAnchor = owner;
@@ -236,23 +299,23 @@ void PlayerAttackComponent::CreateBoomerangAttack(GameObject* owner, const Playe
 		request.homing = false;
 	}
 
-void PlayerAttackComponent::CreateRicochetAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
+void PlayerAttackComponent::CreateRicochetAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
 		// 画面端・障害物での反射判定は、シーン内のカメラとコライダーを参照できるBaseScene側で行う。
 		const int shotCount = (std::max)(1, levelStats.shotCount);
 		for (int index = 0; index < shotCount; ++index) {
 			const float angle = index < static_cast<int>(levelStats.angles.size()) ? levelStats.angles[index] : 0.0f;
-			QueueShot(owner, player, slot, levelStats, currentLevel, angle, index);
+			QueueShot(owner, player, attackStats, levelStats, currentLevel, angle, index);
 			PlayerAttackShotRequest& request = shotRequests_.back();
 			request.motionType = PlayerProjectileMotionType::Ricochet;
 			request.homing = false;
 		}
 	}
 
-void PlayerAttackComponent::CreateClawSlashAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
+void PlayerAttackComponent::CreateClawSlashAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
 		// 通常は3本、JSONでそれ以上の本数が指定された場合（Superなど）はその本数で生成する。
 		const int slashCount = (std::max)(3, levelStats.shotCount);
 		for (int index = 0; index < slashCount; ++index) {
-			QueueShot(owner, player, slot, levelStats, currentLevel, 0.0f, index);
+			QueueShot(owner, player, attackStats, levelStats, currentLevel, 0.0f, index);
 			PlayerAttackShotRequest& request = shotRequests_.back();
 			request.motionType = PlayerProjectileMotionType::ClawSlash;
 			request.motionAnchor = owner;
@@ -265,39 +328,24 @@ void PlayerAttackComponent::CreateClawSlashAttack(GameObject* owner, const Playe
 		}
 	}
 
-void PlayerAttackComponent::CreateAttackByName(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
-		// 専用挙動を持つ攻撃は名前で生成方式を振り分け、その他は設定値から通常・拡散・追尾を選ぶ。
-		if (slot.stats.name == "勾玉") {
-			CreateMagatamaAttack(owner, player, slot, levelStats, currentLevel);
-			return;
-		}
-		if (slot.stats.name == "ClawSlash") {
-			CreateClawSlashAttack(owner, player, slot, levelStats, currentLevel);
-			return;
-		}
-		if (slot.stats.name == "Ricochet") {
-			CreateRicochetAttack(owner, player, slot, levelStats, currentLevel);
-			return;
-		}
-		if (slot.stats.name == "Boomerang") {
-			CreateBoomerangAttack(owner, player, slot, levelStats, currentLevel);
-			return;
-		}
-		if (slot.stats.name == "Orbit") {
-			CreateOrbitAttack(owner, player, slot, levelStats, currentLevel);
-			return;
-		}
-		if (slot.stats.name == "SkyLaser") {
-			CreateSkyLaserAttack(owner, player, slot, levelStats, currentLevel);
-			return;
-		}
-		if (levelStats.homing) {
-			CreateHomingAttack(owner, player, slot, levelStats, currentLevel);
-			return;
-		}
-		if (levelStats.shotCount > 1) {
-			CreateSpreadAttack(owner, player, slot, levelStats, currentLevel);
-			return;
-		}
-		CreateStraightAttack(owner, player, slot, levelStats, currentLevel);
+void PlayerAttackComponent::CreateAttack(GameObject* owner, const Player& player, const AttackSlotRuntime& slot, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
+	// 攻撃名は登録表の検索にだけ使い、具体的な発射方式は仮想関数へ委譲する。
+	if (!defaultAttackPattern_) {
+		RegisterAttackPatterns();
 	}
+	const auto pattern = attackPatterns_.find(slot.stats.name);
+	const IPlayerAttackPattern* selectedPattern =
+		pattern != attackPatterns_.end() ? pattern->second.get() : defaultAttackPattern_.get();
+	selectedPattern->CreateShots(*this, owner, player, slot.stats, levelStats, currentLevel);
+}
+
+void PlayerAttackComponent::RegisterAttackPatterns() {
+	defaultAttackPattern_ = std::make_unique<DefaultPlayerAttackPattern>();
+	attackPatterns_.clear();
+	attackPatterns_.emplace("勾玉", std::make_unique<MagatamaPlayerAttackPattern>());
+	attackPatterns_.emplace("Orbit", std::make_unique<OrbitPlayerAttackPattern>());
+	attackPatterns_.emplace("SkyLaser", std::make_unique<SkyLaserPlayerAttackPattern>());
+	attackPatterns_.emplace("Boomerang", std::make_unique<BoomerangPlayerAttackPattern>());
+	attackPatterns_.emplace("Ricochet", std::make_unique<RicochetPlayerAttackPattern>());
+	attackPatterns_.emplace("ClawSlash", std::make_unique<ClawSlashPlayerAttackPattern>());
+}

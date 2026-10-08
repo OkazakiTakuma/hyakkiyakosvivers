@@ -390,6 +390,32 @@ public:
 	}
 };
 
+// 経験値オーブ専用の弱い脈動発光。ほかのドロップには適用しない。
+class ExperienceGlowVisualComponent final : public Component {
+public:
+	void Update() override {
+		Object3dComponent* object3d = GetOwner() ? GetOwner()->GetComponent<Object3dComponent>() : nullptr;
+		if (!object3d) {
+			return;
+		}
+
+		if (!initialized_) {
+			baseEmissionColor_ = object3d->GetEmissionColor();
+			initialized_ = true;
+		}
+
+		time_ += GameTime::GetDeltaTime();
+		// Bloomが途切れない範囲で、ゆっくり明滅させる。
+		const float intensity = 0.54f + 0.10f * std::sin(time_ * 2.4f);
+		object3d->SetEmission(baseEmissionColor_, intensity);
+	}
+
+private:
+	Vector3 baseEmissionColor_ = {0.0f, 0.0f, 0.0f};
+	float time_ = 0.0f;
+	bool initialized_ = false;
+};
+
 // 圧縮後も経験値の段階を見た目で判別できるよう、単位ごとの表示色を返します。
 Vector4 GetExperienceColor(int denomination) {
 	switch (denomination) {
@@ -696,7 +722,7 @@ void BaseScene::UpdateEnemySpawning() {
 				return;
 			}
 		}
-		if (isLevelUpSelectionActive_ || !bossAcquisitionOfferQueue_.empty()) {
+		if (IsLevelUpSelectionActive() || !bossAcquisitionOfferQueue_.empty()) {
 			return;
 		}
 		// Boss Encounter はステージの最後に一度だけ発生するため、撃破をクリア条件とする。
@@ -850,6 +876,12 @@ void BaseScene::UpdateStageBoundaryWrapping() {
 				}
 			}
 			target->GetTransform().translate = target->GetTransform().translate + shift;
+			// ループ移動後の座標を同じフレームでカメラ行列へ反映する。
+			// 床タイルは固定配置のままにし、カメラだけが古い座標で1フレーム
+			// 描画される可能性をなくす。
+			if (CameraComponent* camera = target->GetComponent<CameraComponent>()) {
+				camera->Update();
+			}
 		}
 	}
 }
@@ -920,26 +952,9 @@ GameObject* BaseScene::CreateRuntimeEnemy(
 		enemy->SetTargetName(target->GetName());
 	}
 
-	// ステージ1の最終ボスは猫、ステージ2の最終ボスはドッペルゲンガーを使い、
-	// それ以外は行動タイプごとの外見を割り当てる。
-	const char* enemyModelFilePath = "enemy_chaser.gltf";
-	switch (stats.behavior) {
-	case EnemyBehaviorType::Shooter:
-	case EnemyBehaviorType::BurstShooter:
-	case EnemyBehaviorType::TornadoBoss:
-		enemyModelFilePath = "enemy_shooter.gltf";
-		break;
-	case EnemyBehaviorType::Charger:
-	case EnemyBehaviorType::NightSlashBoss:
-		enemyModelFilePath = "enemy_charger.gltf";
-		break;
-	case EnemyBehaviorType::SelfDestruct:
-		enemyModelFilePath = "enemy_bomber.gltf";
-		break;
-	case EnemyBehaviorType::Chase:
-	default:
-		break;
-	}
+	// 行動に対応する標準モデルはStrategyから受け取り、ステージ固有キャラクターだけ名前で上書きする。
+	const EnemyBehaviorPresentation initialPresentation = enemy->GetBehaviorPresentation();
+	std::string enemyModelFilePath = initialPresentation.modelFilePath;
 	if (resolvedTypeName == "Stage2Boss") {
 		enemyModelFilePath = "doppelganger.gltf";
 		if (!ModelManager::GetInstance()->FindModel(enemyModelFilePath)) {
@@ -959,7 +974,7 @@ GameObject* BaseScene::CreateRuntimeEnemy(
 	OBBColliderComponent* collider = object->AddComponent<OBBColliderComponent>();
 	collider->SetHalfSize({0.4f, 0.4f, 0.4f});
 	collider->SetPushBackEnabled(true);
-	if (stats.behavior == EnemyBehaviorType::NightSlashBoss) {
+	if (initialPresentation.addAttackTrail) {
 		// 高速移動した経路を紫色の帯として残し、切り返し方向を視覚化する。
 		TrailRendererComponent* trail = object->AddComponent<TrailRendererComponent>();
 		trail->SetWidth(1.15f * stats.sizeScale);
@@ -1026,13 +1041,14 @@ GameObject* BaseScene::CreateRuntimeExperience(const EnemyStats& enemyStats, con
 			experience->SetModelFilePath(resolvedModelFilePath);
 			experience->SetTarget(target);
 			object->AddComponent<DropItemVisualComponent>();
+			object->AddComponent<ExperienceGlowVisualComponent>();
 
 			Object3dComponent* object3d = object->AddComponent<Object3dComponent>();
 			object3d->SetModel(resolvedModelFilePath);
 			const Vector4 experienceColor = GetExperienceColor(denomination);
 			object3d->SetColor(experienceColor);
 			object3d->SetEmission(
-				{experienceColor.x, experienceColor.y, experienceColor.z}, 0.45f);
+				{experienceColor.x, experienceColor.y, experienceColor.z}, 0.54f);
 
 			object->Update();
 			GameObject* createdObject = object.get();
@@ -1126,7 +1142,7 @@ void BaseScene::CreateRuntimeBossUpgradeDrop(const Vector3& position, GameObject
 	reward->SetBossUpgradeCount(upgradeCount);
 	reward->SetTarget(target);
 	reward->SetAttractDistance(12.0f);
-	reward->SetAttractSpeed(0.06f);
+	reward->SetAttractSpeed(0.12f);
 	object->AddComponent<DropItemVisualComponent>();
 
 	Object3dComponent* object3d = object->AddComponent<Object3dComponent>();
@@ -1328,7 +1344,7 @@ void BaseScene::QueueBossAcquisitionOffers(Player* player, int offerCount) {
 	    offers.begin() + queuedCount
 	);
 	bossAcquisitionPlayer_ = player;
-	if (!isLevelUpSelectionActive_) {
+	if (!IsLevelUpSelectionActive()) {
 		ShowNextBossAcquisitionOffer();
 	}
 }
@@ -1384,9 +1400,7 @@ bool BaseScene::ShowNextBossAcquisitionOffer() {
 			""
 		});
 		selectedLevelUpChoiceIndex_ = 0;
-		isBossAcquisitionOfferActive_ = true;
-		isLevelUpSelectionActive_ = true;
-		GameTime::SetPaused(true);
+		SetGameplayMode(GameplayMode::BossReward);
 		return true;
 	}
 	bossAcquisitionPlayer_ = nullptr;
@@ -1415,52 +1429,16 @@ void BaseScene::UpdateEnemyAttacks() {
 		}
 		std::vector<EnemyShotRequest> requests = enemy->ConsumeShotRequests();
 		shotRequests.insert(shotRequests.end(), requests.begin(), requests.end());
+		const EnemyBehaviorPresentation presentation = enemy->GetBehaviorPresentation();
 
-		if (TrailRendererComponent* trail = object->GetComponent<TrailRendererComponent>();
-			trail && enemy->GetStats().behavior == EnemyBehaviorType::NightSlashBoss) {
+		if (TrailRendererComponent* trail = object->GetComponent<TrailRendererComponent>()) {
 			// 待機中の不要な軌跡を防ぎ、斬撃判定が有効な期間だけ新しい点を記録する。
-			trail->SetEmitting(enemy->IsNightSlashAttacking());
+			trail->SetEmitting(presentation.attackTrailEmitting);
 		}
 
 		if (Object3dComponent* object3d = object->GetComponent<Object3dComponent>()) {
-			if (enemy->IsTornadoWarningActive()) {
-				const float pulse = 0.45f + 0.55f * std::sin(enemy->GetTornadoWarningProgress() * 16.0f * MathConstants::kPi);
-				object3d->SetColor(enemy->GetTornadoPatternIndex() == 0
-				    ? Vector4{0.08f, 0.60f + 0.35f * pulse, 1.0f, 1.0f}
-				    : enemy->GetTornadoPatternIndex() == 1
-				        ? Vector4{0.65f + 0.30f * pulse, 0.12f, 1.0f, 1.0f}
-				        : Vector4{0.08f, 0.65f + 0.30f * pulse, 0.30f, 1.0f});
-			} else if (enemy->IsBossRangedWarningActive()) {
-				const float pulse = 0.45f + 0.55f * std::sin(enemy->GetBossRangedProgress() * 14.0f * MathConstants::kPi);
-				object3d->SetColor({0.05f, 0.35f + 0.35f * pulse, 1.0f, 1.0f});
-			} else if (enemy->IsBossRangedAttacking()) {
-				object3d->SetColor({0.12f, 0.70f, 1.0f, 1.0f});
-			} else if (enemy->IsNightSlashWarningActive()) {
-				// 予兆中は進行度に応じて紫色を点滅させ、攻撃開始が近いことを知らせる。
-				const float pulse = 0.45f + 0.55f * std::sin(enemy->GetNightSlashProgress() * 14.0f * MathConstants::kPi);
-				object3d->SetColor({0.62f + 0.28f * pulse, 0.04f, 0.82f + 0.18f * pulse, 1.0f});
-			} else if (enemy->IsNightSlashAttacking()) {
-				// 斬撃中は明るい紫へ固定し、接触ダメージが有効な状態を判別しやすくする。
-				object3d->SetColor({0.95f, 0.18f, 1.0f, 1.0f});
-			} else if (enemy->GetStats().behavior == EnemyBehaviorType::NightSlashBoss) {
-				object3d->SetColor({0.42f, 0.06f, 0.62f, 1.0f});
-			} else if (enemy->GetStats().behavior == EnemyBehaviorType::TornadoBoss) {
-				object3d->SetColor({0.08f, 0.48f, 0.78f, 1.0f});
-			} else if (enemy->GetStats().behavior == EnemyBehaviorType::BurstShooter) {
-				// ステージ2中ボスは通常射撃敵と見分けられるよう、風を連想する青緑色にする。
-				object3d->SetColor({0.08f, 0.86f, 0.62f, 1.0f});
-			} else if (enemy->IsChargeWarningActive()) {
-				const float pulse = 0.45f + 0.55f * std::sin(enemy->GetChargeProgress() * 18.0f * MathConstants::kPi);
-				object3d->SetColor({1.0f, 0.05f + 0.25f * pulse, 0.02f, 1.0f});
-			} else if (enemy->GetStats().behavior == EnemyBehaviorType::Shooter) {
-				object3d->SetColor({0.25f, 0.55f, 1.0f, 1.0f});
-			} else if (enemy->GetStats().behavior == EnemyBehaviorType::Charger) {
-				object3d->SetColor({1.0f, 0.35f, 0.08f, 1.0f});
-			} else if (enemy->GetStats().behavior == EnemyBehaviorType::SelfDestruct) {
-				const float pulse = enemy->IsSelfDestructArmed()
-				    ? 0.45f + 0.55f * std::sin(enemy->GetSelfDestructProgress() * 20.0f * MathConstants::kPi)
-				    : 0.0f;
-				object3d->SetColor({1.0f, 0.72f * (1.0f - pulse), 0.02f, 1.0f});
+			if (presentation.overrideColor) {
+				object3d->SetColor(presentation.color);
 			} else if (enemy->GetEnemyTypeName() == "MidBoss") {
 				// 行動は通常追跡のまま、紫色と大型シルエットで中ボスだと識別できるようにする。
 				object3d->SetColor({0.62f, 0.16f, 0.85f, 1.0f});
@@ -1736,7 +1714,7 @@ void BaseScene::UpdateItemDrops() {
 				}
 				// 距離制限を実質解除し、フィールド上の経験値を一斉にプレイヤーへ向かわせる。
 				experience->SetAttractDistance((std::numeric_limits<float>::max)());
-				experience->SetAttractSpeed(0.16f);
+				experience->SetAttractSpeed(0.22f);
 			}
 		} else if (item->GetType() == ItemDropType::Money) {
 			// Gドロップを拾った瞬間に倍率を掛け、ゲームを途中終了しても獲得分が残るよう即時保存する。
@@ -1797,13 +1775,14 @@ GameObject* BaseScene::CreateRuntimePlayerProjectile(const PlayerAttackShotReque
 	projectile->SetTravelOrigin(request.position);
 	projectile->SetClawSlashIndex(request.clawSlashIndex);
 	projectile->SetClawSlashCount(request.clawSlashCount);
-	if (request.motionType == PlayerProjectileMotionType::Orbit) {
-		projectile->SetRepeatHitInterval(0.75f);
+	const PlayerProjectilePresentation presentation = projectile->GetMotionPresentation();
+	if (presentation.repeatHitInterval > 0.0f) {
+		projectile->SetRepeatHitInterval(presentation.repeatHitInterval);
 	}
 	if (request.homing) {
 		projectile->SetHomingTarget(FindNearestEnemy(request.position));
 	}
-	if (request.motionType == PlayerProjectileMotionType::Boomerang) {
+	if (presentation.aimAtNearestEnemyOnSpawn) {
 		if (GameObject* target = FindNearestEnemy(request.position)) {
 			Vector3 toTarget = target->GetTransform().translate - request.position;
 			toTarget.y = 0.0f;
@@ -1827,11 +1806,11 @@ GameObject* BaseScene::CreateRuntimePlayerProjectile(const PlayerAttackShotReque
 	if (!ModelManager::GetInstance()->FindModel(modelFilePath)) {
 		ModelManager::GetInstance()->LoadModel(modelFilePath);
 	}
-	if (request.motionType == PlayerProjectileMotionType::SkyLaser) {
-		object->GetTransform().scale = {request.size * 0.30f, request.size * 5.0f, request.size * 0.30f};
-	} else if (request.motionType == PlayerProjectileMotionType::ClawSlash) {
-		object->GetTransform().scale = {request.size * 0.18f, request.size * 0.18f, request.size * 0.18f};
-	}
+	object->GetTransform().scale = {
+		request.size * presentation.scaleMultiplier.x,
+		request.size * presentation.scaleMultiplier.y,
+		request.size * presentation.scaleMultiplier.z
+	};
 	Object3dComponent* object3d = object->AddComponent<Object3dComponent>();
 	if (ModelManager::GetInstance()->FindModel(modelFilePath)) {
 		object3d->SetModel(modelFilePath);
@@ -1839,55 +1818,35 @@ GameObject* BaseScene::CreateRuntimePlayerProjectile(const PlayerAttackShotReque
 		ModelManager::GetInstance()->LoadModel("sphere.obj");
 		object3d->SetModel("sphere.obj");
 	}
-	if (request.motionType == PlayerProjectileMotionType::Magatama) {
+	object3d->SetEnabled(presentation.modelVisible);
+	if (presentation.useMagatamaPalette) {
 		// 白い玉部分だけを6色に染め、黒い孔の象嵌は輪郭として残す。
 		object3d->SetColor(GetMagatamaProjectileColor(request.colorIndex));
-	} else if (request.motionType == PlayerProjectileMotionType::Orbit) {
-		object3d->SetColor({0.35f, 0.75f, 1.0f, 1.0f});
-	} else if (request.motionType == PlayerProjectileMotionType::SkyLaser) {
-		// 球を引き伸ばした旧表示は隠し、加算合成の専用エフェクトでレーザーを描画する。
-		object3d->SetEnabled(false);
-		object->AddComponent<SkyLaserVisualComponent>(request.lifeTime, request.size);
-	} else if (request.motionType == PlayerProjectileMotionType::Boomerang) {
-		object3d->SetColor({1.0f, 0.65f, 0.20f, 1.0f});
-	} else if (request.motionType == PlayerProjectileMotionType::Ricochet) {
-		object3d->SetColor({0.45f, 1.0f, 0.30f, 1.0f});
-	} else if (request.motionType == PlayerProjectileMotionType::ClawSlash) {
-		object3d->SetColor({1.0f, 0.22f, 0.10f, 1.0f});
-		// 爪は球モデルではなく、二層の発光トレイル自体を攻撃のシルエットとして見せる。
-		object3d->SetEnabled(false);
+	} else if (presentation.overrideModelColor) {
+		object3d->SetColor(presentation.modelColor);
 	}
-	if (request.motionType != PlayerProjectileMotionType::SkyLaser) {
+	if (presentation.addSkyLaserVisual) {
+		// 球を引き伸ばした旧表示は隠し、加算合成の専用エフェクトでレーザーを描画する。
+		object->AddComponent<SkyLaserVisualComponent>(request.lifeTime, request.size);
+	}
+	if (presentation.addTrail) {
 		TrailRendererComponent* trail = object->AddComponent<TrailRendererComponent>();
-		trail->SetWidth(request.motionType == PlayerProjectileMotionType::ClawSlash
-		        ? (std::max)(0.14f, request.size * 0.30f)
-		        : (std::max)(0.12f, request.size * 0.8f));
-		trail->SetLifeTime(request.motionType == PlayerProjectileMotionType::Orbit
-		        ? 0.45f
-		        : request.motionType == PlayerProjectileMotionType::ClawSlash ? 0.24f : 0.32f);
+		trail->SetWidth((std::max)(presentation.minimumTrailWidth, request.size * presentation.trailWidthMultiplier));
+		trail->SetLifeTime(presentation.trailLifeTime);
 		trail->SetMinSegmentLength((std::max)(0.025f, request.size * 0.08f));
-		if (request.motionType == PlayerProjectileMotionType::Magatama) {
+		if (presentation.trailUsesMotionAnchor) {
+			trail->SetPositionReference(request.motionAnchor);
+		}
+		if (presentation.useMagatamaPalette) {
 			Vector4 headColor = GetMagatamaProjectileColor(request.colorIndex);
 			headColor.w = 0.95f;
 			trail->SetHeadColor(headColor);
 			trail->SetTailColor(GetMagatamaTrailTailColor(request.colorIndex));
-		} else if (request.motionType == PlayerProjectileMotionType::Boomerang) {
-			trail->SetHeadColor({1.0f, 0.72f, 0.20f, 0.95f});
-			trail->SetTailColor({1.0f, 0.12f, 0.02f, 0.0f});
-		} else if (request.motionType == PlayerProjectileMotionType::Orbit) {
-			// 履歴をプレイヤー相対で保持し、プレイヤー移動時に過去の円弧だけが置き去りになるのを防ぐ。
-			trail->SetPositionReference(request.motionAnchor);
-			trail->SetHeadColor({0.45f, 0.90f, 1.0f, 0.9f});
-			trail->SetTailColor({0.10f, 0.30f, 1.0f, 0.0f});
-		} else if (request.motionType == PlayerProjectileMotionType::Ricochet) {
-			trail->SetHeadColor({0.65f, 1.0f, 0.30f, 0.95f});
-			trail->SetTailColor({0.05f, 0.80f, 0.15f, 0.0f});
-		} else if (request.motionType == PlayerProjectileMotionType::ClawSlash) {
-			// プレイヤー相対で履歴を持ち、移動しながら発動しても爪痕の形を崩さない。
-			trail->SetPositionReference(request.motionAnchor);
-			trail->SetHeadColor({1.0f, 0.30f, 0.04f, 0.92f});
-			trail->SetTailColor({0.70f, 0.01f, 0.00f, 0.0f});
-
+		} else if (presentation.overrideTrailColors) {
+			trail->SetHeadColor(presentation.trailHeadColor);
+			trail->SetTailColor(presentation.trailTailColor);
+		}
+		if (presentation.addCoreTrail) {
 			// 細い白熱線を外光へ重ね、一本ごとの切っ先を読み取りやすくする。
 			TrailRendererComponent* coreTrail = object->AddComponent<TrailRendererComponent>();
 			coreTrail->SetWidth((std::max)(0.045f, request.size * 0.085f));
@@ -1898,7 +1857,7 @@ GameObject* BaseScene::CreateRuntimePlayerProjectile(const PlayerAttackShotReque
 			coreTrail->SetTailColor({1.0f, 0.28f, 0.02f, 0.0f});
 		}
 	}
-	if (request.motionType == PlayerProjectileMotionType::Magatama) {
+	if (presentation.addGlowEmitter) {
 		// 環境反射ではなく、加算合成パーティクルを弾から漏れ出す光として連続発生させる。
 		constexpr const char* kGlowParticleGroup = "MagatamaGlow";
 		constexpr const char* kGlowTexture = "Resources/circle.png";
@@ -1971,7 +1930,7 @@ void BaseScene::UpdatePlayerProjectileHits() {
 	for (const auto& projectileObject : sceneObjects_) {
 		PlayerProjectileComponent* projectile = projectileObject->GetComponent<PlayerProjectileComponent>();
 		if (!projectile || projectile->IsExpired() ||
-		    projectile->GetMotionType() != PlayerProjectileMotionType::Ricochet) {
+		    !projectile->GetMotionPresentation().ricochets) {
 			continue;
 		}
 
@@ -2070,7 +2029,7 @@ void BaseScene::UpdatePlayerProjectileHits() {
 
 			float distance = Length(enemyObject->GetTransform().translate - projectileObject->GetTransform().translate);
 			float hitRadius = projectile->GetSize() + 0.5f * enemy->GetStats().sizeScale;
-			if (projectile->GetMotionType() == PlayerProjectileMotionType::SkyLaser) {
+			if (projectile->GetMotionPresentation().usesVerticalHitArea) {
 				Vector3 horizontalDifference = enemyObject->GetTransform().translate - projectileObject->GetTransform().translate;
 				horizontalDifference.y = 0.0f;
 				distance = Length(horizontalDifference);
@@ -2152,11 +2111,8 @@ void BaseScene::CleanupExpiredPlayerProjectiles() {
 		    if (projectile) {
 			    // 弾全体が画面端を抜けてから消えるよう、表示サイズを余白へ反映する。
 			    const float viewMargin = 0.05f + projectile->GetSize() * 0.02f;
-			    const PlayerProjectileMotionType motionType = projectile->GetMotionType();
 			    // 周回弾や反射弾は専用挙動を維持し、画面外へ飛び去る弾だけを破棄する。
-			    const bool shouldExpireOutsideView =
-			        motionType == PlayerProjectileMotionType::Linear ||
-			        motionType == PlayerProjectileMotionType::Magatama;
+			    const bool shouldExpireOutsideView = projectile->GetMotionPresentation().expiresOutsideView;
 			    if (projectile->IsExpired() ||
 				    (shouldExpireOutsideView && IsPointOutsideView(object->GetTransform().translate, viewMargin))) {
 				    return true;
@@ -2361,6 +2317,8 @@ void BaseScene::UpdatePlayerSlotHud() {
 	if (!player) {
 		playerAttackSlotIconVisible_.fill(false);
 		playerStatusSlotIconVisible_.fill(false);
+		playerAttackSlotLevelVisible_.fill(false);
+		playerStatusSlotLevelVisible_.fill(false);
 		return;
 	}
 
@@ -2379,11 +2337,23 @@ void BaseScene::UpdatePlayerSlotHud() {
 		text->SetColor({1.0f, 1.0f, 1.0f, 0.9f});
 		return object;
 	};
+	auto createLevelText = []() {
+		auto object = std::make_unique<GameObject>();
+		TextComponent* text = object->AddComponent<TextComponent>();
+		text->SetFontSize(12.0f);
+		text->SetAnchor(TextComponent::Anchor::Center);
+		text->SetColor({1.0f, 1.0f, 1.0f, 1.0f});
+		return object;
+	};
 	for (int index = 0; index < 5; ++index) {
 		if (!playerAttackSlotBackgroundSprites_[index]) playerAttackSlotBackgroundSprites_[index] = createSprite();
 		if (!playerAttackSlotIconSprites_[index]) playerAttackSlotIconSprites_[index] = createSprite();
 		if (!playerStatusSlotBackgroundSprites_[index]) playerStatusSlotBackgroundSprites_[index] = createSprite();
 		if (!playerStatusSlotIconSprites_[index]) playerStatusSlotIconSprites_[index] = createSprite();
+		if (!playerAttackSlotLevelBackgroundSprites_[index]) playerAttackSlotLevelBackgroundSprites_[index] = createSprite();
+		if (!playerStatusSlotLevelBackgroundSprites_[index]) playerStatusSlotLevelBackgroundSprites_[index] = createSprite();
+		if (!playerAttackSlotLevelTextObjects_[index]) playerAttackSlotLevelTextObjects_[index] = createLevelText();
+		if (!playerStatusSlotLevelTextObjects_[index]) playerStatusSlotLevelTextObjects_[index] = createLevelText();
 	}
 	if (!playerAttackSlotLabelObject_) playerAttackSlotLabelObject_ = createLabel("ATTACK");
 	if (!playerStatusSlotLabelObject_) playerStatusSlotLabelObject_ = createLabel("STATUS");
@@ -2397,6 +2367,7 @@ void BaseScene::UpdatePlayerSlotHud() {
 	constexpr float kSlotGap = 5.0f;
 	constexpr float kRowGap = 7.0f;
 	constexpr float kInnerMargin = 3.0f;
+	constexpr float kLevelHeight = 16.0f;
 	const float slotsWidth = kSlotSize * 5.0f + kSlotGap * 4.0f;
 	const float slotsLeft = (std::max)(kRightMargin + kLabelWidth, screenWidth - kRightMargin - slotsWidth);
 	const float labelRight = slotsLeft - 8.0f;
@@ -2428,6 +2399,37 @@ void BaseScene::UpdatePlayerSlotHud() {
 		updateBackground(playerStatusSlotBackgroundSprites_[index].get(), statusY,
 		    hasStatus ? (statusSlot.enabled ? Vector4{0.10f, 0.42f, 0.25f, 0.95f} : Vector4{0.18f, 0.20f, 0.24f, 0.75f})
 		              : Vector4{0.05f, 0.06f, 0.08f, 0.82f});
+
+		auto updateLevel = [slotX, kSlotSize, kLevelHeight](
+		    Sprite* background, GameObject* textObject, float y, const std::string& levelText, bool enabled) {
+			EulerTransform transform = background->GetTransform();
+			transform.translate = {slotX, y + kSlotSize - kLevelHeight, 0.0f};
+			background->SetTransform(transform);
+			background->SetSize({kSlotSize, kLevelHeight});
+			background->SetColor({0.0f, 0.0f, 0.0f, enabled ? 0.72f : 0.58f});
+			background->Update();
+
+			textObject->GetTransform().translate = {
+				slotX + kSlotSize * 0.5f,
+				y + kSlotSize - kLevelHeight * 0.5f,
+				0.0f};
+			TextComponent* text = textObject->GetComponent<TextComponent>();
+			text->SetText(levelText);
+			text->SetColor(enabled ? Vector4{1.0f, 1.0f, 1.0f, 1.0f} : Vector4{0.65f, 0.65f, 0.65f, 0.9f});
+		};
+		playerAttackSlotLevelVisible_[index] = hasAttack;
+		playerStatusSlotLevelVisible_[index] = hasStatus;
+		if (hasAttack) {
+			const std::string levelText = attackSlot.attackLevel == "super"
+			    ? "SUPER"
+			    : "Lv." + attackSlot.attackLevel;
+			updateLevel(playerAttackSlotLevelBackgroundSprites_[index].get(),
+			    playerAttackSlotLevelTextObjects_[index].get(), attackY, levelText, attackSlot.enabled);
+		}
+		if (hasStatus) {
+			updateLevel(playerStatusSlotLevelBackgroundSprites_[index].get(),
+			    playerStatusSlotLevelTextObjects_[index].get(), statusY, "Lv." + statusSlot.level, statusSlot.enabled);
+		}
 
 		// 名前とレベルの組み合わせをキーにし、毎フレームJSONを読み直さない。
 		const std::string attackTextureKey = hasAttack ? attackSlot.attackName + "#" + attackSlot.attackLevel : std::string{};
@@ -2483,12 +2485,20 @@ void BaseScene::UpdatePlayerSlotHud() {
 void BaseScene::DrawPlayerSlotHud() {
 	if (!isPlayerSlotHudVisible_) return;
 	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
-	// 背景を先、アイコンを後に描画し、最後に行ラベルを重ねる。
+	// 背景、アイコン、レベル帯、レベル文字の順に重ね、最後に行ラベルを描画する。
 	for (int index = 0; index < 5; ++index) {
 		playerAttackSlotBackgroundSprites_[index]->Draw();
 		if (playerAttackSlotIconVisible_[index]) playerAttackSlotIconSprites_[index]->Draw();
+		if (playerAttackSlotLevelVisible_[index]) {
+			playerAttackSlotLevelBackgroundSprites_[index]->Draw();
+			playerAttackSlotLevelTextObjects_[index]->Draw2D();
+		}
 		playerStatusSlotBackgroundSprites_[index]->Draw();
 		if (playerStatusSlotIconVisible_[index]) playerStatusSlotIconSprites_[index]->Draw();
+		if (playerStatusSlotLevelVisible_[index]) {
+			playerStatusSlotLevelBackgroundSprites_[index]->Draw();
+			playerStatusSlotLevelTextObjects_[index]->Draw2D();
+		}
 	}
 	if (playerAttackSlotLabelObject_) playerAttackSlotLabelObject_->Draw2D();
 	if (playerStatusSlotLabelObject_) playerStatusSlotLabelObject_->Draw2D();
@@ -2789,11 +2799,10 @@ void BaseScene::UpdateEditorCameraControl() {
 /// </summary>
 void BaseScene::UpdateLevelUpSelection() {
 	Input* input = Input::GetInstance();
-	if (isLevelUpSelectionActive_) {
+	if (IsLevelUpSelectionActive()) {
 		if (levelUpChoices_.empty()) {
-			isLevelUpSelectionActive_ = false;
+			SetGameplayMode(GameplayMode::Playing);
 			levelUpPlayer_ = nullptr;
-			GameTime::SetPaused(false);
 			return;
 		}
 		if (input->TriggerKey(DIK_A) || input->TriggerGamepadLeft()) {
@@ -2801,6 +2810,10 @@ void BaseScene::UpdateLevelUpSelection() {
 		}
 		if (input->TriggerKey(DIK_D) || input->TriggerGamepadRight()) {
 			selectedLevelUpChoiceIndex_ = (selectedLevelUpChoiceIndex_ + 1) % static_cast<int>(levelUpChoices_.size());
+		}
+		if (gameplayMode_ != GameplayMode::BossReward &&
+		    (input->TriggerKey(DIK_R) || input->TriggerGamepadButton(XINPUT_GAMEPAD_Y))) {
+			RerollLevelUpChoices();
 		}
 		if (input->TriggerKey(DIK_SPACE) || input->TriggerGamepadButton(XINPUT_GAMEPAD_A)) {
 			ApplyLevelUpChoice(selectedLevelUpChoiceIndex_);
@@ -2818,9 +2831,9 @@ void BaseScene::UpdateLevelUpSelection() {
 			continue;
 		}
 		levelUpPlayer_ = player;
+		levelUpRerollUsed_ = false;
 		if (BuildLevelUpChoices(player)) {
-			isLevelUpSelectionActive_ = true;
-			GameTime::SetPaused(true);
+			SetGameplayMode(GameplayMode::LevelUpSelection);
 		} else {
 			levelUpPlayer_ = nullptr;
 		}
@@ -2966,9 +2979,46 @@ bool BaseScene::BuildLevelUpChoices(Player* player) {
 	return true;
 }
 
+void BaseScene::RerollLevelUpChoices() {
+	if (!sceneManager || !levelUpPlayer_ || gameplayMode_ == GameplayMode::BossReward || levelUpRerollUsed_ ||
+	    sceneManager->GetGlobalShopUpgradeLevel("level_up_reroll") <= 0 || levelUpChoices_.empty()) {
+		return;
+	}
+
+	const std::vector<LevelUpChoice> previousChoices = levelUpChoices_;
+	auto makeSortedKeys = [](const std::vector<LevelUpChoice>& choices) {
+		std::vector<std::string> keys;
+		keys.reserve(choices.size());
+		for (const LevelUpChoice& choice : choices) {
+			keys.push_back(std::to_string(static_cast<int>(choice.type)) + ":" + choice.name + ":" +
+			               std::to_string(choice.slotIndex));
+		}
+		std::sort(keys.begin(), keys.end());
+		return keys;
+	};
+	const std::vector<std::string> previousKeys = makeSortedKeys(previousChoices);
+
+	// 候補に余裕がある場合は、単なる並び替えではなく内容が変わるまで再抽選する。
+	for (int attempt = 0; attempt < 12; ++attempt) {
+		if (!BuildLevelUpChoices(levelUpPlayer_)) {
+			levelUpChoices_ = previousChoices;
+			return;
+		}
+		if (makeSortedKeys(levelUpChoices_) != previousKeys) {
+			levelUpRerollUsed_ = true;
+			selectedLevelUpChoiceIndex_ = 0;
+			return;
+		}
+	}
+
+	// 実質的に別候補が存在しない場合は、選択肢とリロール権をそのまま残す。
+	levelUpChoices_ = previousChoices;
+	selectedLevelUpChoiceIndex_ = 0;
+}
+
 void BaseScene::ApplyLevelUpChoice(int choiceIndex) {
 	if (!levelUpPlayer_ || choiceIndex < 0 || choiceIndex >= static_cast<int>(levelUpChoices_.size())) return;
-	const bool wasBossAcquisitionOffer = isBossAcquisitionOfferActive_;
+	const bool wasBossAcquisitionOffer = gameplayMode_ == GameplayMode::BossReward;
 	const LevelUpChoice choice = levelUpChoices_[choiceIndex];
 	PlayerStats stats = levelUpPlayer_->GetBaseStats();
 	switch (choice.type) {
@@ -3001,15 +3051,17 @@ void BaseScene::ApplyLevelUpChoice(int choiceIndex) {
 	}
 	levelUpChoices_.clear();
 	if (wasBossAcquisitionOffer) {
-		isBossAcquisitionOfferActive_ = false;
+		SetGameplayMode(GameplayMode::Playing);
 		if (ShowNextBossAcquisitionOffer()) {
 			return;
 		}
 	}
-	if (levelUpPlayer_->ConsumePendingLevelUp() && BuildLevelUpChoices(levelUpPlayer_)) return;
-	isLevelUpSelectionActive_ = false;
+	if (levelUpPlayer_->ConsumePendingLevelUp()) {
+		levelUpRerollUsed_ = false;
+		if (BuildLevelUpChoices(levelUpPlayer_)) return;
+	}
+	SetGameplayMode(GameplayMode::Playing);
 	levelUpPlayer_ = nullptr;
-	GameTime::SetPaused(false);
 }
 
 void BaseScene::EnsureLevelUpSelectionSprites() {
@@ -3044,7 +3096,7 @@ void BaseScene::EnsureLevelUpSelectionSprites() {
 }
 
 void BaseScene::DrawLevelUpSelection2D() {
-	if (!isLevelUpSelectionActive_ || levelUpChoices_.empty()) return;
+	if (!IsLevelUpSelectionActive() || levelUpChoices_.empty()) return;
 	EnsureLevelUpSelectionSprites();
 	DirectXCommon* dxCommon = SpriteCommon::GetInstance()->GetDxCommon();
 	if (!dxCommon) return;
@@ -3117,7 +3169,15 @@ void BaseScene::DrawLevelUpSelection2D() {
 	}
 
 	if (TextComponent* titleText = levelUpTitleTextObject_->GetComponent<TextComponent>()) {
-		titleText->SetText(isBossAcquisitionOfferActive_ ? "BOSS REWARD!" : "LEVEL UP!");
+		titleText->SetText(gameplayMode_ == GameplayMode::BossReward ? "BOSS REWARD!" : "LEVEL UP!");
+	}
+	if (TextComponent* instructionText = levelUpInstructionTextObject_->GetComponent<TextComponent>()) {
+		std::string instruction = "A / D or Pad: Select    Space or Pad A: Confirm";
+		if (gameplayMode_ != GameplayMode::BossReward && sceneManager &&
+		    sceneManager->GetGlobalShopUpgradeLevel("level_up_reroll") > 0) {
+			instruction += levelUpRerollUsed_ ? "    Reroll: Used" : "    R or Pad Y: Reroll";
+		}
+		instructionText->SetText(instruction);
 	}
 	levelUpTitleTextObject_->GetTransform().translate = {screenWidth * 0.5f, panelY + 35.0f, 0.0f};
 	levelUpInstructionTextObject_->GetTransform().translate = {screenWidth * 0.5f, panelY + panelHeight - 24.0f, 0.0f};

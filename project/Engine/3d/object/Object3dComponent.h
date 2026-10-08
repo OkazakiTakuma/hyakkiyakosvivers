@@ -111,6 +111,22 @@ public:
 	void SetEmission(const Vector3& color, float intensity) {
 		if (object3d_) object3d_->SetEmission(color, intensity);
 	}
+	/// <summary>演出用に指定ボーンの回転オフセットを設定します。</summary>
+	void SetJointRotationOffset(const std::string& jointName, const Quaternion& rotationOffset) {
+		if (object3d_) object3d_->SetJointRotationOffset(jointName, rotationOffset);
+	}
+	void ClearJointRotationOffsets() {
+		if (object3d_) object3d_->ClearJointRotationOffsets();
+	}
+	std::vector<std::string> GetJointNames() const {
+		return object3d_ ? object3d_->GetJointNames() : std::vector<std::string>{};
+	}
+	void SetJointRotationOffsetEuler(const std::string& jointName, const Vector3& rotation) {
+		if (object3d_) object3d_->SetJointRotationOffsetEuler(jointName, rotation);
+	}
+	Vector3 GetJointRotationOffsetEuler(const std::string& jointName) const {
+		return object3d_ ? object3d_->GetJointRotationOffsetEuler(jointName) : Vector3{};
+	}
 	Vector3 GetEmissionColor() const {
 		return object3d_ ? object3d_->GetEmissionColor() : Vector3{0.0f, 0.0f, 0.0f};
 	}

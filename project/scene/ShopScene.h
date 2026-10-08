@@ -52,8 +52,8 @@ private:
 	std::unique_ptr<GameObject> titleTextObject_;
 	/// <summary>共有所持金と強化対象プレイヤーの表示です。</summary>
 	std::unique_ptr<GameObject> moneyTextObject_;
-	/// <summary>キャラクター強化4種類と全体強化2種類を表示する行です。</summary>
-	std::array<std::unique_ptr<GameObject>, 6> itemTextObjects_;
+	/// <summary>キャラクター強化4種類と全体商品3種類を表示する行です。</summary>
+	std::array<std::unique_ptr<GameObject>, 7> itemTextObjects_;
 	/// <summary>購入結果や購入不可理由を表示します。</summary>
 	std::unique_ptr<GameObject> messageTextObject_;
 	/// <summary>選択、購入、終了操作の説明です。</summary>
