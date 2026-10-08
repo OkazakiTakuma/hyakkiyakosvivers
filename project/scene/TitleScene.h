@@ -54,6 +54,8 @@ private:
 	SceneManager* sceneManager = nullptr;
 	/// <summary>球体モデルを使わず、空の散乱計算から太陽を描くタイトル専用Skyです。</summary>
 	std::unique_ptr<AtmosphereSky> atmosphereSky_;
+	/// <summary>タイトル背景の地面へ配置する草のインスタンシング描画です。</summary>
+	std::unique_ptr<InstancingModel> grassInstancingModel_;
 	/// <summary>画面全体を塗る背景です。</summary>
 	std::unique_ptr<Sprite> backgroundSprite_;
 	/// <summary>導入時に3Dシーンを黒から浮かび上がらせるフェードです。</summary>
@@ -102,6 +104,8 @@ private:
 	float pulseTime_ = 0.0f;
 	/// <summary>タイトル導入演出の開始からの経過秒数です。</summary>
 	float presentationTime_ = 0.0f;
+	/// <summary>タイトル専用の巫女ポーズを初回だけ適用済みかどうかです。</summary>
+	bool titleMikoPoseApplied_ = false;
 	/// <summary>現在の導入演出またはメニュー段階です。</summary>
 	TitlePhase titlePhase_ = TitlePhase::FadeIn;
 };

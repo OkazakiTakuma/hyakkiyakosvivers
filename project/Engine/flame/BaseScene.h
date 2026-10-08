@@ -50,6 +50,18 @@ class SceneManager;
 /// </summary>
 class BaseScene {
 public:
+	/// <summary>
+	/// ゲームプレイ中の入力先と時間停止理由を表す排他的なモードです。
+	/// 複数のboolを同時に立てないことで、ポーズと選択画面の競合を防ぎます。
+	/// </summary>
+	enum class GameplayMode {
+		Playing,
+		Paused,
+		LevelUpSelection,
+		BossReward,
+		Finished
+	};
+
 	enum class EditorCreateType {
 		Empty,
 		Object3dSphere,
@@ -109,7 +121,10 @@ public:
 	void SetFallbackCamera(Camera* camera) { fallbackCamera_ = camera; }
 	/// <summary>配置JSONのPlayer設定を上書きする、ゲーム開始時の選択タイプを設定します。</summary>
 	void SetPlayerTypeOverride(const std::string& playerTypeName) { playerTypeOverride_ = playerTypeName; }
-	bool IsLevelUpSelectionActive() const { return isLevelUpSelectionActive_; }
+	bool IsLevelUpSelectionActive() const {
+		return gameplayMode_ == GameplayMode::LevelUpSelection || gameplayMode_ == GameplayMode::BossReward;
+	}
+	GameplayMode GetGameplayMode() const { return gameplayMode_; }
 	/// <summary>最終ボスを倒し、ステージクリア条件を満たしたかを返します。</summary>
 	bool IsStageCleared() const { return isStageCleared_; }
 	/// <summary>プレイヤーの体力が0になったかを返します。</summary>
@@ -117,6 +132,8 @@ public:
 	/// <summary>現在の装備とプレイ戦績をリザルト表示用に取得します。</summary>
 	StageResultData GetStageResultData() const;
 protected:
+	/// <summary>入力先の切り替えとGameTimeの停止状態を一括して反映します。</summary>
+	void SetGameplayMode(GameplayMode mode);
 	/// <summary>派生シーン固有の演出で配置オブジェクトを変更するための非所有ポインタ一覧です。</summary>
 	std::vector<GameObject*> GetMutableSceneObjects() {
 		std::vector<GameObject*> objects;
@@ -286,6 +303,8 @@ private:
 	void DrawPlayerSlotHud();
 	void UpdateLevelUpSelection();
 	bool BuildLevelUpChoices(Player* player);
+	/// <summary>購入済みの場合、通常レベルアップ候補を1回だけ再抽選します。</summary>
+	void RerollLevelUpChoices();
 	void ApplyLevelUpChoice(int choiceIndex);
 	void EnsureLevelUpSelectionSprites();
 	void DrawLevelUpSelection2D();
@@ -392,8 +411,16 @@ private:
 	std::array<std::unique_ptr<Sprite>, 5> playerAttackSlotIconSprites_;
 	std::array<std::unique_ptr<Sprite>, 5> playerStatusSlotBackgroundSprites_;
 	std::array<std::unique_ptr<Sprite>, 5> playerStatusSlotIconSprites_;
+	/// <summary>各スロット下端でレベル文字の可読性を確保する半透明帯です。</summary>
+	std::array<std::unique_ptr<Sprite>, 5> playerAttackSlotLevelBackgroundSprites_;
+	std::array<std::unique_ptr<Sprite>, 5> playerStatusSlotLevelBackgroundSprites_;
+	/// <summary>装備中の武器・ステータスの現在レベル表示です。</summary>
+	std::array<std::unique_ptr<GameObject>, 5> playerAttackSlotLevelTextObjects_;
+	std::array<std::unique_ptr<GameObject>, 5> playerStatusSlotLevelTextObjects_;
 	std::array<bool, 5> playerAttackSlotIconVisible_{};
 	std::array<bool, 5> playerStatusSlotIconVisible_{};
+	std::array<bool, 5> playerAttackSlotLevelVisible_{};
+	std::array<bool, 5> playerStatusSlotLevelVisible_{};
 	/// <summary>名前とレベルが変化したスロットだけJSONを再読込するためのキャッシュです。</summary>
 	std::array<std::string, 5> playerAttackSlotTextureKeys_{};
 	std::array<std::string, 5> playerAttackSlotTexturePaths_{};
@@ -402,16 +429,16 @@ private:
 	std::unique_ptr<GameObject> playerAttackSlotLabelObject_;
 	std::unique_ptr<GameObject> playerStatusSlotLabelObject_;
 	bool isPlayerSlotHudVisible_ = false;
-	bool isLevelUpSelectionActive_ = false;
+	GameplayMode gameplayMode_ = GameplayMode::Playing;
 	Player* levelUpPlayer_ = nullptr;
 	int selectedLevelUpChoiceIndex_ = 0;
 	std::vector<LevelUpChoice> levelUpChoices_;
+	/// <summary>現在の通常レベルアップ選択でリロールを消費したかを示します。</summary>
+	bool levelUpRerollUsed_ = false;
 	/// <summary>ボス報酬で提示する未所持攻撃・アイテムの待機列です。</summary>
 	std::vector<LevelUpChoice> bossAcquisitionOfferQueue_;
 	/// <summary>取得確認の反映先となるプレイヤーへの非所有参照です。</summary>
 	Player* bossAcquisitionPlayer_ = nullptr;
-	/// <summary>通常レベルアップ画面とボス報酬確認画面を区別します。</summary>
-	bool isBossAcquisitionOfferActive_ = false;
 	std::unique_ptr<Sprite> levelUpOverlaySprite_;
 	std::unique_ptr<Sprite> levelUpPanelSprite_;
 	std::array<std::unique_ptr<Sprite>, 3> levelUpChoiceBorderSprites_;

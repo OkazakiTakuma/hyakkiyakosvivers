@@ -1,42 +1,185 @@
 #include "EnemyComponent.h"
 #include "../3d/object/Object3dComponent.h"
 
-void EnemyComponent::Initialize() {
-		currentHealth_ = stats_.health;
-	}
+namespace {
 
-void EnemyComponent::Update() {
-		// 設定された行動タイプに応じて、追跡または突進ステートを更新する。
-		GameObject* owner = GetOwner();
-		if (!owner || !target_) {
+EnemyBehaviorPresentation MakeColoredPresentation(const char* modelFilePath, const Vector4& color) {
+	EnemyBehaviorPresentation result;
+	result.modelFilePath = modelFilePath;
+	result.color = color;
+	result.overrideColor = true;
+	return result;
+}
+
+}
+
+/// <summary>
+/// 夜叉ボスの1状態が実行する処理です。
+/// ContextであるEnemyComponentは状態判定のswitchを持たず、現在Stateへ更新を委譲します。
+/// </summary>
+class INightSlashState {
+public:
+	virtual ~INightSlashState() = default;
+	virtual void Update(
+		EnemyComponent& enemy,
+		EulerTransform& transform,
+		const Vector3& direction,
+		float distance,
+		float frameScale) const = 0;
+};
+
+class NightSlashApproachState final : public INightSlashState {
+public:
+	void Update(EnemyComponent& enemy, EulerTransform& transform, const Vector3& direction, float distance, float frameScale) const override {
+		// 攻撃範囲までは追跡し、現在の攻撃パターンに対応する予兆Stateへ遷移する。
+		if (distance > enemy.stats_.comboTriggerDistance) {
+			transform.translate = transform.translate + (enemy.stats_.speed * frameScale) * direction;
 			return;
 		}
+		enemy.comboDashIndex_ = 0;
+		enemy.rangedWaveIndex_ = 0;
+		enemy.ChangeNightSlashState(
+			enemy.bossPatternIndex_ == 0
+				? EnemyComponent::NightSlashState::Windup
+				: EnemyComponent::NightSlashState::RangedWindup);
+	}
+};
 
-		EulerTransform& transform = owner->GetTransform();
-		const Vector3 targetPosition = target_->GetTransform().translate;
-		Vector3 direction = targetPosition - transform.translate;
-		direction.y = 0.0f;
-		const float distance = Length(direction);
-		const Vector3 normalized = distance > MathConstants::kDirectionEpsilon ? Normalize(direction) : Vector3{0.0f, 0.0f, 1.0f};
-		transform.rotate.y = std::atan2(normalized.x, normalized.z);
-
-		if (stats_.behavior == EnemyBehaviorType::TornadoBoss) {
-			UpdateTornadoBoss(transform, normalized, distance);
-		} else if (stats_.behavior == EnemyBehaviorType::NightSlashBoss) {
-			UpdateNightSlashBoss(transform, normalized, distance);
-			UpdateNightSlashBossMotion(transform);
-		} else if (stats_.behavior == EnemyBehaviorType::SelfDestruct) {
-			UpdateSelfDestruct(transform, normalized, distance);
-		} else if (stats_.behavior == EnemyBehaviorType::BurstShooter) {
-			UpdateBurstShooter(transform, normalized, distance);
-		} else if (stats_.behavior == EnemyBehaviorType::Charger) {
-			UpdateCharger(transform, normalized, distance);
-		} else if (stats_.behavior == EnemyBehaviorType::Shooter || stats_.shoots) {
-			UpdateShooter(transform, normalized, distance);
-		} else if (distance > MathConstants::kDirectionEpsilon) {
-			transform.translate = transform.translate + (stats_.speed * GameTime::GetFrameScale60()) * normalized;
+class NightSlashWindupState final : public INightSlashState {
+public:
+	void Update(EnemyComponent& enemy, EulerTransform& transform, const Vector3&, float, float) const override {
+		// 予兆完了時点の標的位置を使い、回避可能な固定ダッシュ方向を決める。
+		if (enemy.stateTimer_ >= enemy.stats_.comboWindup) {
+			enemy.BeginNightSlashDash(transform);
 		}
 	}
+};
+
+class NightSlashDashingState final : public INightSlashState {
+public:
+	void Update(EnemyComponent& enemy, EulerTransform& transform, const Vector3&, float, float frameScale) const override {
+		const bool isFinisher = enemy.comboDashIndex_ + 1 >= (std::max)(1, enemy.stats_.comboDashCount);
+		const float speedMultiplier = isFinisher ? enemy.stats_.finisherSpeedMultiplier : 1.0f;
+		transform.translate = transform.translate +
+			(enemy.stats_.comboDashSpeed * speedMultiplier * frameScale) * enemy.dashDirection_;
+		transform.rotate.y = std::atan2(enemy.dashDirection_.x, enemy.dashDirection_.z);
+		if (enemy.stateTimer_ >= enemy.stats_.comboDashDuration) {
+			enemy.ChangeNightSlashState(EnemyComponent::NightSlashState::Slashing);
+		}
+	}
+};
+
+class NightSlashSlashingState final : public INightSlashState {
+public:
+	void Update(EnemyComponent& enemy, EulerTransform& transform, const Vector3&, float, float) const override {
+		if (enemy.stateTimer_ < enemy.stats_.comboSlashPause) {
+			return;
+		}
+		++enemy.comboDashIndex_;
+		if (enemy.comboDashIndex_ >= (std::max)(1, enemy.stats_.comboDashCount)) {
+			enemy.ChangeNightSlashState(EnemyComponent::NightSlashState::Recovering);
+		} else {
+			// 次の斬撃ごとに標的位置を取り直し、左右交互のダッシュを開始する。
+			enemy.BeginNightSlashDash(transform);
+		}
+	}
+};
+
+class NightSlashRangedWindupState final : public INightSlashState {
+public:
+	void Update(EnemyComponent& enemy, EulerTransform& transform, const Vector3&, float, float) const override {
+		if (enemy.stateTimer_ < enemy.stats_.bossRangedWindup) {
+			return;
+		}
+		enemy.rangedWaveIndex_ = 0;
+		enemy.ChangeNightSlashState(EnemyComponent::NightSlashState::RangedFiring);
+		// 1ウェーブ目は射撃Stateへ入った瞬間に発射する。
+		enemy.EmitBossRangedWave(transform);
+	}
+};
+
+class NightSlashRangedFiringState final : public INightSlashState {
+public:
+	void Update(EnemyComponent& enemy, EulerTransform& transform, const Vector3&, float, float) const override {
+		if (enemy.stateTimer_ < enemy.stats_.bossRangedInterval) {
+			return;
+		}
+		++enemy.rangedWaveIndex_;
+		if (enemy.rangedWaveIndex_ >= (std::max)(1, enemy.stats_.bossRangedWaves)) {
+			enemy.ChangeNightSlashState(EnemyComponent::NightSlashState::Recovering);
+			return;
+		}
+		// 同じState内で次のウェーブを待つため、経過時間だけをリセットする。
+		enemy.stateTimer_ = 0.0f;
+		enemy.EmitBossRangedWave(transform);
+	}
+};
+
+class NightSlashRecoveringState final : public INightSlashState {
+public:
+	void Update(EnemyComponent& enemy, EulerTransform&, const Vector3&, float, float) const override {
+		if (enemy.stateTimer_ < enemy.stats_.comboRecovery) {
+			return;
+		}
+		// 0=連続斬り、1=全方位弾幕、2=扇状連射を固定順で循環する。
+		enemy.bossPatternIndex_ = (enemy.bossPatternIndex_ + 1) % 3;
+		enemy.ChangeNightSlashState(EnemyComponent::NightSlashState::Approach);
+	}
+};
+
+void EnemyComponent::Initialize() {
+	currentHealth_ = stats_.health;
+}
+
+void EnemyComponent::Update() {
+	// 敵タイプは実行中に頻繁に変わらないため、薄いStrategyを介さず直接ディスパッチする。
+	// 複雑な時間遷移を持つ夜叉ボスだけは、この先でState Patternへ委譲する。
+	GameObject* owner = GetOwner();
+	if (!owner || !target_) {
+		return;
+	}
+
+	EulerTransform& transform = owner->GetTransform();
+	const Vector3 targetPosition = target_->GetTransform().translate;
+	Vector3 direction = targetPosition - transform.translate;
+	direction.y = 0.0f;
+	const float distance = Length(direction);
+	const Vector3 normalized = distance > MathConstants::kDirectionEpsilon ? Normalize(direction) : Vector3{0.0f, 0.0f, 1.0f};
+	transform.rotate.y = std::atan2(normalized.x, normalized.z);
+
+	const EnemyBehaviorType behavior =
+		stats_.behavior == EnemyBehaviorType::Chase && stats_.shoots
+			? EnemyBehaviorType::Shooter
+			: stats_.behavior;
+	switch (behavior) {
+	case EnemyBehaviorType::Shooter:
+		UpdateShooter(transform, normalized, distance);
+		break;
+	case EnemyBehaviorType::Charger:
+		UpdateCharger(transform, normalized, distance);
+		break;
+	case EnemyBehaviorType::NightSlashBoss:
+		UpdateNightSlashBoss(transform, normalized, distance);
+		UpdateNightSlashBossMotion(transform);
+		break;
+	case EnemyBehaviorType::SelfDestruct:
+		UpdateSelfDestruct(transform, normalized, distance);
+		break;
+	case EnemyBehaviorType::TornadoBoss:
+		UpdateTornadoBoss(transform, normalized, distance);
+		break;
+	case EnemyBehaviorType::BurstShooter:
+		UpdateBurstShooter(transform, normalized, distance);
+		break;
+	case EnemyBehaviorType::Chase:
+	default:
+		if (distance > MathConstants::kDirectionEpsilon) {
+			transform.translate = transform.translate +
+				(stats_.speed * GameTime::GetFrameScale60()) * normalized;
+		}
+		break;
+	}
+}
 
 void EnemyComponent::Draw3D() {
 		// 攻撃予兆または攻撃中だけ、地面の警告円と照準線を描画する。
@@ -116,7 +259,8 @@ void EnemyComponent::Draw3D() {
 
 void EnemyComponent::ApplyStats(const EnemyStats& stats) {
 		const bool isFirstStatsApplication = !hasAppliedStats_;
-		const bool behaviorChanged = hasAppliedStats_ && stats_.behavior != stats.behavior;
+		const bool behaviorChanged = hasAppliedStats_ &&
+			(stats_.behavior != stats.behavior || stats_.shoots != stats.shoots);
 		stats_ = stats;
 		hasAppliedStats_ = true;
 		if (behaviorChanged) {
@@ -124,6 +268,8 @@ void EnemyComponent::ApplyStats(const EnemyStats& stats) {
 			stateTimer_ = 0.0f;
 			chargeState_ = ChargeState::Approach;
 			nightSlashState_ = NightSlashState::Approach;
+			// 行動種別を戻した場合も必ずApproach Stateから再構築する。
+			nightSlashStateObject_ = nullptr;
 			previousNightSlashMotionState_ = NightSlashState::Approach;
 			nightSlashMotionInitialized_ = false;
 			nightSlashMotionTime_ = 0.0f;
@@ -234,22 +380,79 @@ float EnemyComponent::GetNightSlashProgress() const {
 	}
 
 bool EnemyComponent::CanDealContactDamage() const {
-		// 自爆敵と竜巻ボスは専用攻撃だけでダメージを与え、接触との二重ヒットを防ぐ。
-		if (stats_.behavior == EnemyBehaviorType::SelfDestruct || stats_.behavior == EnemyBehaviorType::TornadoBoss) {
-			return false;
-		}
-		// つじぎりボスは接近・予兆・硬直中の単なる接触ではダメージを与えない。
-		return stats_.behavior != EnemyBehaviorType::NightSlashBoss || IsNightSlashAttacking();
+	if (stats_.behavior == EnemyBehaviorType::SelfDestruct || stats_.behavior == EnemyBehaviorType::TornadoBoss) {
+		return false;
 	}
+	return stats_.behavior != EnemyBehaviorType::NightSlashBoss || IsNightSlashAttacking();
+}
 
 float EnemyComponent::GetContactAttackDamage() const {
-		// コンボの最終斬りだけ基礎攻撃力の1.6倍にして、フィニッシュを明確に強くする。
-		const bool isNightSlashFinisher =
-			stats_.behavior == EnemyBehaviorType::NightSlashBoss &&
-			IsNightSlashAttacking() &&
-			comboDashIndex_ + 1 >= (std::max)(1, stats_.comboDashCount);
-		return stats_.attack * (isNightSlashFinisher ? 1.6f : 1.0f);
+	const bool isNightSlashFinisher =
+		stats_.behavior == EnemyBehaviorType::NightSlashBoss && IsNightSlashAttacking() &&
+		comboDashIndex_ + 1 >= (std::max)(1, stats_.comboDashCount);
+	return stats_.attack * (isNightSlashFinisher ? 1.6f : 1.0f);
+}
+
+EnemyBehaviorPresentation EnemyComponent::GetBehaviorPresentation() {
+	const EnemyBehaviorType behavior =
+		stats_.behavior == EnemyBehaviorType::Chase && stats_.shoots
+			? EnemyBehaviorType::Shooter
+			: stats_.behavior;
+	switch (behavior) {
+	case EnemyBehaviorType::Shooter:
+		return MakeColoredPresentation("enemy_shooter.gltf", {0.25f, 0.55f, 1.0f, 1.0f});
+	case EnemyBehaviorType::Charger: {
+		if (IsChargeWarningActive()) {
+			const float pulse = 0.45f + 0.55f * std::sin(GetChargeProgress() * 18.0f * MathConstants::kPi);
+			return MakeColoredPresentation("enemy_charger.gltf", {1.0f, 0.05f + 0.25f * pulse, 0.02f, 1.0f});
+		}
+		return MakeColoredPresentation("enemy_charger.gltf", {1.0f, 0.35f, 0.08f, 1.0f});
 	}
+	case EnemyBehaviorType::BurstShooter:
+		return MakeColoredPresentation("enemy_shooter.gltf", {0.08f, 0.86f, 0.62f, 1.0f});
+	case EnemyBehaviorType::SelfDestruct: {
+		const float pulse = IsSelfDestructArmed()
+			? 0.45f + 0.55f * std::sin(GetSelfDestructProgress() * 20.0f * MathConstants::kPi)
+			: 0.0f;
+		return MakeColoredPresentation("enemy_bomber.gltf", {1.0f, 0.72f * (1.0f - pulse), 0.02f, 1.0f});
+	}
+	case EnemyBehaviorType::TornadoBoss: {
+		if (!IsTornadoWarningActive()) {
+			return MakeColoredPresentation("enemy_shooter.gltf", {0.08f, 0.48f, 0.78f, 1.0f});
+		}
+		const float pulse = 0.45f + 0.55f * std::sin(GetTornadoWarningProgress() * 16.0f * MathConstants::kPi);
+		const Vector4 color = tornadoPatternIndex_ == 0
+			? Vector4{0.08f, 0.60f + 0.35f * pulse, 1.0f, 1.0f}
+			: tornadoPatternIndex_ == 1
+				? Vector4{0.65f + 0.30f * pulse, 0.12f, 1.0f, 1.0f}
+				: Vector4{0.08f, 0.65f + 0.30f * pulse, 0.30f, 1.0f};
+		return MakeColoredPresentation("enemy_shooter.gltf", color);
+	}
+	case EnemyBehaviorType::NightSlashBoss: {
+		Vector4 color{0.42f, 0.06f, 0.62f, 1.0f};
+		if (IsBossRangedWarningActive()) {
+			const float pulse = 0.45f + 0.55f * std::sin(GetBossRangedProgress() * 14.0f * MathConstants::kPi);
+			color = {0.05f, 0.35f + 0.35f * pulse, 1.0f, 1.0f};
+		} else if (IsBossRangedAttacking()) {
+			color = {0.12f, 0.70f, 1.0f, 1.0f};
+		} else if (IsNightSlashWarningActive()) {
+			const float pulse = 0.45f + 0.55f * std::sin(GetNightSlashProgress() * 14.0f * MathConstants::kPi);
+			color = {0.62f + 0.28f * pulse, 0.04f, 0.82f + 0.18f * pulse, 1.0f};
+		} else if (IsNightSlashAttacking()) {
+			color = {0.95f, 0.18f, 1.0f, 1.0f};
+		}
+		EnemyBehaviorPresentation result = MakeColoredPresentation("enemy_charger.gltf", color);
+		result.addAttackTrail = true;
+		result.attackTrailEmitting = IsNightSlashAttacking();
+		return result;
+	}
+	case EnemyBehaviorType::Chase:
+	default:
+		EnemyBehaviorPresentation result;
+		result.modelFilePath = "enemy_chaser.gltf";
+		return result;
+	}
+}
 
 void EnemyComponent::UpdateShooter(EulerTransform& transform, const Vector3& direction, float distance) {
 		const float frameScale = GameTime::GetFrameScale60();
@@ -420,87 +623,36 @@ void EnemyComponent::UpdateTornadoBoss(EulerTransform& transform, const Vector3&
 	}
 
 void EnemyComponent::UpdateNightSlashBoss(EulerTransform& transform, const Vector3& direction, float distance) {
-		// 斬撃、全方位弾幕、扇状弾幕の3パターンを攻撃後の硬直ごとに順番に切り替える。
-		const float deltaTime = GameTime::GetDeltaTime();
-		const float frameScale = GameTime::GetFrameScale60();
-		stateTimer_ += deltaTime;
-
-		switch (nightSlashState_) {
-		case NightSlashState::Approach:
-			// 攻撃開始距離までは追跡し、到達後は現在のパターンに対応する予兆へ入る。
-			if (distance <= stats_.comboTriggerDistance) {
-				// パターン0は斬撃用の予備動作、1と2は共通の射撃予備動作へ遷移する。
-				nightSlashState_ = bossPatternIndex_ == 0
-				    ? NightSlashState::Windup
-				    : NightSlashState::RangedWindup;
-				stateTimer_ = 0.0f;
-				comboDashIndex_ = 0;
-				rangedWaveIndex_ = 0;
-			} else {
-				transform.translate = transform.translate + (stats_.speed * frameScale) * direction;
-			}
-			break;
-		case NightSlashState::Windup:
-			// 予兆時間中は停止し、完了時点の標的位置から最初のダッシュ方向を確定する。
-			if (stateTimer_ >= stats_.comboWindup) {
-				BeginNightSlashDash(transform);
-			}
-			break;
-		case NightSlashState::Dashing: {
-			// 最終斬りは速度を上げ、通常の切り返しより回避を難しくする。
-			const bool isFinisher = comboDashIndex_ + 1 >= (std::max)(1, stats_.comboDashCount);
-			const float speedMultiplier = isFinisher ? stats_.finisherSpeedMultiplier : 1.0f;
-			transform.translate = transform.translate + (stats_.comboDashSpeed * speedMultiplier * frameScale) * dashDirection_;
-			transform.rotate.y = std::atan2(dashDirection_.x, dashDirection_.z);
-			if (stateTimer_ >= stats_.comboDashDuration) {
-				nightSlashState_ = NightSlashState::Slashing;
-				stateTimer_ = 0.0f;
-			}
-			break;
-		}
-		case NightSlashState::Slashing:
-			// 各ダッシュ後に短い斬撃時間を置き、次の切り返し方向を再計算する。
-			if (stateTimer_ >= stats_.comboSlashPause) {
-				++comboDashIndex_;
-				if (comboDashIndex_ >= (std::max)(1, stats_.comboDashCount)) {
-					nightSlashState_ = NightSlashState::Recovering;
-					stateTimer_ = 0.0f;
-				} else {
-					BeginNightSlashDash(transform);
-				}
-			}
-			break;
-		case NightSlashState::RangedWindup:
-			if (stateTimer_ >= stats_.bossRangedWindup) {
-				nightSlashState_ = NightSlashState::RangedFiring;
-				stateTimer_ = 0.0f;
-				rangedWaveIndex_ = 0;
-				EmitBossRangedWave(transform);
-			}
-			break;
-		case NightSlashState::RangedFiring:
-			// 1ウェーブ目は予備動作終了時に発射済みなので、ここでは2ウェーブ目以降を管理する。
-			if (stateTimer_ >= stats_.bossRangedInterval) {
-				stateTimer_ = 0.0f;
-				++rangedWaveIndex_;
-				if (rangedWaveIndex_ >= (std::max)(1, stats_.bossRangedWaves)) {
-					nightSlashState_ = NightSlashState::Recovering;
-				} else {
-					EmitBossRangedWave(transform);
-				}
-			}
-			break;
-		case NightSlashState::Recovering:
-			// 攻撃終了後は無防備な硬直を設け、プレイヤー側の反撃時間を保証する。
-			if (stateTimer_ >= stats_.comboRecovery) {
-				nightSlashState_ = NightSlashState::Approach;
-				stateTimer_ = 0.0f;
-				// 0=連続斬り、1=全方位弾幕、2=扇状連射を固定順で循環する。
-				bossPatternIndex_ = (bossPatternIndex_ + 1) % 3;
-			}
-			break;
-		}
+	// 夜叉ボスだけは状態数と責務が多いため、状態固有処理をStateオブジェクトへ委譲する。
+	if (!nightSlashStateObject_) {
+		ChangeNightSlashState(NightSlashState::Approach);
 	}
+	stateTimer_ += GameTime::GetDeltaTime();
+	nightSlashStateObject_->Update(*this, transform, direction, distance, GameTime::GetFrameScale60());
+}
+
+void EnemyComponent::ChangeNightSlashState(NightSlashState state) {
+	// Stateオブジェクトは内部データを持たないため全個体で共有し、遷移時の動的確保を避ける。
+	static const NightSlashApproachState approachState;
+	static const NightSlashWindupState windupState;
+	static const NightSlashDashingState dashingState;
+	static const NightSlashSlashingState slashingState;
+	static const NightSlashRangedWindupState rangedWindupState;
+	static const NightSlashRangedFiringState rangedFiringState;
+	static const NightSlashRecoveringState recoveringState;
+
+	nightSlashState_ = state;
+	stateTimer_ = 0.0f;
+	switch (state) {
+	case NightSlashState::Approach: nightSlashStateObject_ = &approachState; break;
+	case NightSlashState::Windup: nightSlashStateObject_ = &windupState; break;
+	case NightSlashState::Dashing: nightSlashStateObject_ = &dashingState; break;
+	case NightSlashState::Slashing: nightSlashStateObject_ = &slashingState; break;
+	case NightSlashState::RangedWindup: nightSlashStateObject_ = &rangedWindupState; break;
+	case NightSlashState::RangedFiring: nightSlashStateObject_ = &rangedFiringState; break;
+	case NightSlashState::Recovering: nightSlashStateObject_ = &recoveringState; break;
+	}
+}
 
 void EnemyComponent::UpdateNightSlashBossMotion(EulerTransform& transform) {
 		if (!nightSlashMotionInitialized_) {
@@ -752,6 +904,5 @@ void EnemyComponent::BeginNightSlashDash(const EulerTransform& transform) {
 		Vector3 dashVector = dashTarget - transform.translate;
 		dashVector.y = 0.0f;
 		dashDirection_ = Length(dashVector) > MathConstants::kDirectionEpsilon ? Normalize(dashVector) : forward;
-		nightSlashState_ = NightSlashState::Dashing;
-		stateTimer_ = 0.0f;
+		ChangeNightSlashState(NightSlashState::Dashing);
 	}

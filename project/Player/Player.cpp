@@ -6,6 +6,8 @@
 #include "object/Object3dComponent.h"
 #include "object/Object3dCommon.h"
 #include "object/Object3d.h"
+#include "camera/Camera.h"
+#include "ImGuiManager.h"
 #include "model/ModelManager.h"
 #include "Matrix.h"
 #include "PostEffect.h"
@@ -19,6 +21,7 @@ constexpr float kHealthRegenerationAmount = 1.0f;
 // brade.obj はプレイヤーモデルより小さいため、装備表示用の倍率と柄の中心位置をまとめて管理する。
 constexpr float kBladeScale = 12.0f;
 constexpr float kBladeGripCenter = 0.007f * kBladeScale;
+constexpr int kLeftMouseButton = 0;
 
 // セーブデータや選択画面で使われる日本語名と、旧来の英語名の両方を烏天狗として扱う。
 bool IsKarasuTenguPlayerType(const std::string& playerTypeName) {
@@ -37,6 +40,68 @@ Vector3 MoveTowards(const Vector3& current, const Vector3& target, float maxDelt
 
 	const Vector3 direction = {difference.x / distance, difference.y / distance, difference.z / distance};
 	return current + maxDelta * direction;
+}
+
+bool TryGetMouseAimDirection(const Vector3& playerPosition, Vector3& outDirection) {
+	Input* input = Input::GetInstance();
+	Camera* camera = Object3dCommon::GetInstance()->GetDefaultCamera();
+	if (!camera) {
+		return false;
+	}
+
+	float viewLeft = 0.0f;
+	float viewTop = 0.0f;
+	float viewWidth = static_cast<float>(input->GetClientWidth());
+	float viewHeight = static_cast<float>(input->GetClientHeight());
+#ifdef USE_IMGUI
+	const ImVec2 gameViewPosition = ImGuiManager::GetInstance()->GetGameViewContentPosition();
+	const ImVec2 gameViewSize = ImGuiManager::GetInstance()->GetGameViewContentSize();
+	if (gameViewSize.x > 1.0f && gameViewSize.y > 1.0f) {
+		const ImGuiViewport* mainViewport = ImGui::GetMainViewport();
+		const float viewportOriginX = mainViewport ? mainViewport->Pos.x : 0.0f;
+		const float viewportOriginY = mainViewport ? mainViewport->Pos.y : 0.0f;
+		viewLeft = gameViewPosition.x - viewportOriginX;
+		viewTop = gameViewPosition.y - viewportOriginY;
+		viewWidth = gameViewSize.x;
+		viewHeight = gameViewSize.y;
+	}
+#endif
+	if (viewWidth <= 1.0f || viewHeight <= 1.0f) {
+		return false;
+	}
+
+	const float mouseX = static_cast<float>(input->GetMouseClientX());
+	const float mouseY = static_cast<float>(input->GetMouseClientY());
+	if (mouseX < viewLeft || mouseX > viewLeft + viewWidth ||
+	    mouseY < viewTop || mouseY > viewTop + viewHeight) {
+		return false;
+	}
+
+	const float ndcX = ((mouseX - viewLeft) / viewWidth) * 2.0f - 1.0f;
+	const float ndcY = 1.0f - ((mouseY - viewTop) / viewHeight) * 2.0f;
+	const Matrix4x4 inverseViewProjection = Inverse(camera->GetViewProjectionMatrix());
+	const Vector3 nearPoint = Transformation({ndcX, ndcY, 0.0f}, inverseViewProjection);
+	const Vector3 farPoint = Transformation({ndcX, ndcY, 1.0f}, inverseViewProjection);
+	const Vector3 ray = farPoint - nearPoint;
+	if (std::fabs(ray.y) <= MathConstants::kNormalizationEpsilon) {
+		return false;
+	}
+
+	const float distanceAlongRay = (playerPosition.y - nearPoint.y) / ray.y;
+	if (distanceAlongRay < 0.0f) {
+		return false;
+	}
+
+	const Vector3 aimPoint = nearPoint + distanceAlongRay * ray;
+	Vector3 aimDirection = aimPoint - playerPosition;
+	aimDirection.y = 0.0f;
+	const float aimLength = Length(aimDirection);
+	if (aimLength <= MathConstants::kNormalizationEpsilon) {
+		return false;
+	}
+
+	outDirection = {aimDirection.x / aimLength, 0.0f, aimDirection.z / aimLength};
+	return true;
 }
 
 }
@@ -110,16 +175,40 @@ void Player::Update() {
 		}
 	}
 
+	// 照準入力は移動方向より優先する。両方が同時なら、明示的に押しているマウスを最優先にする。
+	Vector3 facingDirection{};
+	bool hasFacingDirection = false;
+	if (input->PushMouseButton(kLeftMouseButton)) {
+		hasFacingDirection = TryGetMouseAimDirection(owner->GetTransform().translate, facingDirection);
+	}
+	if (!hasFacingDirection) {
+		const Vector3 rightStick = input->GetGamepadRightStick();
+		const float rightStickLength = Length(rightStick);
+		if (rightStickLength > MathConstants::kNormalizationEpsilon) {
+			facingDirection = {
+			    rightStick.x / rightStickLength,
+			    0.0f,
+			    rightStick.z / rightStickLength
+			};
+			hasFacingDirection = true;
+		}
+	}
+	if (!hasFacingDirection && currentSpeed > MathConstants::kNormalizationEpsilon) {
+		facingDirection = {
+		    currentMoveVelocity_.x / currentSpeed,
+		    0.0f,
+		    currentMoveVelocity_.z / currentSpeed
+		};
+		hasFacingDirection = true;
+	}
+	if (hasFacingDirection) {
+		owner->GetTransform().rotate.y = std::atan2(facingDirection.x, facingDirection.z);
+	}
+
 	if (currentSpeed <= MathConstants::kNormalizationEpsilon) {
 		return;
 	}
 
-	const Vector3 currentMoveDirection = {
-	    currentMoveVelocity_.x / currentSpeed,
-	    0.0f,
-	    currentMoveVelocity_.z / currentSpeed
-	};
-	owner->GetTransform().rotate.y = std::atan2(currentMoveDirection.x, currentMoveDirection.z);
 	owner->GetTransform().translate = owner->GetTransform().translate + frameScale * currentMoveVelocity_;
 }
 

@@ -135,7 +135,8 @@ void TrailRenderer::AppendRequestVertices(const Request& request, const Vector3&
 		// 古い点ほど幅とアルファを小さくし、末端が細く消える形状にする。
 		const float halfWidth = request.width * 0.5f * lifeRate;
 		Vector4 color = LerpColor(request.tailColor, request.headColor, lifeRate);
-		color.w *= lifeRate;
+		// tail/head のアルファ補間ですでに寿命に応じて減衰しているため、lifeRateを重ねて
+		// 掛けない。二重減衰を避け、明るい背景でも中間部分の色と輪郭を残す。
 		left[i] = {request.points[i].position + halfWidth * sides[i], color};
 		right[i] = {request.points[i].position + (-halfWidth) * sides[i], color};
 	}
@@ -179,10 +180,14 @@ void TrailRenderer::CreatePipelineState() {
 	inputElements[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
 	inputElements[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 
+	// 発光する軌跡として背景へ光を重ねる。中間部のアルファを二重減衰させないことで、
+	// 加算合成の見栄えを維持しながら明所でも帯の長さを読み取りやすくする。
 	const D3D12_BLEND_DESC blendDesc = PipelineStateUtility::MakeBlendDesc(
 	    TRUE, D3D12_BLEND_SRC_ALPHA, D3D12_BLEND_ONE);
 	const D3D12_RASTERIZER_DESC rasterizerDesc =
 	    PipelineStateUtility::MakeRasterizerDesc(D3D12_CULL_MODE_NONE, TRUE);
+	// 既に描画済みの3Dオブジェクトより奥にあるトレイル画素は深度テストで破棄する。
+	// 深度への書き込みは行わないため、トレイル同士や後続の描画へ深度を残さない。
 	const D3D12_DEPTH_STENCIL_DESC depthDesc =
 	    PipelineStateUtility::MakeDepthStencilDesc(TRUE, D3D12_DEPTH_WRITE_MASK_ZERO);
 

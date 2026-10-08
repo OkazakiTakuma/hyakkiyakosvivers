@@ -43,7 +43,8 @@ struct PointLight
     float intensity; // 光の強度
     float radius; // 光の半径
     float decay; // 光の減衰率
-    float2 padding; // パディング
+    float enabled; // isPointLight が有効か
+    float padding; // パディング
 };
 
 ConstantBuffer<Material> gMaterial : register(b0);
@@ -96,34 +97,23 @@ PixelShaderOutput main(VertexShaderOutput input)
         float specularPow_dir = pow(NdotH_dir, gMaterial.shininess);
         float3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow_dir;
 
-        // ==========================================
-        // ★追加：ポイントライトの計算
-        // ==========================================
-        // ライトからピクセルへの方向と距離を計算
-        float3 pointLightDirection = gPointLight.position - input.worldPosition;
-        float distance = length(pointLightDirection);
-        float3 L_point = normalize(pointLightDirection);
-
-        // 減衰（距離がradiusを超えたら0になるように計算）
-        float factor = pow(saturate(-distance / gPointLight.radius + 1.0f), gPointLight.decay);
-
-        // 光が届く範囲内(factor > 0)のときだけ計算を足し合わせる
-        if (factor > 0.0f)
+        // ポイントライトが有効なオブジェクトだけ計算する。
+        if (gPointLight.enabled > 0.5f)
         {
-            float3 H_point = normalize(L_point + V);
+            float3 pointLightDirection = gPointLight.position - input.worldPosition;
+            float distance = length(pointLightDirection);
+            float3 L_point = normalize(pointLightDirection);
+            float factor = pow(saturate(-distance / gPointLight.radius + 1.0f), gPointLight.decay);
 
-            // 拡散反射
-            float NdotL_point = saturate(dot(N, L_point));
-            float3 diffuse_point = gMaterial.color.rgb * textureColor.rgb * gPointLight.color.rgb * NdotL_point * gPointLight.intensity * factor;
-
-            // 鏡面反射（Blinn-Phong）
-            float NdotH_point = saturate(dot(N, H_point));
-            float specularPow_point = pow(NdotH_point, gMaterial.shininess);
-            float3 specular_point = gPointLight.color.rgb * gPointLight.intensity * specularPow_point * factor;
-
-            // ディレクショナルライトの結果に足し合わせる
-            diffuse += diffuse_point;
-            specular += specular_point;
+            if (factor > 0.0f)
+            {
+                float3 H_point = normalize(L_point + V);
+                float NdotL_point = saturate(dot(N, L_point));
+                diffuse += gMaterial.color.rgb * textureColor.rgb * gPointLight.color.rgb * NdotL_point * gPointLight.intensity * factor;
+                float NdotH_point = saturate(dot(N, H_point));
+                float specularPow_point = pow(NdotH_point, gMaterial.shininess);
+                specular += gPointLight.color.rgb * gPointLight.intensity * specularPow_point * factor;
+            }
         }
         output.color.rgb = ambient + diffuse + specular;
 

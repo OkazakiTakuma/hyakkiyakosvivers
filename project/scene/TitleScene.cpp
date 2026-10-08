@@ -2,6 +2,7 @@
 #include "SceneManager.h"
 #include "MathConstants.h"
 #include <model/ModelManager.h>
+#include "instancing/InstancingModelCommon.h"
 
 #include <algorithm>
 #include <cmath>
@@ -12,6 +13,9 @@ namespace {
 constexpr float kSlashStartSeconds = 1.70f;
 constexpr float kLogoStartSeconds = 2.25f;
 constexpr float kPromptStartSeconds = 5.00f;
+// 巫女はフェードイン中に素立ちから臨戦姿勢へ移り、斬撃演出が始まる前に構え終わる。
+constexpr float kMikoPoseStartSeconds = 0.35f;
+constexpr float kMikoPoseEndSeconds = 1.45f;
 // リソースフォントを追加するまではWindows標準の和文明朝・UIゴシックを使用する。
 // Resources/Fontsへ同系統のフォントを追加した場合は、このファミリー名だけを差し替えればよい。
 constexpr const char* kTitleFontName = "Yu Mincho";
@@ -74,6 +78,7 @@ void TitleScene::Initialize() {
 	isResetConfirmationOpen_ = false;
 	pulseTime_ = 0.0f;
 	presentationTime_ = 0.0f;
+	titleMikoPoseApplied_ = false;
 	titlePhase_ = TitlePhase::FadeIn;
 
 	// 太陽方向を空・平行光源・距離霞で共有し、別々に位置を調整する必要をなくします。
@@ -94,6 +99,42 @@ void TitleScene::Initialize() {
 	atmosphereSky_ = std::make_unique<AtmosphereSky>();
 	atmosphereSky_->Initialize();
 	LoadTitleModels();
+
+	Model* grassModel = ModelManager::GetInstance()->FindModel("grass.obj");
+	if (grassModel) {
+		// 100x100のタイトル床全体を、従来の約5倍の密度で覆う。
+		constexpr int kGrassSide = 701;
+		constexpr int kGrassInstanceCount = kGrassSide * kGrassSide;
+		constexpr float kSpacing = 0.14285715f;
+		grassInstancingModel_ = std::make_unique<InstancingModel>();
+		grassInstancingModel_->Initialize(grassModel, kGrassInstanceCount);
+		// タイトルカメラから床の最遠端までは約85mあるため、端まで描画できる距離を確保する。
+		grassInstancingModel_->SetMaxDrawDistance(90.0f);
+
+		// タイトルの地面はz=4.0、y=-1.2にあるため、少しだけ上へ配置して地面に埋まらないようにする。
+		const float offset = (kGrassSide - 1) * kSpacing * 0.5f;
+		for (int z = 0; z < kGrassSide; ++z) {
+			for (int x = 0; x < kGrassSide; ++x) {
+				const float jitterX = std::sin(x * 12.9898f + z * 78.233f) * 0.05f;
+				const float jitterZ = std::sin(x * 39.3467f + z * 11.135f) * 0.05f;
+				EulerTransform transform{};
+				transform.translate = {
+					x * kSpacing - offset + jitterX,
+					-1.19f,
+					z * kSpacing - offset + jitterZ + 4.0f
+				};
+				transform.rotate = {
+					0.0f,
+					std::sin(x * 4.1f + z * 7.3f) * MathConstants::kPi,
+					0.0f
+				};
+				const float scale = 0.65f +
+					(std::sin(x * 3.7f + z * 5.9f) * 0.10f + 0.10f);
+				transform.scale = {scale, scale, scale};
+				grassInstancingModel_->AddInstance(transform);
+			}
+		}
+	}
 	CreateUi();
 }
 
@@ -101,6 +142,7 @@ void TitleScene::LoadTitleModels() {
 	// SceneManagerはInitializeの直後にTITLE_objects.jsonを読み込むため、先に参照モデルを登録する。
 	ModelManager::GetInstance()->LoadModel("miko.gltf", true, "/human");
 	ModelManager::GetInstance()->LoadModel("sand.obj", false, "/sand");
+	ModelManager::GetInstance()->LoadModel("grass.obj");
 	ModelManager::GetInstance()->LoadModel("enemy_chaser.gltf");
 	ModelManager::GetInstance()->LoadModel("enemy_shooter.gltf");
 	ModelManager::GetInstance()->LoadModel("enemy_charger.gltf");
@@ -218,6 +260,13 @@ void TitleScene::UpdateTitlePresentation() {
 	const float sunlightIntensity = 1.35f + (0.78f - 1.35f) * sunsetAmount;
 
 	// 戦闘ロジックを持たない配置モデルだけを、名前に応じて静かに動かす。
+	Vector3 playerPosition{};
+	for (GameObject* object : GetMutableSceneObjects()) {
+		if (object && object->GetName() == "TitleMiko") {
+			playerPosition = object->GetTransform().translate;
+			break;
+		}
+	}
 	for (GameObject* object : GetMutableSceneObjects()) {
 		if (!object) continue;
 		const std::string& name = object->GetName();
@@ -226,6 +275,33 @@ void TitleScene::UpdateTitlePresentation() {
 			object3d->SetDirectionalLight(sunlightColor, lightDirection, sunlightIntensity);
 			// 旧TitleSunの局所光を廃止したため、初期値のPointLightも明示的に無効化します。
 			object3d->SetPointLight({0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, 0.0f, 1.0f, 1.0f);
+			if (name == "TitleMiko") {
+				// 歩行アニメーションの影響を初回だけ解除し、素立ちを開始姿勢にする。
+				if (!titleMikoPoseApplied_) {
+					object3d->ResetAnimationPoseToInitial();
+					titleMikoPoseApplied_ = true;
+				}
+
+				// ボーン補正なしの素立ちから、現在の臨戦姿勢まで滑らかに補間する。
+				// SmoothStepを使うことで、動き始めと構え終わりが急停止して見えないようにする。
+				const float poseBlend = SmoothStep(
+					kMikoPoseStartSeconds, kMikoPoseEndSeconds, presentationTime_);
+				// 左腕は内側へ寄せたうえで前方へ少し持ち上げ、胸の手前で構える。
+				const Quaternion leftArmTarget = Normalize(Multiply(
+					MakeRotateAxisAngleQuaternion({0.0f, 0.0f, 1.0f}, -0.95f),
+					MakeRotateAxisAngleQuaternion({1.0f, 0.0f, 0.0f}, -0.65f)));
+				const Quaternion rightArmTarget =
+					MakeRotateAxisAngleQuaternion({0.0f, 0.0f, 1.0f}, -0.95f);
+				const Quaternion spineTarget =
+					MakeRotateAxisAngleQuaternion({1.0f, 0.0f, 0.0f}, -0.12f);
+
+				object3d->SetJointRotationOffset(
+					"arm.L", Slerp(IdentityQuaternion(), leftArmTarget, poseBlend));
+				object3d->SetJointRotationOffset(
+					"arm.R", Slerp(IdentityQuaternion(), rightArmTarget, poseBlend));
+				object3d->SetJointRotationOffset(
+					"spine", Slerp(IdentityQuaternion(), spineTarget, poseBlend));
+			}
 		}
 		if (name.starts_with("TitleMagatama")) {
 			// 勾玉は個別の角度差を持つ円運動にし、4つが同じ場所へ重ならないようにする。
@@ -280,7 +356,14 @@ void TitleScene::UpdateTitlePresentation() {
 		} else if (name.starts_with("TitleEnemy")) {
 			EulerTransform& transform = object->GetTransform();
 			const float phase = static_cast<float>(name.back() % 4) * 0.8f;
-			transform.translate.y = -1.15f + std::sin(pulseTime_ * 1.25f + phase) * 0.08f;
+			// 敵の上下基準を勾玉と同じ0.20へ合わせ、画面内で同じ高さの群れに見せる。
+			transform.translate.y = 0.20f + std::sin(pulseTime_ * 1.25f + phase) * 0.08f;
+			// タイトル画面でも敵の正面を巫女へ向け、配置された全個体に視線の向きを与える。
+			Vector3 direction = playerPosition - transform.translate;
+			direction.y = 0.0f;
+			if (Length(direction) > MathConstants::kDirectionEpsilon) {
+				transform.rotate.y = std::atan2(direction.x, direction.z);
+			}
 		}
 	}
 }
@@ -428,7 +511,14 @@ void TitleScene::Draw2D() {
 	}
 }
 
-void TitleScene::Draw3D() {}
+void TitleScene::Draw3D() {
+	if (!grassInstancingModel_) {
+		return;
+	}
+
+	InstancingModelCommon::GetInstance()->SetDraw();
+	grassInstancingModel_->Draw(Object3dCommon::GetInstance()->GetDefaultCamera());
+}
 
 /// <summary>
 /// 確保したリソースを解放し、終了処理を行います。
@@ -439,6 +529,7 @@ void TitleScene::Finalize() {
 		atmosphereSky_->Finalize();
 		atmosphereSky_.reset();
 	}
+	grassInstancingModel_.reset();
 	// タイトル専用の距離霞が次のシーンのObject3dへ残らないよう既定値へ戻します。
 	AtmosphereSystem::GetInstance()->Reset();
 	backgroundSprite_.reset();

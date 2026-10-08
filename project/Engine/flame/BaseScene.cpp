@@ -82,8 +82,14 @@ void BaseScene::Finalize() {
 	for (auto& sprite : playerAttackSlotIconSprites_) sprite.reset();
 	for (auto& sprite : playerStatusSlotBackgroundSprites_) sprite.reset();
 	for (auto& sprite : playerStatusSlotIconSprites_) sprite.reset();
+	for (auto& sprite : playerAttackSlotLevelBackgroundSprites_) sprite.reset();
+	for (auto& sprite : playerStatusSlotLevelBackgroundSprites_) sprite.reset();
+	for (auto& object : playerAttackSlotLevelTextObjects_) object.reset();
+	for (auto& object : playerStatusSlotLevelTextObjects_) object.reset();
 	playerAttackSlotIconVisible_.fill(false);
 	playerStatusSlotIconVisible_.fill(false);
+	playerAttackSlotLevelVisible_.fill(false);
+	playerStatusSlotLevelVisible_.fill(false);
 	playerAttackSlotTextureKeys_.fill({});
 	playerAttackSlotTexturePaths_.fill({});
 	playerStatusSlotTextureKeys_.fill({});
@@ -91,12 +97,12 @@ void BaseScene::Finalize() {
 	playerAttackSlotLabelObject_.reset();
 	playerStatusSlotLabelObject_.reset();
 	isPlayerSlotHudVisible_ = false;
-	isLevelUpSelectionActive_ = false;
+	SetGameplayMode(GameplayMode::Playing);
 	levelUpPlayer_ = nullptr;
 	levelUpChoices_.clear();
+	levelUpRerollUsed_ = false;
 	bossAcquisitionOfferQueue_.clear();
 	bossAcquisitionPlayer_ = nullptr;
-	isBossAcquisitionOfferActive_ = false;
 	levelUpOverlaySprite_.reset();
 	levelUpPanelSprite_.reset();
 	for (auto& sprite : levelUpChoiceBorderSprites_) sprite.reset();
@@ -105,10 +111,18 @@ void BaseScene::Finalize() {
 	levelUpTitleTextObject_.reset();
 	levelUpInstructionTextObject_.reset();
 	for (auto& object : levelUpChoiceTextObjects_) object.reset();
-	GameTime::SetPaused(false);
 	selectedObjectIndex_ = -1;
 	activeCameraObjectName_.clear();
 	enemyInspectorObjectName_.clear();
+}
+
+void BaseScene::SetGameplayMode(GameplayMode mode) {
+	gameplayMode_ = mode;
+	// UIがゲーム世界を占有するモードだけ時間を止め、停止理由を一か所で管理する。
+	const bool shouldPause = mode == GameplayMode::Paused ||
+		mode == GameplayMode::LevelUpSelection ||
+		mode == GameplayMode::BossReward;
+	GameTime::SetPaused(shouldPause);
 }
 
 /// <summary>

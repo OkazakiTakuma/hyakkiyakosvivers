@@ -39,6 +39,7 @@ public:
 	LONG GetClientHeight() const { return clientHeight; }
 	bool IsGamepadConnected() const { return isGamepadConnected_; }
 	Vector3 GetGamepadLeftStick() const { return gamepadLeftStick_; }
+	Vector3 GetGamepadRightStick() const { return gamepadRightStick_; }
 	bool TriggerGamepadButton(WORD buttonMask) const;
 	bool TriggerGamepadLeft() const;
 	bool TriggerGamepadRight() const;
@@ -72,6 +73,7 @@ private:
 	bool isGamepadConnected_ = false;
 	Vector3 gamepadLeftStick_{0.0f, 0.0f, 0.0f};
 	Vector3 previousGamepadLeftStick_{0.0f, 0.0f, 0.0f};
+	Vector3 gamepadRightStick_{0.0f, 0.0f, 0.0f};
 	WORD gamepadButtons_ = 0;
 	WORD previousGamepadButtons_ = 0;
 

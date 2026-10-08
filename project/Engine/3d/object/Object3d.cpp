@@ -371,6 +371,15 @@ void Object3d::Update() {
 			}
 			SkeletonAnimationUtility::ApplyAnimation(skeleton, animation, animationTime, animationBlendWeight_);
 		}
+		// アニメーションの有無に関係なく、シーン演出用のボーン回転を最後に合成する。
+		for (const auto& [jointName, rotationOffset] : jointRotationOffsets_) {
+			const auto jointIterator = skeleton.jointMap.find(jointName);
+			if (jointIterator == skeleton.jointMap.end()) {
+				continue;
+			}
+			Joint& joint = skeleton.joints[jointIterator->second];
+			joint.transform.rotate = Normalize(Multiply(rotationOffset, joint.transform.rotate));
+		}
 
 		SkeletonAnimationUtility::UpdateMatrices(skeleton);
 		UpdateSkinningPaletteResource();
@@ -447,6 +456,15 @@ bool Object3d::GetJointWorldMatrix(const std::string& jointName, Matrix4x4& join
 	const Matrix4x4 objectWorldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 	jointWorldMatrix = Multiply(jointMatrix, objectWorldMatrix);
 	return true;
+}
+
+std::vector<std::string> Object3d::GetJointNames() const {
+	std::vector<std::string> names;
+	names.reserve(skeleton.joints.size());
+	for (const Joint& joint : skeleton.joints) {
+		names.push_back(joint.name);
+	}
+	return names;
 }
 
 bool Object3d::HasAnimation() const {
@@ -528,6 +546,8 @@ void Object3d::Draw() {
 	Object3dCommon* common = Object3dCommon::GetInstance();
 	transformationMatrix->lightWVP = Multiply(
 	    transformationMatrix->world, common->GetLightViewProjectionMatrix());
+	// isPointLight をシェーダーへ渡し、無効なオブジェクトでは局所光の計算を省略する。
+	pointLightData->enabled = isPointLightSet ? 1.0f : 0.0f;
 
 	commandList->SetGraphicsRootConstantBufferView(1, wvpResorceModel->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(2, lightResource->GetGPUVirtualAddress());
@@ -640,6 +660,8 @@ void Object3d::SetModel(Model* newModel) {
 	skeleton = {};
 	animationTime = 0.0f;
 	activeAnimationName_.clear();
+	jointRotationOffsets_.clear();
+	jointRotationOffsetEuler_.clear();
 	useInitialSkinningPose_ = false;
 	animation = {};
 	if (model && model->GetIsAnimation() && !model->GetAnimationNames().empty()) {

@@ -141,7 +141,8 @@ struct PointLight {
 	float intensity;
 	float radius;
 	float decay;
-	float padding[2];
+	float enabled;
+	float padding;
 };
 
 /// <summary>パーティクル生成時の初期値とランダム範囲です。</summary>

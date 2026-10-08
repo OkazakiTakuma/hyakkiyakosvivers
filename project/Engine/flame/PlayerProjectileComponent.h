@@ -5,9 +5,35 @@
 #include <string>
 #include <vector>
 
+/// <summary>軌道Strategyが生成側へ公開する、弾の見た目と衝突上の特性です。</summary>
+struct PlayerProjectilePresentation {
+	Vector3 scaleMultiplier{1.0f, 1.0f, 1.0f};
+	bool modelVisible = true;
+	bool addSkyLaserVisual = false;
+	bool addTrail = true;
+	float trailWidthMultiplier = 0.8f;
+	float minimumTrailWidth = 0.12f;
+	float trailLifeTime = 0.32f;
+	bool trailUsesMotionAnchor = false;
+	bool overrideModelColor = false;
+	Vector4 modelColor{1.0f, 1.0f, 1.0f, 1.0f};
+	bool overrideTrailColors = false;
+	Vector4 trailHeadColor{1.0f, 1.0f, 1.0f, 1.0f};
+	Vector4 trailTailColor{1.0f, 1.0f, 1.0f, 0.0f};
+	bool useMagatamaPalette = false;
+	bool addCoreTrail = false;
+	bool addGlowEmitter = false;
+	float repeatHitInterval = 0.0f;
+	bool aimAtNearestEnemyOnSpawn = false;
+	bool ricochets = false;
+	bool usesVerticalHitArea = false;
+	bool expiresOutsideView = true;
+};
+
 /// <summary>プレイヤー弾の移動方式、追尾、寿命、貫通・再ヒット制御を管理します。</summary>
 class PlayerProjectileComponent : public Component {
 public:
+	void Initialize() override;
 	void Update() override;
 
 	void SetAttackName(const std::string& attackName);
@@ -28,6 +54,7 @@ public:
 	float GetHomingAccuracy() const;
 	void SetMotionType(PlayerProjectileMotionType motionType);
 	PlayerProjectileMotionType GetMotionType() const;
+	PlayerProjectilePresentation GetMotionPresentation() const;
 	void SetMotionAnchor(GameObject* motionAnchor);
 	void SetOrbitAngleRadians(float angle);
 	void SetOrbitRadius(float radius);
@@ -59,6 +86,7 @@ private:
 	};
 
 	void UpdateHitCooldowns(float deltaTime);
+	void UpdateLinearMotion(GameObject* owner, float deltaTime, float frameScale, bool rampHoming);
 
 	void UpdateBoomerang(GameObject* owner, float deltaTime, float frameScale);
 

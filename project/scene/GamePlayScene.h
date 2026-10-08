@@ -52,7 +52,6 @@ private:
 	bool isShowCylinder_ = true;
 	bool isShowParticles_ = true;
 	enum class PauseMenuItem { Resume, Retry, StageSelect, Count };
-	bool isPauseMenuOpen_ = false;
 	int selectedPauseMenuItem_ = static_cast<int>(PauseMenuItem::Resume);
 	std::unique_ptr<Sprite> pauseOverlaySprite_;
 	std::unique_ptr<Sprite> pausePanelSprite_;
