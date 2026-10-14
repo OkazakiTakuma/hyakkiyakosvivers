@@ -1,6 +1,7 @@
 #include "TitleScene.h"
 #include "SceneManager.h"
 #include "MathConstants.h"
+#include "PostEffect.h"
 #include <model/ModelManager.h>
 #include "instancing/InstancingModelCommon.h"
 
@@ -16,10 +17,14 @@ constexpr float kPromptStartSeconds = 5.00f;
 // 巫女はフェードイン中に素立ちから臨戦姿勢へ移り、斬撃演出が始まる前に構え終わる。
 constexpr float kMikoPoseStartSeconds = 0.35f;
 constexpr float kMikoPoseEndSeconds = 1.45f;
-// リソースフォントを追加するまではWindows標準の和文明朝・UIゴシックを使用する。
-// Resources/Fontsへ同系統のフォントを追加した場合は、このファミリー名だけを差し替えればよい。
-constexpr const char* kTitleFontName = "Yu Mincho";
+constexpr float kExitFirstHitSeconds = 0.34f;
+constexpr float kExitHitIntervalSeconds = 0.15f;
+constexpr float kExitAttackTravelSeconds = 0.28f;
+constexpr float kExitEnemyVanishSeconds = 0.20f;
+constexpr float kExitFogBuildSeconds = 1.10f;
 constexpr const char* kUiFontName = "Yu Gothic UI";
+constexpr const char* kTitleLogoTexturePath = "Resources/UI/title_logo.png";
+constexpr float kTitleLogoAspectRatio = 1774.0f / 887.0f;
 constexpr int kMenuItemCount = 3;
 
 float SmoothStep(float start, float end, float value) {
@@ -78,8 +83,16 @@ void TitleScene::Initialize() {
 	isResetConfirmationOpen_ = false;
 	pulseTime_ = 0.0f;
 	presentationTime_ = 0.0f;
+	magatamaOrbitAngle_ = 0.0f;
 	titleMikoPoseApplied_ = false;
 	titlePhase_ = TitlePhase::FadeIn;
+	exitElapsed_ = 0.0f;
+	exitSceneName_.clear();
+	exitSceneChangeRequested_ = false;
+	exitMagatamas_.clear();
+	exitMagatamaStartPositions_.clear();
+	exitEnemies_.clear();
+	exitEnemyStartScales_.clear();
 
 	// 太陽方向を空・平行光源・距離霞で共有し、別々に位置を調整する必要をなくします。
 	AtmosphereSettings& atmosphere = AtmosphereSystem::GetInstance()->GetSettings();
@@ -95,6 +108,10 @@ void TitleScene::Initialize() {
 	atmosphere.distanceFogDensity = 0.012f;
 	atmosphere.heightFogDensity = 0.16f;
 	atmosphere.aerialPerspectiveStrength = 0.68f;
+	// 待機中は単層ノイズの軽量な低層霧を使い、終了演出だけ多層化する。
+	PostEffect::GetInstance()->SetFogSettings(
+		true, {0.26f, 0.31f, 0.40f, 0.82f}, 0.68f, 0.54f,
+		3.8f, 0.48f, 0.08f, 0.028f, 4.5f, 52.0f, false);
 
 	atmosphereSky_ = std::make_unique<AtmosphereSky>();
 	atmosphereSky_->Initialize();
@@ -102,10 +119,10 @@ void TitleScene::Initialize() {
 
 	Model* grassModel = ModelManager::GetInstance()->FindModel("grass.obj");
 	if (grassModel) {
-		// 100x100のタイトル床全体を、従来の約5倍の密度で覆う。
-		constexpr int kGrassSide = 701;
+		// 100x100の範囲は維持しつつ、遠景で重なっていた草を間引いて負荷を抑える。
+		constexpr int kGrassSide = 321;
 		constexpr int kGrassInstanceCount = kGrassSide * kGrassSide;
-		constexpr float kSpacing = 0.14285715f;
+		constexpr float kSpacing = 0.3125f;
 		grassInstancingModel_ = std::make_unique<InstancingModel>();
 		grassInstancingModel_->Initialize(grassModel, kGrassInstanceCount);
 		// タイトルカメラから床の最遠端までは約85mあるため、端まで描画できる距離を確保する。
@@ -151,6 +168,7 @@ void TitleScene::LoadTitleModels() {
 	TextureManager::GetInstance()->LoadTexture("Resources/human/white.png");
 	TextureManager::GetInstance()->LoadTexture("Resources/sand/sand.png");
 	TextureManager::GetInstance()->LoadTexture("Resources/circle.png");
+	TextureManager::GetInstance()->LoadTexture(kTitleLogoTexturePath);
 }
 
 void TitleScene::CreateUi() {
@@ -165,12 +183,11 @@ void TitleScene::CreateUi() {
 	shopButtonSprite_ = CreateColorSprite();
 	confirmationBackdropSprite_ = CreateColorSprite();
 	confirmationPanelSprite_ = CreateColorSprite();
+	titleLogoSprite_ = std::make_unique<Sprite>();
+	titleLogoSprite_->Initialize(kTitleLogoTexturePath);
+	titleLogoSprite_->SetAnchorPoint({0.5f, 0.5f});
 
 	// 表示文字と基本色はここへ集約し、Draw2Dでは配置と選択状態だけを更新する。
-	titleGlowTextObject_ = CreateTextObject(
-		"百鬼夜行サバイバーズ", 64.0f, {0.86f, 0.08f, 0.025f, 0.0f}, kTitleFontName);
-	titleTextObject_ = CreateTextObject(
-		"百鬼夜行サバイバーズ", 58.0f, {1.0f, 0.94f, 0.79f, 0.0f}, kTitleFontName);
 	startTextObject_ = CreateTextObject("GAME START", 30.0f, {1.0f, 1.0f, 1.0f, 1.0f});
 	newGameTextObject_ = CreateTextObject("初めから", 30.0f, {0.82f, 0.87f, 0.94f, 1.0f});
 	shopTextObject_ = CreateTextObject("SHOP", 30.0f, {0.82f, 0.87f, 0.94f, 1.0f});
@@ -192,6 +209,12 @@ void TitleScene::Update() {
 	Input* input = Input::GetInstance();
 	const float deltaTime = GameTime::GetDeltaTime();
 	pulseTime_ += deltaTime;
+	if (titlePhase_ == TitlePhase::Exit) {
+		exitElapsed_ += deltaTime;
+		UpdateTitlePresentation();
+		UpdateExitPresentation();
+		return;
+	}
 	if (titlePhase_ != TitlePhase::Menu) {
 		presentationTime_ += deltaTime;
 	}
@@ -205,7 +228,7 @@ void TitleScene::Update() {
 		}
 		if (input->TriggerKey(DIK_RETURN) || input->TriggerGamepadButton(XINPUT_GAMEPAD_A)) {
 			sceneManager->ResetGameProgress();
-			sceneManager->ChangeScene("PLAYER_SELECT");
+			BeginExitTransition("PLAYER_SELECT");
 		}
 		return;
 	}
@@ -239,8 +262,122 @@ void TitleScene::Update() {
 			// 「初めから」は即時消去せず、もう一度明示的な決定操作を求める。
 			isResetConfirmationOpen_ = true;
 		} else {
-			sceneManager->ChangeScene(selectedMenuIndex_ == 0 ? "PLAYER_SELECT" : "SHOP");
+			BeginExitTransition(selectedMenuIndex_ == 0 ? "PLAYER_SELECT" : "SHOP");
 		}
+	}
+}
+
+void TitleScene::BeginExitTransition(const std::string& sceneName) {
+	exitSceneName_ = sceneName;
+	exitElapsed_ = 0.0f;
+	exitSceneChangeRequested_ = false;
+	isResetConfirmationOpen_ = false;
+	exitMagatamas_.clear();
+	exitMagatamaStartPositions_.clear();
+	exitEnemies_.clear();
+	exitEnemyStartScales_.clear();
+
+	// JSONの列挙順ではなく名前順へ揃え、配置の保存順が変わっても同じ撃破順を保つ。
+	for (GameObject* object : GetMutableSceneObjects()) {
+		if (!object) continue;
+		if (object->GetName().starts_with("TitleMagatama")) {
+			exitMagatamas_.push_back(object);
+		} else if (object->GetName().starts_with("TitleEnemy")) {
+			exitEnemies_.push_back(object);
+		}
+	}
+	auto compareByName = [](const GameObject* lhs, const GameObject* rhs) {
+		return lhs->GetName() < rhs->GetName();
+	};
+	std::sort(exitMagatamas_.begin(), exitMagatamas_.end(), compareByName);
+	std::sort(exitEnemies_.begin(), exitEnemies_.end(), compareByName);
+	for (GameObject* magatama : exitMagatamas_) {
+		exitMagatamaStartPositions_.push_back(magatama->GetTransform().translate);
+		if (TrailRendererComponent* trail = magatama->GetComponent<TrailRendererComponent>()) {
+			trail->Clear();
+			trail->SetWidth(0.18f);
+			trail->SetLifeTime(0.42f);
+			trail->SetMinSegmentLength(0.025f);
+		}
+	}
+	for (GameObject* enemy : exitEnemies_) {
+		exitEnemyStartScales_.push_back(enemy->GetTransform().scale);
+	}
+	titlePhase_ = TitlePhase::Exit;
+}
+
+void TitleScene::UpdateExitPresentation() {
+	if (exitMagatamas_.empty() || exitEnemies_.empty()) {
+		if (!exitSceneChangeRequested_ && sceneManager && !exitSceneName_.empty()) {
+			exitSceneChangeRequested_ = true;
+			sceneManager->ChangeScene(exitSceneName_, SceneTransitionType::FadeWhite);
+		}
+		return;
+	}
+
+	// 各勾玉は自分が担当する敵だけを巡回する。二巡目も直前の命中地点から飛び立つ。
+	for (size_t magatamaIndex = 0; magatamaIndex < exitMagatamas_.size(); ++magatamaIndex) {
+		GameObject* magatama = exitMagatamas_[magatamaIndex];
+		Vector3 position = exitMagatamaStartPositions_[magatamaIndex];
+		for (size_t enemyIndex = magatamaIndex; enemyIndex < exitEnemies_.size(); enemyIndex += exitMagatamas_.size()) {
+			const float hitTime = kExitFirstHitSeconds + static_cast<float>(enemyIndex) * kExitHitIntervalSeconds;
+			const float launchTime = hitTime - kExitAttackTravelSeconds;
+			const Vector3 target = exitEnemies_[enemyIndex]->GetTransform().translate + Vector3{0.0f, 0.65f, 0.0f};
+			if (exitElapsed_ < launchTime) break;
+			if (exitElapsed_ >= hitTime) {
+				position = target;
+				continue;
+			}
+			const float travel = SmoothStep(launchTime, hitTime, exitElapsed_);
+			const Vector3 source = position;
+			position = source + travel * (target - source);
+			position.y += std::sin(travel * MathConstants::kPi) * 0.75f;
+			break;
+		}
+		EulerTransform& transform = magatama->GetTransform();
+		const Vector3 velocity = position - transform.translate;
+		transform.translate = position;
+		if (Length(velocity) > MathConstants::kDirectionEpsilon) {
+			transform.rotate.y = std::atan2(velocity.x, velocity.z);
+		}
+		transform.rotate.z += GameTime::GetDeltaTime() * 9.0f;
+	}
+
+	for (size_t enemyIndex = 0; enemyIndex < exitEnemies_.size(); ++enemyIndex) {
+		GameObject* enemy = exitEnemies_[enemyIndex];
+		Object3dComponent* object3d = enemy->GetComponent<Object3dComponent>();
+		const float hitTime = kExitFirstHitSeconds + static_cast<float>(enemyIndex) * kExitHitIntervalSeconds;
+		if (exitElapsed_ < hitTime) continue;
+		const float vanish = SmoothStep(hitTime, hitTime + kExitEnemyVanishSeconds, exitElapsed_);
+		const float scale = 1.0f - vanish;
+		enemy->GetTransform().scale = scale * exitEnemyStartScales_[enemyIndex];
+		enemy->GetTransform().rotate.y += GameTime::GetDeltaTime() * (5.0f + static_cast<float>(enemyIndex));
+		if (object3d) {
+			object3d->SetColor({1.0f, 0.55f + vanish * 0.35f, 0.18f, 1.0f - vanish});
+			object3d->SetEmission({1.0f, 0.24f, 0.04f}, (1.0f - vanish) * 2.8f);
+			if (vanish >= 1.0f) {
+				object3d->SetShadowEnabled(false);
+				object3d->SetEnabled(false);
+			}
+		}
+	}
+
+	const float lastHitTime = kExitFirstHitSeconds +
+		static_cast<float>(exitEnemies_.size() - 1) * kExitHitIntervalSeconds;
+	// 先に複数体の撃破を見せ、3体目の消滅が始まってから粒状の霧を増やす。
+	const size_t fogStartEnemyIndex = (std::min)(size_t{2}, exitEnemies_.size() - 1);
+	const float fogStartTime = kExitFirstHitSeconds +
+		static_cast<float>(fogStartEnemyIndex) * kExitHitIntervalSeconds + 0.08f;
+	const float fogEndTime = lastHitTime + kExitEnemyVanishSeconds + kExitFogBuildSeconds;
+	// 粒状霧が増え始める時点からFadeWhiteへ渡し、濃霧化・白被覆・復帰を一括管理する。
+	if (!exitSceneChangeRequested_ &&
+		exitElapsed_ >= fogStartTime &&
+		sceneManager && !exitSceneName_.empty()) {
+		exitSceneChangeRequested_ = true;
+		const float fogTransitionDuration = fogEndTime - fogStartTime;
+		sceneManager->ChangeScene(
+			exitSceneName_, SceneTransitionType::FadeWhite,
+			fogTransitionDuration, fogTransitionDuration);
 	}
 }
 
@@ -258,6 +395,14 @@ void TitleScene::UpdateTitlePresentation() {
 	    daylightColor.z + (sunsetColor.z - daylightColor.z) * sunsetAmount,
 	    1.0f};
 	const float sunlightIntensity = 1.35f + (0.78f - 1.35f) * sunsetAmount;
+	// 約4秒ごとに短い加速の山を作り、角度を積算して位置が飛ばない周回運動にする。
+	constexpr float kOrbitAccelerationPeriod = 4.0f;
+	const float accelerationWave = (std::max)(
+		std::sin(pulseTime_ * MathConstants::kTwoPi / kOrbitAccelerationPeriod), 0.0f);
+	const float periodicSpeedBoost = accelerationWave * accelerationWave * accelerationWave * 3.2f;
+	const float introSpeedBoost =
+		(1.0f - SmoothStep(2.10f, 3.20f, presentationTime_)) * 2.6f;
+	magatamaOrbitAngle_ += GameTime::GetDeltaTime() * (0.70f + introSpeedBoost + periodicSpeedBoost);
 
 	// 戦闘ロジックを持たない配置モデルだけを、名前に応じて静かに動かす。
 	Vector3 playerPosition{};
@@ -286,33 +431,69 @@ void TitleScene::UpdateTitlePresentation() {
 				// SmoothStepを使うことで、動き始めと構え終わりが急停止して見えないようにする。
 				const float poseBlend = SmoothStep(
 					kMikoPoseStartSeconds, kMikoPoseEndSeconds, presentationTime_);
-				// 左腕は内側へ寄せたうえで前方へ少し持ち上げ、胸の手前で構える。
+				// 参考立ち絵のS字シルエットを、単関節の簡易リグで読み取れる範囲へ落とし込む。
+				// 右腕は胸元へ大きく引き寄せ、左腕は外側かつ斜め下へ開いて左右差を作る。
 				const Quaternion leftArmTarget = Normalize(Multiply(
-					MakeRotateAxisAngleQuaternion({0.0f, 0.0f, 1.0f}, -0.95f),
-					MakeRotateAxisAngleQuaternion({1.0f, 0.0f, 0.0f}, -0.65f)));
-				const Quaternion rightArmTarget =
-					MakeRotateAxisAngleQuaternion({0.0f, 0.0f, 1.0f}, -0.95f);
-				const Quaternion spineTarget =
-					MakeRotateAxisAngleQuaternion({1.0f, 0.0f, 0.0f}, -0.12f);
+					MakeRotateAxisAngleQuaternion({0.0f, 0.0f, 1.0f}, -1.18f),
+					Normalize(Multiply(
+						MakeRotateAxisAngleQuaternion({1.0f, 0.0f, 0.0f}, -0.52f),
+						MakeRotateAxisAngleQuaternion({0.0f, 1.0f, 0.0f}, -0.22f)))));
+				const Quaternion rightArmTarget = Normalize(Multiply(
+					MakeRotateAxisAngleQuaternion({0.0f, 0.0f, 1.0f}, -0.42f),
+					Normalize(Multiply(
+						MakeRotateAxisAngleQuaternion({1.0f, 0.0f, 0.0f}, 0.30f),
+						MakeRotateAxisAngleQuaternion({0.0f, 1.0f, 0.0f}, 0.24f)))));
+				// 骨盤と胸を逆方向へひねり、正面向きのままでも腰へ重心が乗って見えるようにする。
+				const Quaternion pelvisTarget = Normalize(Multiply(
+					MakeRotateAxisAngleQuaternion({0.0f, 1.0f, 0.0f}, -0.20f),
+					MakeRotateAxisAngleQuaternion({0.0f, 0.0f, 1.0f}, 0.10f)));
+				const Quaternion spineTarget = Normalize(Multiply(
+					MakeRotateAxisAngleQuaternion({0.0f, 1.0f, 0.0f}, 0.27f),
+					Normalize(Multiply(
+						MakeRotateAxisAngleQuaternion({1.0f, 0.0f, 0.0f}, -0.10f),
+						MakeRotateAxisAngleQuaternion({0.0f, 0.0f, 1.0f}, -0.13f)))));
+				const Quaternion headTarget = Normalize(Multiply(
+					MakeRotateAxisAngleQuaternion({0.0f, 1.0f, 0.0f}, -0.10f),
+					MakeRotateAxisAngleQuaternion({0.0f, 0.0f, 1.0f}, 0.08f)));
+				// 支持脚は伸ばし、反対脚を少し前へ交差させて片脚重心を表現する。
+				const Quaternion leftLegTarget = Normalize(Multiply(
+					MakeRotateAxisAngleQuaternion({1.0f, 0.0f, 0.0f}, -0.18f),
+					MakeRotateAxisAngleQuaternion({0.0f, 0.0f, 1.0f}, -0.12f)));
+				const Quaternion rightLegTarget = Normalize(Multiply(
+					MakeRotateAxisAngleQuaternion({1.0f, 0.0f, 0.0f}, 0.24f),
+					MakeRotateAxisAngleQuaternion({0.0f, 0.0f, 1.0f}, 0.20f)));
+				const Quaternion tailTarget = Normalize(Multiply(
+					MakeRotateAxisAngleQuaternion({0.0f, 1.0f, 0.0f}, 0.42f),
+					MakeRotateAxisAngleQuaternion({1.0f, 0.0f, 0.0f}, 0.12f)));
 
 				object3d->SetJointRotationOffset(
-					"arm.L", Slerp(IdentityQuaternion(), leftArmTarget, poseBlend));
+					"arm.L", Slerp(IdentityQuaternion(), rightArmTarget, poseBlend));
 				object3d->SetJointRotationOffset(
-					"arm.R", Slerp(IdentityQuaternion(), rightArmTarget, poseBlend));
+					"arm.R", Slerp(IdentityQuaternion(), leftArmTarget, poseBlend));
 				object3d->SetJointRotationOffset(
 					"spine", Slerp(IdentityQuaternion(), spineTarget, poseBlend));
+				object3d->SetJointRotationOffset(
+					"pelvis", Slerp(IdentityQuaternion(), pelvisTarget, poseBlend));
+				object3d->SetJointRotationOffset(
+					"head", Slerp(IdentityQuaternion(), headTarget, poseBlend));
+				object3d->SetJointRotationOffset(
+					"leg.L", Slerp(IdentityQuaternion(), rightLegTarget, poseBlend));
+				object3d->SetJointRotationOffset(
+					"leg.R", Slerp(IdentityQuaternion(), leftLegTarget, poseBlend));
+				object3d->SetJointRotationOffset(
+					"tail", Slerp(IdentityQuaternion(), tailTarget, poseBlend));
 			}
 		}
-		if (name.starts_with("TitleMagatama")) {
+		if (name.starts_with("TitleMagatama") && titlePhase_ != TitlePhase::Exit) {
 			// 勾玉は個別の角度差を持つ円運動にし、4つが同じ場所へ重ならないようにする。
 			const int index = static_cast<int>(name.back() - 'A');
 			const float phase = static_cast<float>(index) * MathConstants::kPi * 0.5f;
 			const float expansion = SmoothStep(0.75f, 2.70f, presentationTime_);
 			const float slashBurst = 1.0f - SmoothStep(2.10f, 3.20f, presentationTime_);
-			const float radiusX = 0.55f + expansion * (1.45f + slashBurst * 0.42f);
-			const float radiusZ = 0.20f + expansion * (0.38f + slashBurst * 0.18f);
-			const float angularSpeed = 0.70f + slashBurst * 2.6f;
-			const float angle = phase + pulseTime_ * angularSpeed;
+			// 尻尾のシルエットと重ならないよう、待機時の勾玉軌道を一回り外側へ広げる。
+			const float radiusX = 0.72f + expansion * (1.88f + slashBurst * 0.48f);
+			const float radiusZ = 0.40f + expansion * (1.05f + slashBurst * 0.28f);
+			const float angle = phase + magatamaOrbitAngle_;
 			EulerTransform& transform = object->GetTransform();
 			transform.translate.x = std::cos(angle) * radiusX;
 			transform.translate.y = 0.20f + std::sin(pulseTime_ * 1.7f + phase) * 0.16f;
@@ -353,7 +534,7 @@ void TitleScene::UpdateTitlePresentation() {
 				trail->SetTailColor({glowColors[glowColorIndex].x * 0.35f, glowColors[glowColorIndex].y * 0.20f,
 					glowColors[glowColorIndex].z, 0.0f});
 			}
-		} else if (name.starts_with("TitleEnemy")) {
+		} else if (name.starts_with("TitleEnemy") && titlePhase_ != TitlePhase::Exit) {
 			EulerTransform& transform = object->GetTransform();
 			const float phase = static_cast<float>(name.back() % 4) * 0.8f;
 			// 敵の上下基準を勾玉と同じ0.20へ合わせ、画面内で同じ高さの群れに見せる。
@@ -375,7 +556,7 @@ void TitleScene::DrawSkyBox() {
 }
 
 void TitleScene::UpdateTitlePhase() {
-	if (titlePhase_ == TitlePhase::Menu) return;
+	if (titlePhase_ == TitlePhase::Menu || titlePhase_ == TitlePhase::Exit) return;
 	if (presentationTime_ < kSlashStartSeconds) {
 		titlePhase_ = TitlePhase::FadeIn;
 	} else if (presentationTime_ < 2.70f) {
@@ -420,15 +601,16 @@ void TitleScene::Draw2D() {
 	}
 
 	if (logoAlpha > 0.0f) {
-		const float glowPulse = 0.32f + 0.10f * std::sin(pulseTime_ * 2.3f);
-		titleGlowTextObject_->GetTransform().translate = {width * 0.5f, height * 0.115f + 2.0f, 0.0f};
-		titleGlowTextObject_->GetComponent<TextComponent>()->SetColor(
-			{0.90f, 0.075f, 0.025f, logoAlpha * glowPulse});
-		titleTextObject_->GetTransform().translate = {width * 0.5f, height * 0.115f, 0.0f};
-		titleTextObject_->GetComponent<TextComponent>()->SetColor(
-			{1.0f, 0.95f, 0.82f, logoAlpha});
-		titleGlowTextObject_->Draw2D();
-		titleTextObject_->Draw2D();
+		// 画面の高さを上限にして、横長ロゴが解像度やアスペクト比を問わず上部へ収まるようにする。
+		const float logoWidth = (std::min)(width * 0.62f, height * 0.72f);
+		const float logoHeight = logoWidth / kTitleLogoAspectRatio;
+		EulerTransform logoTransform = titleLogoSprite_->GetTransform();
+		logoTransform.translate = {width * 0.5f, height * 0.20f, 0.0f};
+		titleLogoSprite_->SetTransform(logoTransform);
+		titleLogoSprite_->SetSize({logoWidth, logoHeight});
+		titleLogoSprite_->SetColor({1.0f, 1.0f, 1.0f, logoAlpha});
+		titleLogoSprite_->Update();
+		titleLogoSprite_->Draw();
 		DrawColorSprite(accentSprite_.get(), 0.0f, 0.0f, width, 3.0f,
 			{0.52f, 0.035f, 0.025f, logoAlpha * 0.90f});
 		DrawColorSprite(accentSprite_.get(), 0.0f, height - 3.0f, width, 3.0f,
@@ -532,6 +714,9 @@ void TitleScene::Finalize() {
 	grassInstancingModel_.reset();
 	// タイトル専用の距離霞が次のシーンのObject3dへ残らないよう既定値へ戻します。
 	AtmosphereSystem::GetInstance()->Reset();
+	PostEffect::GetInstance()->SetFogSettings(
+		false, {0.26f, 0.31f, 0.40f, 0.82f}, 0.68f, 0.54f,
+		3.8f, 0.48f, 0.08f, 0.028f, 4.5f, 52.0f, false);
 	backgroundSprite_.reset();
 	fadeSprite_.reset();
 	slashSprite_.reset();
@@ -542,8 +727,7 @@ void TitleScene::Finalize() {
 	shopButtonSprite_.reset();
 	confirmationBackdropSprite_.reset();
 	confirmationPanelSprite_.reset();
-	titleGlowTextObject_.reset();
-	titleTextObject_.reset();
+	titleLogoSprite_.reset();
 	startTextObject_.reset();
 	newGameTextObject_.reset();
 	shopTextObject_.reset();

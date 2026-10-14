@@ -18,6 +18,7 @@ class Sprite;
 enum class SceneTransitionType {
 	None,           ///< 演出を行わず、次の更新で即時切り替えます。
 	Fade,           ///< 指定色の透明度を変化させて画面全体を覆います。
+	FadeWhite,      ///< 白で画面を覆い、霧や閃光から自然につなぎます。
 	WipeLeft,       ///< 画面左端から右方向へ覆います。
 	WipeRight,      ///< 画面右端から左方向へ覆います。
 	Curtains,       ///< 画面の左右から中央へ向けて閉じます。
@@ -58,6 +59,9 @@ public:
 	void ChangeScene(const std::string& sceneName);
 	/// <summary>この切り替えに限り、指定した遷移パターンを使用します。</summary>
 	void ChangeScene(const std::string& sceneName, SceneTransitionType transitionType);
+	/// <summary>この切り替えに限り、遷移パターンとOut/In時間を指定します。</summary>
+	void ChangeScene(const std::string& sceneName, SceneTransitionType transitionType,
+		float outDuration, float inDuration);
 	/// <summary>以降のシーン切り替えに使用する既定設定を更新します。</summary>
 	void SetTransitionSettings(const SceneTransitionSettings& settings);
 	/// <summary>現在のシーン遷移設定を取得します。</summary>
@@ -195,8 +199,16 @@ private:
 	SceneTransitionType activeTransitionType_ = SceneTransitionType::Fade;
 	/// <summary>現在フェーズが開始してからの経過秒数です。</summary>
 	float transitionElapsed_ = 0.0f;
+	/// <summary>現在の切り替えに確定したフェードアウト時間です。</summary>
+	float activeTransitionOutDuration_ = 0.35f;
+	/// <summary>現在の切り替えに確定したフェードイン時間です。</summary>
+	float activeTransitionInDuration_ = 0.35f;
+	/// <summary>FadeWhiteのOut開始からIn終了まで途切れず進む、霧移動専用の経過秒数です。</summary>
+	float transitionFogElapsed_ = 0.0f;
 	/// <summary>画面が遷移色で覆われている割合です。0が表示、1が完全被覆です。</summary>
 	float transitionCoverage_ = 0.0f;
+	/// <summary>新シーンを白で隠したまま先に描画する準備フレーム数です。</summary>
+	uint32_t transitionInWarmupFrames_ = 0;
 	AbstractSceneFactory* sceneFactory_ = nullptr;
 	Camera* fallbackCamera_ = nullptr;
 	std::string currentSceneName_ = "None";

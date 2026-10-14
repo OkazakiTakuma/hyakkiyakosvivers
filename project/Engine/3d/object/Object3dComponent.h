@@ -145,6 +145,8 @@ public:
 	bool HasAnimation() const { return object3d_ && object3d_->HasAnimation(); }
 	void SetAnimationPlaying(bool isPlaying) { object3d_->SetAnimationPlaying(isPlaying); }
 	bool GetAnimationPlaying() const { return object3d_ && object3d_->GetAnimationPlaying(); }
+	void SetAnimationLooping(bool isLooping) { if (object3d_) object3d_->SetAnimationLooping(isLooping); }
+	bool GetAnimationLooping() const { return object3d_ && object3d_->GetAnimationLooping(); }
 	void RestartAnimation() { object3d_->RestartAnimation(); }
 	void ResetAnimationPoseToInitial() { object3d_->ResetAnimationPoseToInitial(); }
 	bool SetAnimation(const std::string& animationName, bool restart = true) { return object3d_ && object3d_->SetAnimation(animationName, restart); }

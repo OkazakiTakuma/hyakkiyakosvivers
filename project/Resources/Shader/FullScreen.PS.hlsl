@@ -4,6 +4,7 @@ Texture2D<float4> gTexture : register(t0);
 Texture2D<float> gDepthTexture : register(t1);
 Texture2D<float> maskTexture : register(t2);
 Texture2D<float4> gBloomTexture : register(t3);
+Texture2D<float> gFogTexture : register(t4);
 SamplerState gSampler : register(s0);
 
 cbuffer ColorInfo : register(b0)
@@ -45,6 +46,18 @@ cbuffer ColorInfo : register(b0)
     int enableToneMapping;
     float bloomKnee;
     float paddingHdr;
+    int enableFog;
+    float fogDensity;
+    float fogHeight;
+    float fogNoiseScale;
+    float4 fogColor;
+    float fogNoiseStrength;
+    float fogSpeed;
+    float fogDistanceStart;
+    float fogDistanceEnd;
+    float fogParticleAmount;
+    int fogHighQuality;
+    float2 paddingFog;
 };
 
 struct PixelShaderOutPut
@@ -196,6 +209,14 @@ float4 ApplyDissolve(float2 uv, float4 sourceColor)
     return sourceColor;
 }
 
+float4 ApplyFog(float2 uv, float4 sourceColor)
+{
+    // 半解像度で生成済みの霧マスクを線形補間し、最終パスは1サンプルだけで合成します。
+    const float fogAmount = gFogTexture.Sample(gSampler, uv);
+    sourceColor.rgb = lerp(sourceColor.rgb, fogColor.rgb, fogAmount * fogColor.a);
+    return sourceColor;
+}
+
 PixelShaderOutPut main(VertexShaderOutput input)
 {
     PixelShaderOutPut output;
@@ -252,6 +273,11 @@ PixelShaderOutPut main(VertexShaderOutput input)
     if (enableDissolve != 0)
     {
         resultColor = ApplyDissolve(input.uv, resultColor);
+    }
+
+    if (enableFog != 0)
+    {
+        resultColor = ApplyFog(input.uv, resultColor);
     }
 
     if (damageVignetteIntensity > 0.0f)

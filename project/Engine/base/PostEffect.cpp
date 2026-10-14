@@ -5,6 +5,7 @@
 #include "WinApp.h"
 #include "imGuiManager.h"
 #include "GameTime.h"
+#include "TextureManager.h"
 #include "object/Object3dCommon.h"
 #include <algorithm>
 #include <cassert>
@@ -35,9 +36,12 @@ void PostEffect::Initialize(DirectXCommon* dxCommon) {
 	CreateSrv();
 	CreateBloomResources();
 	CreateDissolveMask();
+	CreateFogNoiseTexture();
+	CreateFogResources();
 	CreateRootSignature();
 	CreatePipelineState();
 	CreateBloomPipelineState();
+	CreateFogPipelineState();
 
 	CreateColorBuffer();
 }
@@ -256,11 +260,66 @@ void PostEffect::CreateDissolveMask() {
 	dissolveMaskSrvHandleGPU_ = srvManager->GetGPUDescriptorHandle(dissolveMaskSrvIndex_);
 }
 
+void PostEffect::CreateFogNoiseTexture() {
+	static constexpr const char* kFogNoiseTexturePath = "Resources/Texture/fog_noise.png";
+	TextureManager* textureManager = TextureManager::GetInstance();
+	const bool loaded = textureManager->LoadTexture(kFogNoiseTexturePath);
+	assert(loaded);
+	if (loaded) {
+		fogNoiseSrvHandleGPU_ = textureManager->GetSRVHandleGPU(kFogNoiseTexturePath);
+	}
+}
+
+void PostEffect::CreateFogResources() {
+	fogWidth_ = (std::max)(renderWidth_ / 2, 1);
+	fogHeightPixels_ = (std::max)(renderHeight_ / 2, 1);
+	fogRtvHeap_ = dxCommon_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1, false);
+
+	D3D12_RESOURCE_DESC description{};
+	description.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	description.Width = static_cast<uint64_t>(fogWidth_);
+	description.Height = static_cast<uint32_t>(fogHeightPixels_);
+	description.DepthOrArraySize = 1;
+	description.MipLevels = 1;
+	description.Format = DXGI_FORMAT_R8_UNORM;
+	description.SampleDesc.Count = 1;
+	description.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+	D3D12_HEAP_PROPERTIES heapProperties{};
+	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+	D3D12_CLEAR_VALUE clearValue{};
+	clearValue.Format = DXGI_FORMAT_R8_UNORM;
+	const HRESULT result = dxCommon_->GetDevice()->CreateCommittedResource(
+		&heapProperties, D3D12_HEAP_FLAG_NONE, &description,
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &clearValue,
+		IID_PPV_ARGS(&fogResource_));
+	assert(SUCCEEDED(result));
+
+	D3D12_RENDER_TARGET_VIEW_DESC rtvDescription{};
+	rtvDescription.Format = DXGI_FORMAT_R8_UNORM;
+	rtvDescription.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+	dxCommon_->GetDevice()->CreateRenderTargetView(
+		fogResource_.Get(), &rtvDescription, fogRtvHeap_->GetCPUDescriptorHandleForHeapStart());
+
+	SrvManager* srvManager = SrvManager::GetInstance();
+	if (fogSrvIndex_ == UINT32_MAX) {
+		fogSrvIndex_ = srvManager->Allocate();
+	}
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDescription{};
+	srvDescription.Format = DXGI_FORMAT_R8_UNORM;
+	srvDescription.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDescription.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDescription.Texture2D.MipLevels = 1;
+	dxCommon_->GetDevice()->CreateShaderResourceView(
+		fogResource_.Get(), &srvDescription, srvManager->GetCPUDescriptorHandle(fogSrvIndex_));
+	fogSrvHandleGPU_ = srvManager->GetGPUDescriptorHandle(fogSrvIndex_);
+}
+
 /// <summary>
 /// RootSignature を作成し、利用できる状態にします。
 /// </summary>
 void PostEffect::CreateRootSignature() {
-	D3D12_DESCRIPTOR_RANGE descriptorRanges[4] = {};
+	D3D12_DESCRIPTOR_RANGE descriptorRanges[5] = {};
 	for (uint32_t index = 0; index < _countof(descriptorRanges); ++index) {
 		descriptorRanges[index].BaseShaderRegister = index;
 		descriptorRanges[index].NumDescriptors = 1;
@@ -268,7 +327,7 @@ void PostEffect::CreateRootSignature() {
 		descriptorRanges[index].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	}
 
-	D3D12_ROOT_PARAMETER rootParameters[5] = {};
+	D3D12_ROOT_PARAMETER rootParameters[6] = {};
 
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
@@ -295,6 +354,12 @@ void PostEffect::CreateRootSignature() {
 	rootParameters[4].DescriptorTable.pDescriptorRanges = &descriptorRanges[3];
 	rootParameters[4].DescriptorTable.NumDescriptorRanges = 1;
 
+	// タイル可能な霧ノイズをt4から参照します。
+	rootParameters[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[5].DescriptorTable.pDescriptorRanges = &descriptorRanges[4];
+	rootParameters[5].DescriptorTable.NumDescriptorRanges = 1;
+
 	D3D12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
 	staticSamplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
 	staticSamplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
@@ -307,7 +372,7 @@ void PostEffect::CreateRootSignature() {
 	descriptionSignature.pParameters = rootParameters;
 	descriptionSignature.NumParameters = _countof(rootParameters);
 	descriptionSignature.pStaticSamplers = staticSamplers;
-	descriptionSignature.NumStaticSamplers = 1;
+	descriptionSignature.NumStaticSamplers = _countof(staticSamplers);
 	descriptionSignature.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
 
 	rootSignature_ = PipelineStateUtility::CreateRootSignature(dxCommon_->GetDevice().Get(), descriptionSignature);
@@ -401,6 +466,69 @@ void PostEffect::CreateBloomPipelineState() {
 	pipelineDescription.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	const HRESULT result = dxCommon_->GetDevice()->CreateGraphicsPipelineState(
 	    &pipelineDescription, IID_PPV_ARGS(&bloomPipelineState_));
+	assert(SUCCEEDED(result));
+}
+
+void PostEffect::CreateFogPipelineState() {
+	D3D12_DESCRIPTOR_RANGE ranges[2]{};
+	for (uint32_t index = 0; index < _countof(ranges); ++index) {
+		ranges[index].BaseShaderRegister = index;
+		ranges[index].NumDescriptors = 1;
+		ranges[index].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		ranges[index].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	}
+	D3D12_ROOT_PARAMETER parameters[3]{};
+	parameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	parameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	parameters[0].DescriptorTable.pDescriptorRanges = &ranges[0];
+	parameters[0].DescriptorTable.NumDescriptorRanges = 1;
+	parameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	parameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	parameters[1].DescriptorTable.pDescriptorRanges = &ranges[1];
+	parameters[1].DescriptorTable.NumDescriptorRanges = 1;
+	parameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	parameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	parameters[2].Descriptor.ShaderRegister = 0;
+
+	D3D12_STATIC_SAMPLER_DESC samplers[2]{};
+	for (auto& sampler : samplers) {
+		sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+		sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	}
+	samplers[0].ShaderRegister = 0;
+	samplers[1].ShaderRegister = 1;
+	samplers[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplers[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplers[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+
+	D3D12_ROOT_SIGNATURE_DESC rootDescription{};
+	rootDescription.pParameters = parameters;
+	rootDescription.NumParameters = _countof(parameters);
+	rootDescription.pStaticSamplers = samplers;
+	rootDescription.NumStaticSamplers = _countof(samplers);
+	fogRootSignature_ = PipelineStateUtility::CreateRootSignature(dxCommon_->GetDevice().Get(), rootDescription);
+
+	auto vertexShader = dxCommon_->CompileShader(L"Resources/Shader/CopyImage.VS.hlsl", L"vs_6_0");
+	auto pixelShader = dxCommon_->CompileShader(L"Resources/Shader/FogMask.PS.hlsl", L"ps_6_0");
+	assert(vertexShader && pixelShader);
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC description{};
+	description.pRootSignature = fogRootSignature_.Get();
+	description.VS = {vertexShader->GetBufferPointer(), vertexShader->GetBufferSize()};
+	description.PS = {pixelShader->GetBufferPointer(), pixelShader->GetBufferSize()};
+	description.BlendState = PipelineStateUtility::MakeBlendDesc();
+	description.RasterizerState = PipelineStateUtility::MakeRasterizerDesc(D3D12_CULL_MODE_NONE);
+	description.DepthStencilState = PipelineStateUtility::MakeDepthStencilDesc(
+		FALSE, D3D12_DEPTH_WRITE_MASK_ZERO, D3D12_COMPARISON_FUNC_NEVER);
+	description.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
+	description.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	description.NumRenderTargets = 1;
+	description.RTVFormats[0] = DXGI_FORMAT_R8_UNORM;
+	description.SampleDesc.Count = 1;
+	const HRESULT result = dxCommon_->GetDevice()->CreateGraphicsPipelineState(
+		&description, IID_PPV_ARGS(&fogPipelineState_));
 	assert(SUCCEEDED(result));
 }
 
@@ -509,6 +637,41 @@ void PostEffect::ApplySettingsToBuffer() {
 	colorData_->enableToneMapping = enableToneMapping_ ? 1 : 0;
 	colorData_->bloomKnee = bloomKnee_;
 	colorData_->paddingHdr = 0.0f;
+	colorData_->enableFog = isActive_ && enableFog_ ? 1 : 0;
+	colorData_->fogDensity = fogDensity_;
+	colorData_->fogHeight = fogHeight_;
+	colorData_->fogNoiseScale = fogNoiseScale_;
+	for (size_t index = 0; index < 4; ++index) {
+		colorData_->fogColor[index] = fogColor_[index];
+	}
+	colorData_->fogNoiseStrength = fogNoiseStrength_;
+	colorData_->fogSpeed = fogSpeed_;
+	colorData_->fogDistanceStart = fogDistanceStart_;
+	colorData_->fogDistanceEnd = fogDistanceEnd_;
+	colorData_->fogParticleAmount = fogParticleAmount_;
+	colorData_->fogHighQuality = fogHighQuality_ ? 1 : 0;
+	colorData_->paddingFog[0] = 0.0f;
+	colorData_->paddingFog[1] = 0.0f;
+}
+
+void PostEffect::SetFogSettings(bool enabled, const Vector4& color, float density, float height,
+	float noiseScale, float noiseStrength, float particleAmount, float speed,
+	float distanceStart, float distanceEnd, bool highQuality) {
+	enableFog_ = enabled;
+	fogColor_[0] = color.x;
+	fogColor_[1] = color.y;
+	fogColor_[2] = color.z;
+	fogColor_[3] = color.w;
+	fogDensity_ = std::clamp(density, 0.0f, 2.0f);
+	fogHeight_ = std::clamp(height, 0.0f, 1.0f);
+	fogNoiseScale_ = (std::max)(noiseScale, 0.01f);
+	fogNoiseStrength_ = std::clamp(noiseStrength, 0.0f, 1.0f);
+	fogParticleAmount_ = std::clamp(particleAmount, 0.0f, 1.0f);
+	fogSpeed_ = speed;
+	fogDistanceStart_ = (std::max)(distanceStart, 0.0f);
+	fogDistanceEnd_ = (std::max)(distanceEnd, fogDistanceStart_ + 0.01f);
+	fogHighQuality_ = highQuality;
+	ApplySettingsToBuffer();
 }
 
 void PostEffect::ResizeIfNeeded() {
@@ -539,15 +702,18 @@ void PostEffect::ResizeResources(int32_t width, int32_t height) {
 	for (auto& resource : bloomResources_) {
 		resource.Reset();
 	}
+	fogResource_.Reset();
 	rtvHeap_.Reset();
 	dsvHeap_.Reset();
 	bloomRtvHeap_.Reset();
+	fogRtvHeap_.Reset();
 
 	CreateTextureResource();
 	CreateRtv();
 	CreateDsv();
 	CreateSrv();
 	CreateBloomResources();
+	CreateFogResources();
 	ApplySettingsToBuffer();
 }
 
@@ -681,6 +847,11 @@ void PostEffect::PostDrawScene() {
 	if (isActive_ && enableBloom_) {
 		DrawBloom();
 	}
+
+	// バックバッファへ切り替える前に、深度を使う半解像度の霧マスクを完成させます。
+	time_ += GameTime::GetDeltaTime();
+	ApplySettingsToBuffer();
+	DrawFog();
 }
 
 void PostEffect::DrawBloom() {
@@ -752,6 +923,42 @@ void PostEffect::DrawBloom() {
 	drawPass(0, bloomSrvHandlesGPU_[1], 2, static_cast<float>(bloomWidth_), static_cast<float>(bloomHeight_));
 }
 
+void PostEffect::DrawFog() {
+	if (!fogPipelineState_ || !fogResource_ || !enableFog_ || !isActive_) {
+		return;
+	}
+	auto commandList = dxCommon_->GetCommandList();
+	D3D12_RESOURCE_BARRIER barrier{};
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barrier.Transition.pResource = fogResource_.Get();
+	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	commandList->ResourceBarrier(1, &barrier);
+
+	const D3D12_CPU_DESCRIPTOR_HANDLE rtv = fogRtvHeap_->GetCPUDescriptorHandleForHeapStart();
+	commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+	const float clearColor[4]{};
+	commandList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+	D3D12_VIEWPORT viewport{};
+	viewport.Width = static_cast<float>(fogWidth_);
+	viewport.Height = static_cast<float>(fogHeightPixels_);
+	viewport.MaxDepth = 1.0f;
+	commandList->RSSetViewports(1, &viewport);
+	D3D12_RECT scissor{0, 0, fogWidth_, fogHeightPixels_};
+	commandList->RSSetScissorRects(1, &scissor);
+	commandList->SetGraphicsRootSignature(fogRootSignature_.Get());
+	commandList->SetPipelineState(fogPipelineState_.Get());
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	commandList->SetGraphicsRootDescriptorTable(0, depthSrvHandleGPU_);
+	commandList->SetGraphicsRootDescriptorTable(1, fogNoiseSrvHandleGPU_);
+	commandList->SetGraphicsRootConstantBufferView(2, colorBuffer_->GetGPUVirtualAddress());
+	commandList->DrawInstanced(3, 1, 0, 0);
+
+	std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
+	commandList->ResourceBarrier(1, &barrier);
+}
+
 /// <summary>
 /// 現在の状態をもとに描画処理を行います。
 /// </summary>
@@ -759,8 +966,6 @@ void PostEffect::Draw() {
 	ResizeIfNeeded();
 	auto commandList = dxCommon_->GetCommandList();
 	SrvManager::GetInstance()->PreDraw();
-	time_ += GameTime::GetDeltaTime();
-	ApplySettingsToBuffer();
 
 	commandList->SetGraphicsRootSignature(rootSignature_.Get());
 	commandList->SetPipelineState(graphicsPipelineState_.Get());
@@ -772,6 +977,7 @@ void PostEffect::Draw() {
 	commandList->SetGraphicsRootDescriptorTable(2, depthSrvHandleGPU_);
 	commandList->SetGraphicsRootDescriptorTable(3, dissolveMaskSrvHandleGPU_);
 	commandList->SetGraphicsRootDescriptorTable(4, bloomSrvHandlesGPU_[0]);
+	commandList->SetGraphicsRootDescriptorTable(5, fogSrvHandleGPU_);
 
 	commandList->DrawInstanced(3, 1, 0, 0);
 }
@@ -812,7 +1018,8 @@ void PostEffect::DrawImGui() {
 		static_cast<int>(enableGrayscale_) + static_cast<int>(enableSmoothing_) +
 		static_cast<int>(enableGaussianFilter_) + static_cast<int>(enableRadialBlur_) +
 		static_cast<int>(enableRandom_) + static_cast<int>(enableOutline_) +
-		static_cast<int>(enableDissolve_) + static_cast<int>(enableVignetting_);
+		static_cast<int>(enableDissolve_) + static_cast<int>(enableVignetting_) +
+		static_cast<int>(enableFog_);
 
 	drawEffectToggle("Enable PostEffect", &isActive_);
 	ImGui::TextColored(
@@ -842,6 +1049,26 @@ void PostEffect::DrawImGui() {
 		ImGui::Checkbox("Enable ACES Tone Mapping", &enableToneMapping_);
 		ImGui::SliderFloat("Exposure", &exposure_, 0.1f, 4.0f);
 		ImGui::TextDisabled("Tone mapping remains available when the effect master is off.");
+	}
+	ImGui::Separator();
+	if (ImGui::CollapsingHeader("Fog Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+		drawEffectToggle("Apply Depth Fog", &enableFog_);
+		if (!enableFog_) {
+			ImGui::BeginDisabled();
+		}
+		ImGui::ColorEdit4("Fog Color", fogColor_);
+		ImGui::SliderFloat("Fog Density", &fogDensity_, 0.0f, 2.0f);
+		ImGui::SliderFloat("Fog Screen Height", &fogHeight_, 0.0f, 1.0f);
+		ImGui::SliderFloat("Fog Noise Scale", &fogNoiseScale_, 0.1f, 12.0f);
+		ImGui::SliderFloat("Fog Noise Strength", &fogNoiseStrength_, 0.0f, 1.0f);
+		ImGui::SliderFloat("Fog Particle Amount", &fogParticleAmount_, 0.0f, 1.0f);
+		ImGui::SliderFloat("Fog Wind Speed", &fogSpeed_, -0.2f, 0.2f);
+		ImGui::SliderFloat("Fog Distance Start", &fogDistanceStart_, 0.0f, 100.0f);
+		ImGui::SliderFloat("Fog Distance End", &fogDistanceEnd_, fogDistanceStart_ + 0.01f, 200.0f);
+		ImGui::Checkbox("Fog High Quality", &fogHighQuality_);
+		if (!enableFog_) {
+			ImGui::EndDisabled();
+		}
 	}
 	ImGui::Separator();
 
@@ -979,12 +1206,16 @@ void PostEffect::Finalize() {
 		resource.Reset();
 	}
 	dissolveMaskResource_.Reset();
+	fogResource_.Reset();
 	rtvHeap_.Reset();
 	bloomRtvHeap_.Reset();
+	fogRtvHeap_.Reset();
 	dsvHeap_.Reset();
 	rootSignature_.Reset();
 	graphicsPipelineState_.Reset();
 	bloomRootSignature_.Reset();
 	bloomPipelineState_.Reset();
+	fogRootSignature_.Reset();
+	fogPipelineState_.Reset();
 	colorBuffer_.Reset();
 }

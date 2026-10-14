@@ -5,6 +5,7 @@
 #include "../base/GameTime.h"
 #include <algorithm>
 #include <cmath>
+#include <random>
 
 // 専用パターンが不要な攻撃は、JSONの homing と shotCount だけで従来どおり生成する。
 class DefaultPlayerAttackPattern final : public IPlayerAttackPattern {
@@ -215,6 +216,7 @@ void PlayerAttackComponent::QueueShot(GameObject* owner, const Player& player, c
 		request.speed = levelStats.speed;
 		request.size = (levelStats.size / 100.0f) * playerAttackSizeRate;
 		request.lifeTime = levelStats.lifeTime;
+		request.repeatHitInterval = levelStats.repeatHitInterval;
 		request.pierceCount = levelStats.pierceCount;
 		request.infinitePierce = levelStats.infinitePierce;
 		request.modelFilePath = levelStats.modelFilePath;
@@ -336,7 +338,30 @@ void PlayerAttackComponent::CreateAttack(GameObject* owner, const Player& player
 	const auto pattern = attackPatterns_.find(slot.stats.name);
 	const IPlayerAttackPattern* selectedPattern =
 		pattern != attackPatterns_.end() ? pattern->second.get() : defaultAttackPattern_.get();
+	const size_t firstShotIndex = shotRequests_.size();
 	selectedPattern->CreateShots(*this, owner, player, slot.stats, levelStats, currentLevel);
+	// 継続ダメージ武器は同じ周回軌道でも、見た目を攻撃種別ごとに変える。
+	if (slot.stats.name == "PoisonCloud" || slot.stats.name == "FlameField") {
+		const PlayerProjectileMotionType motionType = slot.stats.name == "PoisonCloud"
+		    ? PlayerProjectileMotionType::PoisonCloud
+		    : PlayerProjectileMotionType::FlameField;
+		for (size_t index = firstShotIndex; index < shotRequests_.size(); ++index) {
+			shotRequests_[index].motionType = motionType;
+			if (motionType == PlayerProjectileMotionType::FlameField) {
+				// プレイヤーを中心とした一定範囲内のランダム地点へフィールドを配置する。
+				static std::mt19937 randomEngine(std::random_device{}());
+				std::uniform_real_distribution<float> angleDistribution(0.0f, MathConstants::kTwoPi);
+				std::uniform_real_distribution<float> distanceDistribution(2.5f, 7.0f);
+				const float angle = angleDistribution(randomEngine);
+				const float distance = distanceDistribution(randomEngine);
+				shotRequests_[index].position = owner->GetTransform().translate + Vector3{
+					std::cos(angle) * distance,
+					levelStats.spawnOffsets.empty() ? 0.5f : levelStats.spawnOffsets.front().y,
+					std::sin(angle) * distance};
+				shotRequests_[index].motionAnchor = nullptr;
+			}
+		}
+	}
 }
 
 void PlayerAttackComponent::RegisterAttackPatterns() {
@@ -344,6 +369,8 @@ void PlayerAttackComponent::RegisterAttackPatterns() {
 	attackPatterns_.clear();
 	attackPatterns_.emplace("勾玉", std::make_unique<MagatamaPlayerAttackPattern>());
 	attackPatterns_.emplace("Orbit", std::make_unique<OrbitPlayerAttackPattern>());
+	attackPatterns_.emplace("PoisonCloud", std::make_unique<OrbitPlayerAttackPattern>());
+	attackPatterns_.emplace("FlameField", std::make_unique<OrbitPlayerAttackPattern>());
 	attackPatterns_.emplace("SkyLaser", std::make_unique<SkyLaserPlayerAttackPattern>());
 	attackPatterns_.emplace("Boomerang", std::make_unique<BoomerangPlayerAttackPattern>());
 	attackPatterns_.emplace("Ricochet", std::make_unique<RicochetPlayerAttackPattern>());

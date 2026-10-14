@@ -144,6 +144,9 @@
     <ClCompile Include="Engine\base\DirectXCommon.cpp">
       <Filter>Engine\base</Filter>
     </ClCompile>
+    <ClCompile Include="Engine\base\FontManager.cpp">
+      <Filter>Engine\base</Filter>
+    </ClCompile>
     <ClCompile Include="Engine\base\ScreenCapture.cpp">
       <Filter>Engine\base</Filter>
     </ClCompile>
@@ -189,11 +192,29 @@
     <ClCompile Include="Engine\flame\BaseSceneSerialization.cpp">
       <Filter>Engine\flame</Filter>
     </ClCompile>
+    <ClCompile Include="Engine\flame\EnemyComponent.cpp">
+      <Filter>Engine\flame</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\flame\EnemyProjectileComponent.cpp">
+      <Filter>Engine\flame</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\flame\EnemySpawnPointComponent.cpp">
+      <Filter>Engine\flame</Filter>
+    </ClCompile>
     <ClCompile Include="Engine\flame\FlameWork.cpp">
       <Filter>Engine\flame</Filter>
     </ClCompile>
     <ClCompile Include="Engine\flame\Game.cpp">
       <Filter>Engine\flame</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\flame\PlayerAttackComponent.cpp">
+      <Filter>Engine\flame</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\flame\PlayerProjectileComponent.cpp">
+      <Filter>Engine\flame</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\flame\repositories\PlayerStatusRepository.cpp">
+      <Filter>Engine\flame\repositories</Filter>
     </ClCompile>
     <ClCompile Include="Engine\math\Matrix.cpp">
       <Filter>Engine\math</Filter>
@@ -225,6 +246,9 @@
 	<ClCompile Include="scene\ResultScene.cpp">
 	  <Filter>Scene</Filter>
 	</ClCompile>
+    <ClCompile Include="scene\ShopScene.cpp">
+      <Filter>Scene</Filter>
+    </ClCompile>
     <ClCompile Include="scene\SceneFactory.cpp">
       <Filter>Scene</Filter>
     </ClCompile>
@@ -341,6 +365,9 @@
     <ClInclude Include="Engine\base\DirectXCommon.h">
       <Filter>Engine\base</Filter>
     </ClInclude>
+    <ClInclude Include="Engine\base\FontManager.h">
+      <Filter>Engine\base</Filter>
+    </ClInclude>
     <ClInclude Include="Engine\base\ScreenCapture.h">
       <Filter>Engine\base</Filter>
     </ClInclude>
@@ -405,6 +432,9 @@
       <Filter>Engine\flame\repositories</Filter>
     </ClInclude>
 	<ClInclude Include="Engine\flame\EnemyComponent.h">
+	  <Filter>Engine\flame</Filter>
+	</ClInclude>
+	<ClInclude Include="Engine\flame\EnemyProjectileComponent.h">
 	  <Filter>Engine\flame</Filter>
 	</ClInclude>
 	<ClInclude Include="Engine\flame\StageResultData.h">
@@ -476,6 +506,9 @@
 	<ClInclude Include="scene\ResultScene.h">
 	  <Filter>Scene</Filter>
 	</ClInclude>
+    <ClInclude Include="scene\ShopScene.h">
+      <Filter>Scene</Filter>
+    </ClInclude>
     <ClInclude Include="scene\SceneFactory.h">
       <Filter>Scene</Filter>
     </ClInclude>
@@ -494,6 +527,12 @@
       <Filter>Resources\Shader</Filter>
     </FxCompile>
     <FxCompile Include="Resources\Shader\FullScreen.PS.hlsl">
+      <Filter>Resources\Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Resources\Shader\FogMask.PS.hlsl">
+      <Filter>Resources\Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Resources\Shader\Grass.PS.hlsl">
       <Filter>Resources\Shader</Filter>
     </FxCompile>
     <FxCompile Include="Resources\Shader\Instancing.VS.hlsl">

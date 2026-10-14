@@ -428,6 +428,77 @@
 				}
 			]
 		}
+,
+		{
+		  "name": "選択登場_烏天狗",
+		  "samplers": [
+		    {
+		      "input": 33,
+		      "interpolation": "LINEAR",
+		      "output": 34
+		    },
+		    {
+		      "input": 33,
+		      "interpolation": "LINEAR",
+		      "output": 35
+		    },
+		    {
+		      "input": 33,
+		      "interpolation": "LINEAR",
+		      "output": 36
+		    },
+		    {
+		      "input": 33,
+		      "interpolation": "LINEAR",
+		      "output": 37
+		    },
+		    {
+		      "input": 33,
+		      "interpolation": "LINEAR",
+		      "output": 38
+		    }
+		  ],
+		  "channels": [
+		    {
+		      "sampler": 0,
+		      "target": {
+		        "node": 3,
+		        "path": "rotation"
+		      }
+		    },
+		    {
+		      "sampler": 1,
+		      "target": {
+		        "node": 0,
+		        "path": "rotation"
+		      }
+		    },
+		    {
+		      "sampler": 2,
+		      "target": {
+		        "node": 1,
+		        "path": "rotation"
+		      }
+		    },
+		    {
+		      "sampler": 3,
+		      "target": {
+		        "node": 2,
+		        "path": "rotation"
+		      }
+		    },
+		    {
+		      "sampler": 4,
+		      "target": {
+		        "node": 6,
+		        "path": "rotation"
+		      }
+		    }
+		  ],
+		  "extras": {
+		    "generatedBy": "generate_player_entrance_animations.js"
+		  }
+		}
 	],
 	"materials":[
 		{
@@ -746,6 +817,55 @@
 			"count":25,
 			"type":"VEC4"
 		}
+,
+		{
+		  "name": "選択登場_烏天狗_時間",
+		  "bufferView": 33,
+		  "componentType": 5126,
+		  "count": 5,
+		  "type": "SCALAR",
+		  "min": [
+		    0
+		  ],
+		  "max": [
+		    0.85
+		  ]
+		},
+		{
+		  "name": "選択登場_烏天狗_spine_回転",
+		  "bufferView": 34,
+		  "componentType": 5126,
+		  "count": 5,
+		  "type": "VEC4"
+		},
+		{
+		  "name": "選択登場_烏天狗_head_回転",
+		  "bufferView": 35,
+		  "componentType": 5126,
+		  "count": 5,
+		  "type": "VEC4"
+		},
+		{
+		  "name": "選択登場_烏天狗_arm.L_回転",
+		  "bufferView": 36,
+		  "componentType": 5126,
+		  "count": 5,
+		  "type": "VEC4"
+		},
+		{
+		  "name": "選択登場_烏天狗_arm.R_回転",
+		  "bufferView": 37,
+		  "componentType": 5126,
+		  "count": 5,
+		  "type": "VEC4"
+		},
+		{
+		  "name": "選択登場_烏天狗_pelvis_回転",
+		  "bufferView": 38,
+		  "componentType": 5126,
+		  "count": 5,
+		  "type": "VEC4"
+		}
 	],
 	"bufferViews":[
 		{
@@ -925,6 +1045,37 @@
 			"byteLength":400,
 			"byteOffset":50852
 		}
+,
+		{
+		  "buffer": 1,
+		  "byteOffset": 0,
+		  "byteLength": 20
+		},
+		{
+		  "buffer": 1,
+		  "byteOffset": 20,
+		  "byteLength": 80
+		},
+		{
+		  "buffer": 1,
+		  "byteOffset": 100,
+		  "byteLength": 80
+		},
+		{
+		  "buffer": 1,
+		  "byteOffset": 180,
+		  "byteLength": 80
+		},
+		{
+		  "buffer": 1,
+		  "byteOffset": 260,
+		  "byteLength": 80
+		},
+		{
+		  "buffer": 1,
+		  "byteOffset": 340,
+		  "byteLength": 80
+		}
 	],
 	"samplers":[
 		{
@@ -940,6 +1091,11 @@
 		{
 			"byteLength":51252,
 			"uri":"doppelganger.bin"
+		}
+,
+		{
+		  "byteLength": 420,
+		  "uri": "doppelganger_entrance.bin"
 		}
 	]
 }

@@ -3,6 +3,7 @@
 #include "TextureManager.h"
 #include "GameTime.h"
 #include <cmath>
+#include <cstring>
 
 /// <summary>
 /// 必要なリソースを準備し、オブジェクトを初期化します。
@@ -104,6 +105,7 @@ void InstancingModel::AddInstance(const EulerTransform& transform) {
 
     chunks_[chunkIt->second].transforms.push_back(transform);
     ++instanceCount_;
+	visibilityCacheValid_ = false;
 }
 
 /// <summary>
@@ -114,37 +116,46 @@ void InstancingModel::Draw(Camera* camera) {
     if (instanceCount_ == 0 || !model_ || !camera) return;
 
     const Vector3 cameraPosition = camera->GetTranslate();
-    const float maxDistanceSquared = maxDrawDistance_ * maxDrawDistance_;
-    uint32_t visibleInstanceCount = 0;
+	const Matrix4x4 viewProjection = camera->GetViewProjectionMatrix();
+	const bool cameraUnchanged = visibilityCacheValid_ &&
+		cameraPosition.x == cachedCameraPosition_.x &&
+		cameraPosition.y == cachedCameraPosition_.y &&
+		cameraPosition.z == cachedCameraPosition_.z &&
+		std::memcmp(&viewProjection, &cachedViewProjection_, sizeof(Matrix4x4)) == 0;
 
-    for (const InstanceChunk& chunk : chunks_) {
-        const float chunkRadius = kChunkSize * 0.7072f;
-        const float dx = chunk.center.x - cameraPosition.x;
-        const float dz = chunk.center.z - cameraPosition.z;
-        const float chunkDistance = maxDrawDistance_ + chunkRadius;
-        if (dx * dx + dz * dz > chunkDistance * chunkDistance) {
-            continue;
-        }
+	uint32_t visibleInstanceCount = cachedVisibleInstanceCount_;
+	if (!cameraUnchanged) {
+		const float maxDistanceSquared = maxDrawDistance_ * maxDrawDistance_;
+		visibleInstanceCount = 0;
+		for (const InstanceChunk& chunk : chunks_) {
+			const float chunkRadius = kChunkSize * 0.7072f;
+			const float dx = chunk.center.x - cameraPosition.x;
+			const float dz = chunk.center.z - cameraPosition.z;
+			const float chunkDistance = maxDrawDistance_ + chunkRadius;
+			if (dx * dx + dz * dz > chunkDistance * chunkDistance) {
+				continue;
+			}
 
-        for (const EulerTransform& transform : chunk.transforms) {
-            const float instanceDx = transform.translate.x - cameraPosition.x;
-            const float instanceDz = transform.translate.z - cameraPosition.z;
-            if (instanceDx * instanceDx + instanceDz * instanceDz > maxDistanceSquared) {
-                continue;
-            }
+			for (const EulerTransform& transform : chunk.transforms) {
+				const float instanceDx = transform.translate.x - cameraPosition.x;
+				const float instanceDz = transform.translate.z - cameraPosition.z;
+				if (instanceDx * instanceDx + instanceDz * instanceDz > maxDistanceSquared) {
+					continue;
+				}
 
-            Matrix4x4 worldMatrix = MakeAffineMatrix(
-                transform.scale,
-                transform.rotate,
-                transform.translate);
-
-            mappedData_[visibleInstanceCount].world = worldMatrix;
-            mappedData_[visibleInstanceCount].WVP =
-                Multiply(worldMatrix, camera->GetViewProjectionMatrix());
-            mappedData_[visibleInstanceCount].WorldInverseTranspose = MakeIdentity4x4();
-            ++visibleInstanceCount;
-        }
-    }
+				const Matrix4x4 worldMatrix = MakeAffineMatrix(
+					transform.scale, transform.rotate, transform.translate);
+				mappedData_[visibleInstanceCount].world = worldMatrix;
+				mappedData_[visibleInstanceCount].WVP = Multiply(worldMatrix, viewProjection);
+				mappedData_[visibleInstanceCount].WorldInverseTranspose = MakeIdentity4x4();
+				++visibleInstanceCount;
+			}
+		}
+		cachedCameraPosition_ = cameraPosition;
+		cachedViewProjection_ = viewProjection;
+		cachedVisibleInstanceCount_ = visibleInstanceCount;
+		visibilityCacheValid_ = true;
+	}
 
     if (visibleInstanceCount == 0) return;
 

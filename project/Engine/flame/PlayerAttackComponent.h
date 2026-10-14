@@ -36,6 +36,8 @@ struct PlayerAttackLevelStats {
 	float homingAccuracy = 1.0f;
 	/// <summary>次にこの攻撃を発射できるまでの基本秒数です。</summary>
 	float attackInterval = 0.5f;
+	/// <summary>同じ敵へ再びダメージを与えるまでの秒数です。0なら通常の一度きり命中です。</summary>
+	float repeatHitInterval = 0.0f;
 	/// <summary>弾が自動消滅するまでの秒数です。</summary>
 	float lifeTime = 3.0f;
 	/// <summary>ブーメランなど、距離で挙動を切り替える攻撃に使用する移動距離です。</summary>
@@ -61,6 +63,8 @@ enum class PlayerProjectileMotionType {
 	// 発射方向へ一度膨らんでから、時間経過で追尾力を強めて敵へ収束する勾玉。
 	Magatama,
 	Orbit,
+	PoisonCloud,
+	FlameField,
 	SkyLaser,
 	Boomerang,
 	Ricochet,
@@ -83,6 +87,7 @@ struct PlayerAttackShotRequest {
 	float lifeTime = 3.0f;
 	int pierceCount = 0;
 	bool infinitePierce = false;
+	float repeatHitInterval = 0.0f;
 	std::string modelFilePath = "sphere.obj";
 	bool homing = false;
 	float homingAccuracy = 1.0f;

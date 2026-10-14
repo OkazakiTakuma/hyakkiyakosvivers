@@ -41,6 +41,21 @@ void PlayerProjectileComponent::Update() {
 		owner->GetTransform().scale = {visualSize, visualSize, visualSize};
 		break;
 	}
+	case PlayerProjectileMotionType::PoisonCloud: {
+		if (!motionAnchor_) {
+			lifeTime_ = 0.0f;
+			break;
+		}
+		const Vector3 anchorPosition = motionAnchor_->GetTransform().translate;
+		// 毒霧はプレイヤーを中心に追従する円形フィールドとして扱う。
+		owner->GetTransform().translate = anchorPosition + Vector3{0.0f, orbitHeight_, 0.0f};
+		lifeTime_ -= deltaTime;
+		break;
+	}
+	case PlayerProjectileMotionType::FlameField:
+		// 炎は生成時に決めたランダム地点へ留まる円形フィールド。
+		lifeTime_ -= deltaTime;
+		break;
 	case PlayerProjectileMotionType::SkyLaser:
 		lifeTime_ -= deltaTime;
 		break;
@@ -114,6 +129,26 @@ PlayerProjectilePresentation PlayerProjectileComponent::GetMotionPresentation() 
 		result.trailLifeTime = 0.45f;
 		result.trailUsesMotionAnchor = true;
 		result.repeatHitInterval = 0.75f;
+		result.expiresOutsideView = false;
+		break;
+	case PlayerProjectileMotionType::PoisonCloud:
+		result.overrideModelColor = true;
+		result.modelColor = {0.35f, 1.0f, 0.18f, 1.0f};
+		result.overrideTrailColors = true;
+		result.trailHeadColor = {0.55f, 1.0f, 0.20f, 0.95f};
+		result.trailTailColor = {0.05f, 0.35f, 0.02f, 0.0f};
+		result.trailLifeTime = 0.60f;
+		result.trailUsesMotionAnchor = true;
+		result.expiresOutsideView = false;
+		break;
+	case PlayerProjectileMotionType::FlameField:
+		result.overrideModelColor = true;
+		result.modelColor = {1.0f, 0.20f, 0.03f, 1.0f};
+		result.overrideTrailColors = true;
+		result.trailHeadColor = {1.0f, 0.85f, 0.18f, 0.98f};
+		result.trailTailColor = {0.85f, 0.03f, 0.0f, 0.0f};
+		result.trailLifeTime = 0.35f;
+		result.trailUsesMotionAnchor = true;
 		result.expiresOutsideView = false;
 		break;
 	case PlayerProjectileMotionType::SkyLaser:

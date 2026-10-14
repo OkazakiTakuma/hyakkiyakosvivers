@@ -60,6 +60,9 @@ public:
 	bool HasAnimation() const;
 	void SetAnimationPlaying(bool isPlaying);
 	bool GetAnimationPlaying() const { return isAnimationPlaying_; }
+	/// <summary>アニメーションを終端から先頭へ戻すか設定します。</summary>
+	void SetAnimationLooping(bool isLooping) { isAnimationLooping_ = isLooping; }
+	bool GetAnimationLooping() const { return isAnimationLooping_; }
 	void RestartAnimation();
 	void ResetAnimationPoseToInitial();
 	bool SetAnimation(const std::string& animationName, bool restart = true);
@@ -269,6 +272,7 @@ private:
 	bool hasSkeleton = false;
 	bool isDrawSkeleton_ = false;
 	bool isAnimationPlaying_ = true;
+	bool isAnimationLooping_ = true;
 	bool useInitialSkinningPose_ = false;
 	/// <summary>アニメーション適用後に合成する演出用ボーン回転です。</summary>
 	std::map<std::string, Quaternion> jointRotationOffsets_;

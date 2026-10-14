@@ -508,6 +508,77 @@
         }
       ]
     }
+,
+    {
+      "name": "選択登場_猫",
+      "samplers": [
+        {
+          "input": 31,
+          "interpolation": "LINEAR",
+          "output": 32
+        },
+        {
+          "input": 31,
+          "interpolation": "LINEAR",
+          "output": 33
+        },
+        {
+          "input": 31,
+          "interpolation": "LINEAR",
+          "output": 34
+        },
+        {
+          "input": 31,
+          "interpolation": "LINEAR",
+          "output": 35
+        },
+        {
+          "input": 31,
+          "interpolation": "LINEAR",
+          "output": 36
+        }
+      ],
+      "channels": [
+        {
+          "sampler": 0,
+          "target": {
+            "node": 3,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 1,
+          "target": {
+            "node": 0,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 2,
+          "target": {
+            "node": 1,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 3,
+          "target": {
+            "node": 2,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 4,
+          "target": {
+            "node": 6,
+            "path": "rotation"
+          }
+        }
+      ],
+      "extras": {
+        "generatedBy": "generate_player_entrance_animations.js"
+      }
+    }
   ],
   "materials": [
     {
@@ -550,7 +621,7 @@
     {
       "mimeType": "image/png",
       "name": "猫_旧UVテクスチャ",
-      "uri": "neko_old_uv_texture.png"
+      "uri": "neko_uv_texture.png"
     }
   ],
   "skins": [
@@ -779,6 +850,55 @@
       "count": 2,
       "type": "VEC3"
     }
+,
+    {
+      "name": "選択登場_猫_時間",
+      "bufferView": 31,
+      "componentType": 5126,
+      "count": 5,
+      "type": "SCALAR",
+      "min": [
+        0
+      ],
+      "max": [
+        1.05
+      ]
+    },
+    {
+      "name": "選択登場_猫_spine_回転",
+      "bufferView": 32,
+      "componentType": 5126,
+      "count": 5,
+      "type": "VEC4"
+    },
+    {
+      "name": "選択登場_猫_head_回転",
+      "bufferView": 33,
+      "componentType": 5126,
+      "count": 5,
+      "type": "VEC4"
+    },
+    {
+      "name": "選択登場_猫_arm.L_回転",
+      "bufferView": 34,
+      "componentType": 5126,
+      "count": 5,
+      "type": "VEC4"
+    },
+    {
+      "name": "選択登場_猫_arm.R_回転",
+      "bufferView": 35,
+      "componentType": 5126,
+      "count": 5,
+      "type": "VEC4"
+    },
+    {
+      "name": "選択登場_猫_tail_回転",
+      "bufferView": 36,
+      "componentType": 5126,
+      "count": 5,
+      "type": "VEC4"
+    }
   ],
   "bufferViews": [
     {
@@ -942,6 +1062,37 @@
       "byteLength": 24,
       "byteOffset": 94768
     }
+,
+    {
+      "buffer": 1,
+      "byteOffset": 0,
+      "byteLength": 20
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 20,
+      "byteLength": 80
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 100,
+      "byteLength": 80
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 180,
+      "byteLength": 80
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 260,
+      "byteLength": 80
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 340,
+      "byteLength": 80
+    }
   ],
   "samplers": [
     {
@@ -953,6 +1104,11 @@
     {
       "byteLength": 94792,
       "uri": "neko.bin"
+    }
+,
+    {
+      "byteLength": 420,
+      "uri": "neko_entrance.bin"
     }
   ]
 }
