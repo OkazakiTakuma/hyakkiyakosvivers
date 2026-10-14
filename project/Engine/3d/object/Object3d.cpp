@@ -367,7 +367,9 @@ void Object3d::Update() {
 			animationBlendWeight_ = MoveTowards(animationBlendWeight_, targetBlendWeight, animationBlendSpeed_ * GameTime::GetFrameScale60());
 			if (isAnimationPlaying_) {
 				animationTime += GameTime::GetDeltaTime();
-				animationTime = std::fmod(animationTime, animation.duration);
+				animationTime = isAnimationLooping_
+				                    ? std::fmod(animationTime, animation.duration)
+				                    : (std::min)(animationTime, animation.duration);
 			}
 			SkeletonAnimationUtility::ApplyAnimation(skeleton, animation, animationTime, animationBlendWeight_);
 		}
@@ -660,6 +662,7 @@ void Object3d::SetModel(Model* newModel) {
 	skeleton = {};
 	animationTime = 0.0f;
 	activeAnimationName_.clear();
+	isAnimationLooping_ = true;
 	jointRotationOffsets_.clear();
 	jointRotationOffsetEuler_.clear();
 	useInitialSkinningPose_ = false;

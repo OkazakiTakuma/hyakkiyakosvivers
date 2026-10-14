@@ -26,6 +26,7 @@ void Game::Initialize() {
 	Object3dCommon::GetInstance()->SetDefaultCamera(camera.get());
 
 	ParticleManager::GetInstance()->SetCamera(camera.get());
+	// SceneManagerはSceneFactoryへの非所有参照を保持するため、Factoryを先に生成する。
 	sceneFactory = std::make_unique<SceneFactory>();
 	sceneManager = std::make_unique<SceneManager>();
 	sceneManager->SetFallbackCamera(camera.get());

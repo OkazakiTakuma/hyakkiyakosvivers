@@ -277,6 +277,7 @@ nlohmann::json PlayerAttackLevelStatsToJson(const PlayerAttackLevelStats& stats)
 	json["homing"] = stats.homing;
 	json["homingAccuracy"] = stats.homingAccuracy;
 	json["attackInterval"] = stats.attackInterval;
+	json["repeatHitInterval"] = stats.repeatHitInterval;
 	json["lifeTime"] = stats.lifeTime;
 	json["travelDistance"] = stats.travelDistance;
 	json["pierceCount"] = stats.pierceCount;
@@ -319,6 +320,7 @@ PlayerAttackLevelStats JsonToPlayerAttackLevelStats(const nlohmann::json& json, 
 	stats.homing = json.value("homing", stats.homing);
 	stats.homingAccuracy = (std::clamp)(json.value("homingAccuracy", stats.homingAccuracy), 0.0f, 1.0f);
 	stats.attackInterval = (std::max)(0.01f, json.value("attackInterval", stats.attackInterval));
+	stats.repeatHitInterval = (std::max)(0.0f, json.value("repeatHitInterval", stats.repeatHitInterval));
 	stats.lifeTime = (std::max)(0.01f, json.value("lifeTime", stats.lifeTime));
 	stats.travelDistance = (std::max)(0.1f, json.value("travelDistance", stats.travelDistance));
 	stats.pierceCount = (std::max)(0, json.value("pierceCount", stats.pierceCount));

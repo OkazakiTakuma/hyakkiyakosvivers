@@ -165,6 +165,9 @@ public:
 	const std::string& GetTargetName() const;
 	void SetCurrentHealth(float health);
 	float GetCurrentHealth() const;
+	/// <summary>ダメージを与え、短時間の被弾カラー演出を開始します。</summary>
+	void TakeDamage(float damage);
+	bool IsDamageFlashActive() const;
 	void SetRuntimeSpawned(bool runtimeSpawned);
 	bool GetRuntimeSpawned() const;
 	std::vector<EnemyShotRequest> ConsumeShotRequests();
@@ -238,6 +241,9 @@ private:
 	/// <summary>行動対象となるGameObjectへの非所有参照です。</summary>
 	GameObject* target_ = nullptr;
 	float currentHealth_ = 10.0f;
+	/// <summary>被弾時にモデルを赤く表示する残り時間（秒）です。</summary>
+	float damageFlashTimer_ = 0.0f;
+	static constexpr float kDamageFlashDuration = 0.12f;
 	float shootTimer_ = 0.0f;
 	float stateTimer_ = 0.0f;
 	Vector3 dashDirection_{0.0f, 0.0f, 1.0f};

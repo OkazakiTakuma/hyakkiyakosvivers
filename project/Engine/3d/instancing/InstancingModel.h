@@ -41,7 +41,10 @@ public:
     ~InstancingModel();
     void SetEnvironmentMapPath(const std::string& path) { envMapTexturePath_ = path; }
     /// <summary>カメラからインスタンスを表示する最大距離を設定します。</summary>
-    void SetMaxDrawDistance(float distance) { maxDrawDistance_ = distance; }
+    void SetMaxDrawDistance(float distance) {
+		maxDrawDistance_ = distance;
+		visibilityCacheValid_ = false;
+	}
 private:
     Model* model_ = nullptr;
     uint32_t maxInstanceCount_ = 1000;
@@ -58,6 +61,11 @@ private:
     std::vector<InstanceChunk> chunks_;
     std::unordered_map<uint64_t, size_t> chunkLookup_;
     uint32_t instanceCount_ = 0;
+	// 固定配置を静止カメラで描く場合、前フレームの可視判定と行列を再利用します。
+	bool visibilityCacheValid_ = false;
+	Vector3 cachedCameraPosition_{};
+	Matrix4x4 cachedViewProjection_{};
+	uint32_t cachedVisibleInstanceCount_ = 0;
 
     Microsoft::WRL::ComPtr<ID3D12Resource> instanceBuffer_;
     InstancingMatrixData* mappedData_ = nullptr;

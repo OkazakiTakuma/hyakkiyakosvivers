@@ -20,6 +20,8 @@ private:
 	void RefreshSelectionPresentation();
 	/// <summary>選択中タイプのモデルをプレビュー専用GameObjectとして生成し直します。</summary>
 	void RebuildCharacterModel(const PlayerStats& stats);
+	/// <summary>キャラクターごとの登場モーションと、その後の待機回転を更新します。</summary>
+	void UpdateCharacterEntranceAnimation();
 	/// <summary>右上の能力パネルへ表示する文字列を生成します。</summary>
 	std::string MakeStatusDescription(const PlayerStats& stats) const;
 	/// <summary>右下の初期武器パネルへ表示する文字列を生成します。</summary>
@@ -35,6 +37,8 @@ private:
 	int presentedPlayerIndex_ = -1;
 	/// <summary>プレビューモデルを緩やかに振るための経過時間です。</summary>
 	float previewTime_ = 0.0f;
+	/// <summary>登場モーションを選ぶため、現在表示しているプレイヤータイプ名を保持します。</summary>
+	std::string presentedPlayerTypeName_;
 	/// <summary>選択画面だけで使う3Dプレビュー用カメラです。</summary>
 	std::unique_ptr<Camera> previewCamera_;
 	/// <summary>選択中キャラクターの3D表示を所有します。</summary>

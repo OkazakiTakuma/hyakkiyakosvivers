@@ -1591,5 +1591,29 @@
             "level": "1",
             "status": "SizeUp"
         }
+    },
+    "PoisonCloud": {
+        "name": "PoisonCloud",
+        "levels": {
+            "1": {"level":"1","description":"プレイヤーを中心とした円形の毒霧フィールドで継続ダメージを与える","attack":7.0,"attackInterval":1.0,"repeatHitInterval":0.70,"lifeTime":5.0,"model":"sphere.obj","size":220.0,"shotCount":1,"speed":1.2,"infinitePierce":true,"spawnOffsets":[[0.0,0.6,0.0]]},
+            "2": {"level":"2","description":"毒霧の円形範囲と持続時間が増加する","attack":9.0,"attackInterval":0.9,"repeatHitInterval":0.65,"lifeTime":5.5,"model":"sphere.obj","size":240.0,"shotCount":1,"speed":1.3,"infinitePierce":true,"spawnOffsets":[[0.0,0.6,0.0]]},
+            "3": {"level":"3","description":"毒霧フィールドの範囲がさらに広がる","attack":10.0,"attackInterval":0.8,"repeatHitInterval":0.60,"lifeTime":6.0,"model":"sphere.obj","size":260.0,"shotCount":1,"speed":1.4,"infinitePierce":true,"spawnOffsets":[[0.0,0.6,0.0]]},
+            "4": {"level":"4","description":"毒のダメージ間隔が短くなり、範囲も広がる","attack":12.0,"attackInterval":0.72,"repeatHitInterval":0.52,"lifeTime":6.0,"model":"sphere.obj","size":280.0,"shotCount":1,"speed":1.5,"infinitePierce":true,"spawnOffsets":[[0.0,0.6,0.0]]},
+            "5": {"level":"5","description":"広い毒霧フィールドで強い継続ダメージを与える","attack":14.0,"attackInterval":0.65,"repeatHitInterval":0.45,"lifeTime":6.5,"model":"sphere.obj","size":300.0,"shotCount":1,"speed":1.6,"infinitePierce":true,"spawnOffsets":[[0.0,0.6,0.0]]},
+            "super": {"level":"super","description":"プレイヤーを包む巨大な毒霧が長時間敵を蝕む","attack":18.0,"attackInterval":0.5,"repeatHitInterval":0.32,"lifeTime":8.0,"model":"sphere.obj","size":330.0,"shotCount":1,"speed":1.8,"infinitePierce":true,"spawnOffsets":[[0.0,0.6,0.0]]}
+        },
+        "superCondition": {"status":"AttackUp","level":"1"}
+    },
+    "FlameField": {
+        "name": "FlameField",
+        "levels": {
+            "1": {"level":"1","description":"ランダム地点に発生する円形の炎が敵を焼き続ける","attack":12.0,"attackInterval":1.25,"repeatHitInterval":0.40,"lifeTime":3.5,"model":"sphere.obj","size":180.0,"shotCount":1,"speed":2.5,"infinitePierce":true,"spawnOffsets":[[0.0,0.5,0.0]]},
+            "2": {"level":"2","description":"炎の威力と範囲が増加する","attack":15.0,"attackInterval":1.15,"repeatHitInterval":0.36,"lifeTime":3.8,"model":"sphere.obj","size":108.0,"shotCount":1,"speed":2.7,"infinitePierce":true,"spawnOffsets":[[0.0,0.5,2.2]]},
+            "3": {"level":"3","description":"炎が2つになり、攻撃範囲が広がる","attack":18.0,"attackInterval":1.05,"repeatHitInterval":0.33,"lifeTime":4.0,"model":"sphere.obj","size":112.0,"shotCount":2,"speed":2.9,"infinitePierce":true,"spawnOffsets":[[0.0,0.5,2.3],[0.0,0.5,-2.3]]},
+            "4": {"level":"4","description":"炎の燃焼間隔が短くなり、より激しく焼く","attack":21.0,"attackInterval":0.95,"repeatHitInterval":0.29,"lifeTime":4.2,"model":"sphere.obj","size":118.0,"shotCount":2,"speed":3.1,"infinitePierce":true,"spawnOffsets":[[0.0,0.5,2.5],[0.0,0.5,-2.5]]},
+            "5": {"level":"5","description":"3つの炎が高速周回し、広範囲を焼き尽くす","attack":25.0,"attackInterval":0.85,"repeatHitInterval":0.25,"lifeTime":4.5,"model":"sphere.obj","size":125.0,"shotCount":3,"speed":3.3,"infinitePierce":true,"spawnOffsets":[[0.0,0.5,2.6],[0.0,0.5,-2.6],[2.6,0.5,0.0]]},
+            "super": {"level":"super","description":"6つの巨大な炎が敵を包囲し、猛烈な継続ダメージを与える","attack":32.0,"attackInterval":0.7,"repeatHitInterval":0.18,"lifeTime":5.0,"model":"sphere.obj","size":135.0,"shotCount":6,"speed":3.7,"infinitePierce":true,"spawnOffsets":[[0.0,0.5,2.9],[0.0,0.5,-2.9],[2.9,0.5,0.0],[-2.9,0.5,0.0],[2.0,0.5,2.0],[-2.0,0.5,-2.0]]}
+        },
+        "superCondition": {"status":"AttackUp","level":"1"}
     }
 }

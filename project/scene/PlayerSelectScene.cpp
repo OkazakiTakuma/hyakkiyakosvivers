@@ -14,6 +14,22 @@
 
 namespace {
 constexpr const char* kUiFontName = "Yu Gothic UI";
+constexpr float kPi = 3.14159265f;
+// 自機選択プレビューはゲーム中のモデル向きと反対側から見せる。
+constexpr float kPreviewBaseRotationY = 0.18f + kPi;
+constexpr Vector3 kPreviewBasePosition = {-2.15f, -1.25f, 0.45f};
+constexpr float kPreviewBaseScale = 1.20f;
+// タイトルへ戻る際、粒状の深度霧が先に十分増えてから前面の霧画像へつなぐ長さです。
+constexpr float kReturnToTitleFogTransitionSeconds = 1.65f;
+
+float EaseOutCubic(float value) {
+	const float inverse = 1.0f - value;
+	return 1.0f - inverse * inverse * inverse;
+}
+
+float SmoothStep(float value) {
+	return value * value * (3.0f - 2.0f * value);
+}
 
 std::unique_ptr<Sprite> CreateColorSprite() {
 	// 白テクスチャへ描画時に色を乗算し、全パネルを同じ仕組みで描画する。
@@ -59,6 +75,13 @@ std::string GetModelDirectory(const std::string& modelFilePath) {
 	if (modelFilePath == "neko.gltf") return "/cat";
 	if (modelFilePath == "doppelganger.gltf") return "/doppelganger";
 	return "/";
+}
+
+std::string GetEntranceAnimationName(const std::string& playerTypeName) {
+	if (playerTypeName == "巫女") return "選択登場_巫女";
+	if (playerTypeName == "烏天狗") return "選択登場_烏天狗";
+	if (playerTypeName == "猫") return "選択登場_猫";
+	return "";
 }
 }
 
@@ -164,6 +187,7 @@ void PlayerSelectScene::RefreshSelectionPresentation() {
 void PlayerSelectScene::RebuildCharacterModel(const PlayerStats& stats) {
 	// 選択変更時は旧モデルを破棄し、共有ModelManagerから新しい表示モデルを参照する。
 	characterModelObject_.reset();
+	presentedPlayerTypeName_ = stats.name;
 	if (stats.modelFilePath.empty()) return;
 	if (!ModelManager::GetInstance()->FindModel(stats.modelFilePath)) {
 		ModelManager::GetInstance()->LoadModel(stats.modelFilePath, stats.isAnimationModel, GetModelDirectory(stats.modelFilePath));
@@ -174,19 +198,75 @@ void PlayerSelectScene::RebuildCharacterModel(const PlayerStats& stats) {
 	characterModelObject_->SetName("PlayerSelectPreview");
 	EulerTransform& transform = characterModelObject_->GetTransform();
 	// UIの左カラム中央へ見えるよう、カメラ正面より左へモデルを配置する。
-	transform.translate = {-2.15f, -1.25f, 0.45f};
-	transform.rotate = {0.0f, 0.18f, 0.0f};
-	transform.scale = {1.20f, 1.20f, 1.20f};
+	transform.translate = kPreviewBasePosition;
+	transform.rotate = {0.0f, kPreviewBaseRotationY, 0.0f};
+	transform.scale = {kPreviewBaseScale, kPreviewBaseScale, kPreviewBaseScale};
 	Object3dComponent* object3d = characterModelObject_->AddComponent<Object3dComponent>();
 	object3d->SetModel(stats.modelFilePath);
 	object3d->SetCamera(previewCamera_.get());
 	object3d->SetDrawSkeleton(false);
-	object3d->SetAnimationPlaying(stats.isAnimationModel);
+	// 新規の専用クリップは一度だけ再生し、終端の決めポーズを維持する。
+	const std::string entranceAnimationName = GetEntranceAnimationName(stats.name);
+	if (stats.isAnimationModel && !entranceAnimationName.empty() && object3d->SetAnimation(entranceAnimationName, true)) {
+		object3d->SetAnimationLooping(false);
+	} else {
+		object3d->SetAnimationPlaying(stats.isAnimationModel);
+	}
 	object3d->SetDirectionalLight({1.0f, 0.92f, 0.80f, 1.0f}, {-0.35f, -0.75f, 0.55f}, 1.35f);
 	// プレビューでは衣装や肌の色を読み取りやすくし、環境マップ由来の鏡面反射をほぼ抑える。
 	object3d->SetPointLight({0.30f, 0.62f, 1.0f, 1.0f}, {-3.2f, 2.8f, -2.0f}, 0.75f, 9.0f, 1.6f);
 	object3d->SetEnvironmentMultiplier(0.02f);
+	UpdateCharacterEntranceAnimation();
 	characterModelObject_->Update();
+}
+
+void PlayerSelectScene::UpdateCharacterEntranceAnimation() {
+	if (!characterModelObject_) return;
+	EulerTransform& transform = characterModelObject_->GetTransform();
+	transform.translate = kPreviewBasePosition;
+	transform.rotate = {0.0f, kPreviewBaseRotationY, 0.0f};
+	transform.scale = {kPreviewBaseScale, kPreviewBaseScale, kPreviewBaseScale};
+
+	float entranceDuration = 0.85f;
+	if (presentedPlayerTypeName_ == "猫") entranceDuration = 1.05f;
+	const float normalizedTime = (std::min)(previewTime_ / entranceDuration, 1.0f);
+	const float remaining = 1.0f - normalizedTime;
+
+	if (presentedPlayerTypeName_ == "巫女") {
+		// 巫女は上方から静かに降り、正面へ向き直りながら着地する。
+		const float progress = SmoothStep(normalizedTime);
+		transform.translate.y += remaining * 2.15f;
+		transform.rotate.y += remaining * 0.58f;
+		const float scale = kPreviewBaseScale * (0.84f + progress * 0.16f);
+		transform.scale = {scale, scale, scale};
+	} else if (presentedPlayerTypeName_ == "烏天狗") {
+		// 烏天狗は左奥から一気に飛び込み、鋭く正面へ旋回する。
+		const float progress = EaseOutCubic(normalizedTime);
+		transform.translate.x -= (1.0f - progress) * 3.4f;
+		transform.translate.y += (1.0f - progress) * 0.55f;
+		transform.translate.z += (1.0f - progress) * 0.9f;
+		transform.rotate.y -= (1.0f - progress) * 1.15f;
+	} else if (presentedPlayerTypeName_ == "猫") {
+		// 猫は右下から弧を描いて跳び込み、空中で伸びてから着地時の大きさへ戻る。
+		const float progress = EaseOutCubic(normalizedTime);
+		const float jumpArc = std::sin(normalizedTime * kPi);
+		transform.translate.x += (1.0f - progress) * 1.35f;
+		transform.translate.y += -(1.0f - progress) * 1.75f + jumpArc * 0.95f;
+		transform.rotate.z = (1.0f - progress) * -0.20f;
+		transform.scale.x = kPreviewBaseScale * (0.74f + progress * 0.26f + jumpArc * 0.07f);
+		transform.scale.y = kPreviewBaseScale * (0.66f + progress * 0.34f + jumpArc * 0.18f);
+		transform.scale.z = transform.scale.x;
+	} else {
+		// 将来追加されるタイプも、専用設定がなくても軽いポップ表示で破綻させない。
+		const float progress = EaseOutCubic(normalizedTime);
+		const float scale = kPreviewBaseScale * (0.72f + progress * 0.28f);
+		transform.scale = {scale, scale, scale};
+	}
+
+	// 登場完了後は従来の小さな往復回転へ位相0からつなぎ、切り替わりを目立たせない。
+	if (normalizedTime >= 1.0f) {
+		transform.rotate.y += std::sin((previewTime_ - entranceDuration) * 0.75f) * 0.16f;
+	}
 }
 
 std::string PlayerSelectScene::MakeStatusDescription(const PlayerStats& stats) const {
@@ -221,10 +301,10 @@ void PlayerSelectScene::Update() {
 	// 入力で位置が変わったフレームだけ、モデルと文字テクスチャを作り直す。
 	if (selectedPlayerIndex_ != presentedPlayerIndex_) RefreshSelectionPresentation();
 
-	// 静止画に見えない程度の小さな往復回転をプレビューモデルへ与える。
+	// 選択変更直後はタイプ固有の登場モーションを流し、完了後は小さな待機回転へつなぐ。
 	previewTime_ += GameTime::GetDeltaTime();
 	if (characterModelObject_) {
-		characterModelObject_->GetTransform().rotate.y = 0.18f + std::sin(previewTime_ * 0.75f) * 0.16f;
+		UpdateCharacterEntranceAnimation();
 		characterModelObject_->Update();
 	}
 	if (input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN) || input->TriggerGamepadButton(XINPUT_GAMEPAD_A)) {
@@ -235,7 +315,11 @@ void PlayerSelectScene::Update() {
 		}
 		return;
 	}
-	if (input->TriggerKey(DIK_Q) || input->TriggerGamepadButton(XINPUT_GAMEPAD_B)) sceneManager_->ChangeScene("TITLE");
+	if (input->TriggerKey(DIK_Q) || input->TriggerGamepadButton(XINPUT_GAMEPAD_B)) {
+		sceneManager_->ChangeScene(
+			"TITLE", SceneTransitionType::FadeWhite,
+			kReturnToTitleFogTransitionSeconds, kReturnToTitleFogTransitionSeconds);
+	}
 }
 
 void PlayerSelectScene::Draw3D() {
@@ -336,5 +420,6 @@ void PlayerSelectScene::Finalize() {
 	pageTextObject_.reset();
 	instructionTextObject_.reset();
 	playerTypeNames_.clear();
+	presentedPlayerTypeName_.clear();
 	BaseScene::Finalize();
 }

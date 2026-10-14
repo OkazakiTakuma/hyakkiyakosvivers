@@ -45,6 +45,10 @@ public:
 	void UpdateHotkeys();
 	/// <summary>プレイヤー被弾時の赤い画面端エフェクトを開始します。</summary>
 	void TriggerDamageVignette();
+	/// <summary>深度と画面位置から合成する低層霧の有効状態と外観を設定します。</summary>
+	void SetFogSettings(bool enabled, const Vector4& color, float density, float height,
+		float noiseScale, float noiseStrength, float particleAmount, float speed,
+		float distanceStart, float distanceEnd, bool highQuality = false);
 
 	bool IsActive() const { return isActive_; }
 
@@ -73,6 +77,10 @@ private:
 	/// <summary>半解像度Bloomで使用する2枚のHDR描画先とSRVを作成します。</summary>
 	void CreateBloomResources();
 	void CreateDissolveMask();
+	/// <summary>霧の模様に使用するタイル可能なノイズテクスチャを読み込みます。</summary>
+	void CreateFogNoiseTexture();
+	/// <summary>霧だけを半解像度で生成する描画先を作成します。</summary>
+	void CreateFogResources();
 	/// <summary>
 	/// RootSignature を作成し、利用できる状態にします。
 	/// </summary>
@@ -83,8 +91,11 @@ private:
 	void CreatePipelineState();
 	/// <summary>輝度抽出と縦横ぼかしに共通使用するBloomパイプラインを作成します。</summary>
 	void CreateBloomPipelineState();
+	void CreateFogPipelineState();
 	/// <summary>HDRシーンから明部を抽出し、半解像度で縦横にぼかします。</summary>
 	void DrawBloom();
+	/// <summary>深度とノイズから半解像度の霧マスクを生成します。</summary>
+	void DrawFog();
 
 	/// <summary>
 	/// ColorBuffer を作成し、利用できる状態にします。
@@ -112,12 +123,17 @@ private:
 	D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU_{};
 	D3D12_GPU_DESCRIPTOR_HANDLE depthSrvHandleGPU_{};
 	D3D12_GPU_DESCRIPTOR_HANDLE dissolveMaskSrvHandleGPU_{};
+	D3D12_GPU_DESCRIPTOR_HANDLE fogNoiseSrvHandleGPU_{};
+	uint32_t fogSrvIndex_ = UINT32_MAX;
+	D3D12_GPU_DESCRIPTOR_HANDLE fogSrvHandleGPU_{};
 	std::array<uint32_t, 2> bloomSrvIndices_{UINT32_MAX, UINT32_MAX};
 	std::array<D3D12_GPU_DESCRIPTOR_HANDLE, 2> bloomSrvHandlesGPU_{};
 	int32_t renderWidth_ = 1;
 	int32_t renderHeight_ = 1;
 	int32_t bloomWidth_ = 1;
 	int32_t bloomHeight_ = 1;
+	int32_t fogWidth_ = 1;
+	int32_t fogHeightPixels_ = 1;
 	bool sceneTextureReadyAsSrv_ = false;
 	bool depthTextureReadyAsSrv_ = false;
 
@@ -125,8 +141,12 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> bloomRootSignature_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> bloomPipelineState_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> fogRootSignature_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> fogPipelineState_ = nullptr;
 	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, 2> bloomResources_{};
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> bloomRtvHeap_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> fogResource_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> fogRtvHeap_ = nullptr;
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> colorBuffer_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> dissolveMaskResource_ = nullptr;
@@ -171,8 +191,20 @@ private:
 		int32_t enableToneMapping;
 		float bloomKnee;
 		float paddingHdr;
+		int32_t enableFog;
+		float fogDensity;
+		float fogHeight;
+		float fogNoiseScale;
+		float fogColor[4];
+		float fogNoiseStrength;
+		float fogSpeed;
+		float fogDistanceStart;
+		float fogDistanceEnd;
+		float fogParticleAmount;
+		int32_t fogHighQuality;
+		float paddingFog[2];
 	};
-	static_assert(sizeof(ColorData) == 192, "ColorData must match the FullScreen.PS.hlsl constant buffer layout");
+	static_assert(sizeof(ColorData) == 256, "ColorData must match the FullScreen.PS.hlsl constant buffer layout");
 
 	ColorData* colorData_ = nullptr;
 
@@ -215,4 +247,15 @@ private:
 	float bloomKnee_ = 0.50f;
 	float exposure_ = 1.0f;
 	bool enableToneMapping_ = true;
+	bool enableFog_ = false;
+	float fogDensity_ = 0.72f;
+	float fogHeight_ = 0.50f;
+	float fogNoiseScale_ = 3.5f;
+	float fogColor_[4] = {0.30f, 0.36f, 0.46f, 1.0f};
+	float fogNoiseStrength_ = 0.42f;
+	float fogParticleAmount_ = 0.08f;
+	float fogSpeed_ = 0.035f;
+	float fogDistanceStart_ = 5.0f;
+	float fogDistanceEnd_ = 48.0f;
+	bool fogHighQuality_ = false;
 };

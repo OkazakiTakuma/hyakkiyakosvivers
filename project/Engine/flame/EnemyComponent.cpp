@@ -132,6 +132,8 @@ void EnemyComponent::Initialize() {
 }
 
 void EnemyComponent::Update() {
+	damageFlashTimer_ = (std::max)(0.0f, damageFlashTimer_ - GameTime::GetDeltaTime());
+
 	// 敵タイプは実行中に頻繁に変わらないため、薄いStrategyを介さず直接ディスパッチする。
 	// 複雑な時間遷移を持つ夜叉ボスだけは、この先でState Patternへ委譲する。
 	GameObject* owner = GetOwner();
@@ -304,6 +306,16 @@ const std::string& EnemyComponent::GetTargetName() const { return targetName_; }
 void EnemyComponent::SetCurrentHealth(float health) { currentHealth_ = health < 0.0f ? 0.0f : health; }
 
 float EnemyComponent::GetCurrentHealth() const { return currentHealth_; }
+
+void EnemyComponent::TakeDamage(float damage) {
+	if (damage <= 0.0f || currentHealth_ <= 0.0f) {
+		return;
+	}
+	SetCurrentHealth(currentHealth_ - damage);
+	damageFlashTimer_ = kDamageFlashDuration;
+}
+
+bool EnemyComponent::IsDamageFlashActive() const { return damageFlashTimer_ > 0.0f; }
 
 void EnemyComponent::SetRuntimeSpawned(bool runtimeSpawned) { runtimeSpawned_ = runtimeSpawned; }
 

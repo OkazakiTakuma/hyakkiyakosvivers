@@ -9,6 +9,7 @@
 #include "TextureManager.h"
 #include "sky/SkyBoxCommon.h"
 #include "GameTime.h"
+#include "PostEffect.h"
 #include "StringUtility.h"
 
 #include <assert.h>
@@ -35,6 +36,7 @@ const char* kSceneNames[] = {
 const char* kTransitionNames[] = {
 	"None",
 	"Fade",
+	"Fade White",
 	"Wipe Left",
 	"Wipe Right",
 	"Curtains",
@@ -43,6 +45,38 @@ const char* kTransitionNames[] = {
 
 // 外部画像を必要としないよう、遷移色の下地には実行時生成する白1pxテクスチャを使用する。
 constexpr const char* kTransitionTextureKey = "__scene_transition_white";
+constexpr const char* kTransitionFogTexturePath = "Resources/Texture/fog_transition.png";
+
+float SmoothStep(float start, float end, float value) {
+	const float rate = std::clamp((value - start) / (end - start), 0.0f, 1.0f);
+	return rate * rate * (3.0f - 2.0f * rate);
+}
+
+void ApplyFadeWhiteFog(float coverage, bool keepBaseFog) {
+	// タイトル終了時に濃くした霧と同じ値を逆向きに辿る。
+	const float fogRate = SmoothStep(0.0f, 1.0f, coverage);
+	// 逆再生の終端では、遷移先へ薄い霧を残さないよう最後だけ穏やかに消す。
+	const float visibility = keepBaseFog ? 1.0f : SmoothStep(0.0f, 0.16f, coverage);
+	// タイトルでは待機時の粒量まで滑らかに戻し、終端で0から0.08へ跳ねないようにする。
+	const float baseParticleAmount = keepBaseFog ? 0.08f : 0.0f;
+	const float particleAmount = baseParticleAmount + (1.0f - baseParticleAmount) * fogRate;
+	const Vector4 fogColor = {
+		0.26f + (1.0f - 0.26f) * fogRate,
+		0.31f + (1.0f - 0.31f) * fogRate,
+		0.40f + (1.0f - 0.40f) * fogRate,
+		(0.82f + (1.0f - 0.82f) * fogRate) * visibility};
+	PostEffect::GetInstance()->SetFogSettings(
+		true, fogColor,
+		0.68f + 1.22f * fogRate,
+		0.54f - 0.28f * fogRate,
+		3.8f,
+		0.48f - 0.16f * fogRate,
+		particleAmount,
+		0.028f + 0.018f * fogRate,
+		4.5f * (1.0f - fogRate),
+		52.0f + (9.0f - 52.0f) * fogRate,
+		true);
+}
 /// <summary>
 /// 所持金・ショップ購入レベル・ステージ開放状況を永続化するファイルです。
 /// </summary>
@@ -74,6 +108,7 @@ SceneManager::SceneManager() {
 	RefreshGameplayStagePatterns();
 	// 白1pxを任意サイズ・任意色へ拡大し、全パターンを同じスプライト群で構成する。
 	TextureManager::GetInstance()->CreateTextureFromRGBA(kTransitionTextureKey, 1, 1, {255, 255, 255, 255});
+	TextureManager::GetInstance()->LoadTexture(kTransitionFogTexturePath);
 	for (auto& sprite : transitionSprites_) {
 		sprite = std::make_unique<Sprite>();
 		sprite->Initialize(kTransitionTextureKey);
@@ -401,8 +436,14 @@ void SceneManager::Update() {
 	UpdateTransition();
 
 	if (scene_) {
-		// 遷移中はゲーム進行を止め、閉じる前後でシーン状態が変化しないようにする。
-		const bool shouldUpdateScene = transitionPhase_ == TransitionPhase::Idle &&
+		// FadeWhiteのOut中は退出演出を進め、タイトルへ戻るIn中は黒幕を開いて減少する深度霧を見せます。
+		const bool updatesBehindFadeWhite =
+			transitionPhase_ == TransitionPhase::Out && activeTransitionType_ == SceneTransitionType::FadeWhite;
+		const bool revealsTitleBehindFadeWhite =
+			transitionPhase_ == TransitionPhase::In && activeTransitionType_ == SceneTransitionType::FadeWhite &&
+			currentSceneName_ == "TITLE";
+		const bool shouldUpdateScene =
+			(transitionPhase_ == TransitionPhase::Idle || updatesBehindFadeWhite || revealsTitleBehindFadeWhite) &&
 		    (isScenePlaying_ || isFrameStepRequested_);
 		if (shouldUpdateScene) {
 			scene_->Update();
@@ -804,15 +845,24 @@ void SceneManager::ChangeScene(const std::string& sceneName) {
 }
 
 void SceneManager::ChangeScene(const std::string& sceneName, SceneTransitionType transitionType) {
+	ChangeScene(sceneName, transitionType, transitionSettings_.outDuration, transitionSettings_.inDuration);
+}
+
+void SceneManager::ChangeScene(const std::string& sceneName, SceneTransitionType transitionType,
+	float outDuration, float inDuration) {
 	assert(sceneFactory_);
 	assert(nextScene_ == nullptr);
 	QueueNextScene(sceneName);
 
 	activeTransitionType_ = transitionType;
+	activeTransitionOutDuration_ = (std::max)(outDuration, 0.0f);
+	activeTransitionInDuration_ = (std::max)(inDuration, 0.0f);
 	transitionElapsed_ = 0.0f;
+	transitionFogElapsed_ = 0.0f;
 	transitionCoverage_ = 0.0f;
+	transitionInWarmupFrames_ = 0;
 	// 初回ロード、演出なし、またはOut時間0の場合はUpdateで即時交換する。
-	if (!scene_ || transitionType == SceneTransitionType::None || transitionSettings_.outDuration <= 0.0f) {
+	if (!scene_ || transitionType == SceneTransitionType::None || activeTransitionOutDuration_ <= 0.0f) {
 		transitionPhase_ = TransitionPhase::Idle;
 		return;
 	}
@@ -873,15 +923,24 @@ void SceneManager::UpdateTransition() {
 	if (transitionPhase_ == TransitionPhase::Idle) {
 		return;
 	}
-	transitionElapsed_ += GameTime::GetDeltaTime();
+	const float deltaTime = GameTime::GetDeltaTime();
+	transitionElapsed_ += deltaTime;
+	// フェードの濃さが停止する完全白・準備フレーム中も、霧の流れだけは継続します。
+	if (activeTransitionType_ == SceneTransitionType::FadeWhite) {
+		transitionFogElapsed_ += deltaTime;
+	}
 	if (transitionPhase_ == TransitionPhase::Out) {
 		// Outでは被覆率を0→1へ増やし、完全に隠れたフレームでシーンを交換する。
-		const float duration = (std::max)(transitionSettings_.outDuration, 0.0001f);
+		const float duration = (std::max)(activeTransitionOutDuration_, 0.0001f);
 		transitionCoverage_ = std::clamp(transitionElapsed_ / duration, 0.0f, 1.0f);
+		if (activeTransitionType_ == SceneTransitionType::FadeWhite) {
+			ApplyFadeWhiteFog(transitionCoverage_, currentSceneName_ == "TITLE");
+		}
 		if (transitionCoverage_ >= 1.0f) {
 			SwitchToNextScene();
 			transitionElapsed_ = 0.0f;
-			if (transitionSettings_.inDuration <= 0.0f) {
+			transitionInWarmupFrames_ = 0;
+			if (activeTransitionInDuration_ <= 0.0f) {
 				transitionCoverage_ = 0.0f;
 				transitionPhase_ = TransitionPhase::Idle;
 			} else {
@@ -890,11 +949,31 @@ void SceneManager::UpdateTransition() {
 		}
 	} else {
 		// Inでは新しいシーンを描画しながら被覆率を1→0へ戻す。
-		const float duration = (std::max)(transitionSettings_.inDuration, 0.0001f);
+		// 初期化直後の描画先が安定するまで完全な白を維持し、黒い準備フレームを露出させません。
+		if (transitionInWarmupFrames_ < 2) {
+			++transitionInWarmupFrames_;
+			transitionElapsed_ = 0.0f;
+			transitionCoverage_ = 1.0f;
+			return;
+		}
+		// 白い濃霧からの復帰は、霧が薄くなる過程を読める長さへ延ばします。
+		const float requestedDuration = activeTransitionType_ == SceneTransitionType::FadeWhite
+			? (std::max)(activeTransitionInDuration_, 1.35f)
+			: activeTransitionInDuration_;
+		const float duration = (std::max)(requestedDuration, 0.0001f);
 		transitionCoverage_ = 1.0f - std::clamp(transitionElapsed_ / duration, 0.0f, 1.0f);
+		if (activeTransitionType_ == SceneTransitionType::FadeWhite) {
+			// Outで増加させた深度霧を、同じcoverageに沿って高密度から通常状態へ減少させます。
+			ApplyFadeWhiteFog(transitionCoverage_, currentSceneName_ == "TITLE");
+		}
 		if (transitionCoverage_ <= 0.0f) {
 			transitionCoverage_ = 0.0f;
 			transitionPhase_ = TransitionPhase::Idle;
+			if (activeTransitionType_ == SceneTransitionType::FadeWhite) {
+				PostEffect::GetInstance()->SetFogSettings(
+					currentSceneName_ == "TITLE", {0.26f, 0.31f, 0.40f, 0.82f}, 0.68f, 0.54f,
+					3.8f, 0.48f, 0.08f, 0.028f, 4.5f, 52.0f, false);
+			}
 		}
 	}
 }
@@ -928,11 +1007,55 @@ void SceneManager::DrawTransition() {
 	const float coverage = std::clamp(transitionCoverage_, 0.0f, 1.0f);
 	// Fadeの半透明描画にも対応するため、通常アルファブレンドを使用する。
 	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
+	// 霧境界に使う6枚だけを必要な間テクスチャへ切り替え、他の遷移パターンへ残さないようにします。
+	const bool useFogBoundary = activeTransitionType_ == SceneTransitionType::FadeWhite;
+	for (size_t index = 2; index < transitionSprites_.size(); ++index) {
+		const char* desiredTexture = useFogBoundary ? kTransitionFogTexturePath : kTransitionTextureKey;
+		if (transitionSprites_[index]->GetTextureFilePath() != desiredTexture) {
+			transitionSprites_[index]->SetTexture(desiredTexture);
+		}
+	}
 
 	switch (activeTransitionType_) {
 	case SceneTransitionType::Fade:
 		SetTransitionSpriteRect(0, 0.0f, 0.0f, width, height, coverage);
 		break;
+	case SceneTransitionType::FadeWhite: {
+		// OutとInで同じ被覆率を使い、粒状霧の増加と減少を完全に対称にします。
+		const float easedCoverage = coverage * coverage * (3.0f - 2.0f * coverage);
+		const float solidAlpha = SmoothStep(0.70f, 1.0f, easedCoverage);
+		// 深度霧を先に増やし、前面の霧画像はフェード進行が約8割に達してから現れるようにします。
+		const float mistAlpha = SmoothStep(0.80f, 0.96f, coverage);
+		const auto drawFogLayer = [&](size_t index, float alpha, float scaleX, float scaleY,
+			float speedX, float speedY) {
+			if (index >= transitionSprites_.size() || alpha <= 0.0f) return;
+			Sprite* sprite = transitionSprites_[index].get();
+			EulerTransform transform = sprite->GetTransform();
+			transform.translate = {0.0f, 0.0f, 0.0f};
+			sprite->SetTransform(transform);
+			sprite->SetSize({width, height});
+			sprite->SetColor({1.0f, 1.0f, 1.0f, std::clamp(alpha, 0.0f, 1.0f)});
+			if (index >= 2) {
+				EulerTransform uvTransform = sprite->GetUVTransform();
+				uvTransform.scale = {scaleX, scaleY, 1.0f};
+				uvTransform.translate = {
+					transitionFogElapsed_ * speedX,
+					transitionFogElapsed_ * speedY,
+					0.0f};
+				sprite->SetUVTransform(uvTransform);
+			}
+			sprite->Update();
+			sprite->Draw();
+		};
+		// 白い下地を敷かず、霧画像の隙間から粒状の深度霧を見せます。
+		// 白幕は霧が十分濃くなった終盤だけ重ね、途中の粒が隠れないようにします。
+		// 大きな霧は右上、中層は左上、細かな霧は右下へ流して静止画像に見えないようにします。
+		drawFogLayer(2, mistAlpha * 0.64f, 0.88f, 1.35f, 0.18f, 0.11f);
+		drawFogLayer(3, mistAlpha * 0.48f, 1.34f, 0.92f, -0.15f, 0.17f);
+		drawFogLayer(4, mistAlpha * 0.30f, 1.82f, 1.58f, 0.24f, -0.09f);
+		drawFogLayer(0, solidAlpha, 1.0f, 1.0f, 0.0f, 0.0f);
+		break;
+	}
 	case SceneTransitionType::WipeLeft:
 		SetTransitionSpriteRect(0, 0.0f, 0.0f, width * coverage, height, 1.0f);
 		break;

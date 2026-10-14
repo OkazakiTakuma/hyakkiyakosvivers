@@ -1437,11 +1437,17 @@ void BaseScene::UpdateEnemyAttacks() {
 		}
 
 		if (Object3dComponent* object3d = object->GetComponent<Object3dComponent>()) {
-			if (presentation.overrideColor) {
+			if (enemy->IsDamageFlashActive()) {
+				// 行動中の予兆色よりも被弾フィードバックを優先し、短時間だけ赤くする。
+				object3d->SetColor({1.0f, 0.28f, 0.28f, 1.0f});
+			} else if (presentation.overrideColor) {
 				object3d->SetColor(presentation.color);
 			} else if (enemy->GetEnemyTypeName() == "MidBoss") {
 				// 行動は通常追跡のまま、紫色と大型シルエットで中ボスだと識別できるようにする。
 				object3d->SetColor({0.62f, 0.16f, 0.85f, 1.0f});
+			} else {
+				// 被弾色が終了した通常の追跡敵を標準色へ戻す。
+				object3d->SetColor({1.0f, 1.0f, 1.0f, 1.0f});
 			}
 		}
 	}
@@ -1763,6 +1769,7 @@ GameObject* BaseScene::CreateRuntimePlayerProjectile(const PlayerAttackShotReque
 	projectile->SetLifeTime(request.lifeTime);
 	projectile->SetPierceCount(request.pierceCount);
 	projectile->SetInfinitePierce(request.infinitePierce);
+	projectile->SetRepeatHitInterval(request.repeatHitInterval);
 	projectile->SetHomingEnabled(request.homing);
 	projectile->SetHomingAccuracy(request.homingAccuracy);
 	projectile->SetMotionType(request.motionType);
@@ -1776,7 +1783,7 @@ GameObject* BaseScene::CreateRuntimePlayerProjectile(const PlayerAttackShotReque
 	projectile->SetClawSlashIndex(request.clawSlashIndex);
 	projectile->SetClawSlashCount(request.clawSlashCount);
 	const PlayerProjectilePresentation presentation = projectile->GetMotionPresentation();
-	if (presentation.repeatHitInterval > 0.0f) {
+	if (request.repeatHitInterval <= 0.0f && presentation.repeatHitInterval > 0.0f) {
 		projectile->SetRepeatHitInterval(presentation.repeatHitInterval);
 	}
 	if (request.homing) {
@@ -2036,7 +2043,7 @@ void BaseScene::UpdatePlayerProjectileHits() {
 				hitRadius = projectile->GetSize() * 0.35f + 0.5f * enemy->GetStats().sizeScale;
 			}
 			if (distance <= hitRadius) {
-				enemy->SetCurrentHealth(enemy->GetCurrentHealth() - projectile->GetAttack());
+				enemy->TakeDamage(projectile->GetAttack());
 				if (enemy->GetCurrentHealth() <= 0.0f) {
 					// 生存中の敵だけがこの分岐へ入るため、1体につき一度だけ加算される。
 					++defeatedEnemyCount_;

@@ -36,7 +36,8 @@ private:
 		Slash,
 		LogoReveal,
 		WaitingForInput,
-		Menu
+		Menu,
+		Exit
 	};
 	/// <summary>経過時間から現在のタイトル演出段階を更新します。</summary>
 	void UpdateTitlePhase();
@@ -44,6 +45,10 @@ private:
 	void LoadTitleModels();
 	/// <summary>勾玉と妖怪へタイトル画面用の待機モーションを与えます。</summary>
 	void UpdateTitlePresentation();
+	/// <summary>勾玉が背景の妖怪を連続撃破してから、指定シーンへのフェードを開始します。</summary>
+	void UpdateExitPresentation();
+	/// <summary>タイトル専用の撃破演出を開始し、完了後に遷移するシーン名を保持します。</summary>
+	void BeginExitTransition(const std::string& sceneName);
 	/// <summary>タイトル画面用の2D UIを生成します。</summary>
 	void CreateUi();
 	/// <summary>
@@ -76,10 +81,8 @@ private:
 	std::unique_ptr<Sprite> confirmationBackdropSprite_;
 	/// <summary>初期化確認メッセージを囲むパネルです。</summary>
 	std::unique_ptr<Sprite> confirmationPanelSprite_;
-	/// <summary>タイトルロゴ文字です。</summary>
-	std::unique_ptr<GameObject> titleTextObject_;
-	/// <summary>タイトルロゴの背後へ重ねる簡易発光文字です。</summary>
-	std::unique_ptr<GameObject> titleGlowTextObject_;
+	/// <summary>画像化したゲームタイトルロゴです。</summary>
+	std::unique_ptr<Sprite> titleLogoSprite_;
 	/// <summary>ゲーム開始メニューの文字です。</summary>
 	std::unique_ptr<GameObject> startTextObject_;
 	/// <summary>進行をリセットして始めるメニューの文字です。</summary>
@@ -104,8 +107,24 @@ private:
 	float pulseTime_ = 0.0f;
 	/// <summary>タイトル導入演出の開始からの経過秒数です。</summary>
 	float presentationTime_ = 0.0f;
+	/// <summary>勾玉の周回位置を速度変化で飛ばさず積算する共有角度です。</summary>
+	float magatamaOrbitAngle_ = 0.0f;
 	/// <summary>タイトル専用の巫女ポーズを初回だけ適用済みかどうかです。</summary>
 	bool titleMikoPoseApplied_ = false;
 	/// <summary>現在の導入演出またはメニュー段階です。</summary>
 	TitlePhase titlePhase_ = TitlePhase::FadeIn;
+	/// <summary>タイトル終了演出で移動させる勾玉への非所有参照です。</summary>
+	std::vector<GameObject*> exitMagatamas_;
+	/// <summary>終了演出開始時の各勾玉位置です。</summary>
+	std::vector<Vector3> exitMagatamaStartPositions_;
+	/// <summary>タイトル終了演出で撃破する妖怪への非所有参照です。</summary>
+	std::vector<GameObject*> exitEnemies_;
+	/// <summary>縮小消滅後に元の大きさを失わないための各妖怪の開始スケールです。</summary>
+	std::vector<Vector3> exitEnemyStartScales_;
+	/// <summary>タイトル終了演出の経過秒数です。</summary>
+	float exitElapsed_ = 0.0f;
+	/// <summary>撃破演出完了後にSceneManagerへ渡す遷移先です。</summary>
+	std::string exitSceneName_;
+	/// <summary>SceneManagerへ遷移要求を二重送信しないための状態です。</summary>
+	bool exitSceneChangeRequested_ = false;
 };
