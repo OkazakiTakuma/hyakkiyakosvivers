@@ -2,8 +2,10 @@
 
 #include "object/Object3dCommon.h"
 #include "particle/ParticleManager.h"
-#include "BaseScene.h"
+#include "base_scene/BaseScene.h"
+#include "helpers/SceneUiUtility.h"
 #include "Input.h"
+#include "PlayerSelectScene.h"
 #include "Sprite.h"
 #include "SpriteCommon.h"
 #include "TextureManager.h"
@@ -11,6 +13,7 @@
 #include "GameTime.h"
 #include "PostEffect.h"
 #include "StringUtility.h"
+#include "TitleScene.h"
 
 #include <assert.h>
 #include <algorithm>
@@ -46,6 +49,13 @@ const char* kTransitionNames[] = {
 // 外部画像を必要としないよう、遷移色の下地には実行時生成する白1pxテクスチャを使用する。
 constexpr const char* kTransitionTextureKey = "__scene_transition_white";
 constexpr const char* kTransitionFogTexturePath = "Resources/Texture/fog_transition.png";
+constexpr const char* kDemoStageId = "default";
+constexpr const char* kDemoPlayerTypeName = "巫女";
+// 各選択内容を画面で確認でき、ゲーム開始演出後の戦闘も少し見られる長さにする。
+constexpr float kDemoTitleSeconds = 6.5f;
+constexpr float kDemoStageSelectSeconds = 2.5f;
+constexpr float kDemoPlayerSelectSeconds = 3.0f;
+constexpr float kDemoGameplaySeconds = 15.0f;
 
 float SmoothStep(float start, float end, float value) {
 	const float rate = std::clamp((value - start) / (end - start), 0.0f, 1.0f);
@@ -114,6 +124,12 @@ SceneManager::SceneManager() {
 		sprite->Initialize(kTransitionTextureKey);
 		sprite->SetAnchorPoint({0.0f, 0.0f});
 	}
+	demoGuideBackgroundSprite_ = std::make_unique<Sprite>();
+	demoGuideBackgroundSprite_->Initialize(kTransitionTextureKey);
+	demoGuideBackgroundSprite_->SetAnchorPoint({0.0f, 0.0f});
+	demoGuideTextObject_ = SceneUiUtility::CreateTextObject(
+		"デモプレイ再生中    F1: 停止", 20.0f,
+		Vector4{1.0f, 0.94f, 0.72f, 1.0f}, "Yu Gothic UI");
 }
 
 void SceneManager::LoadGameProgress() {
@@ -434,6 +450,7 @@ void SceneManager::Update() {
 		SwitchToNextScene();
 	}
 	UpdateTransition();
+	UpdateDemoPlay();
 
 	if (scene_) {
 		// FadeWhiteのOut中は退出演出を進め、タイトルへ戻るIn中は黒幕を開いて減少する深度霧を見せます。
@@ -465,6 +482,82 @@ void SceneManager::Update() {
 	}
 }
 
+void SceneManager::UpdateDemoPlay() {
+	Input* input = Input::GetInstance();
+	if (input && input->TriggerKey(DIK_F1)) {
+		isDemoPlayActive_ = !isDemoPlayActive_;
+		demoSceneElapsed_ = 0.0f;
+		demoObservedSceneName_.clear();
+		if (isDemoPlayActive_) {
+			// デモ開始時はエディターの停止状態を解除し、選択内容を必ずステージ1と巫女へ揃える。
+			isScenePlaying_ = true;
+			GameTime::SetPaused(false);
+			SetSelectedGameplayStageId(kDemoStageId);
+			SetSelectedPlayerTypeName(kDemoPlayerTypeName);
+			isDemoRestartRequested_ = true;
+		} else {
+			isDemoRestartRequested_ = false;
+		}
+	}
+	if (!isDemoPlayActive_) {
+		return;
+	}
+
+	if (demoObservedSceneName_ != currentSceneName_) {
+		demoObservedSceneName_ = currentSceneName_;
+		demoSceneElapsed_ = 0.0f;
+		isDemoAdvancePresentationStarted_ = false;
+	}
+
+	// 遷移中は表示時間へ含めず、既に予約されたシーン切り替えとも競合させない。
+	if (transitionPhase_ != TransitionPhase::Idle || nextScene_) {
+		return;
+	}
+	if (isDemoRestartRequested_) {
+		isDemoRestartRequested_ = false;
+		if (currentSceneName_ != "TITLE") {
+			ChangeScene("TITLE", SceneTransitionType::FadeWhite);
+			return;
+		}
+	}
+
+	demoSceneElapsed_ += GameTime::GetUnscaledDeltaTime();
+	if (currentSceneName_ == "TITLE") {
+		if (!isDemoAdvancePresentationStarted_ && demoSceneElapsed_ >= kDemoTitleSeconds) {
+			SetSelectedGameplayStageId(kDemoStageId);
+			if (TitleScene* titleScene = dynamic_cast<TitleScene*>(scene_.get())) {
+				isDemoAdvancePresentationStarted_ = titleScene->BeginDemoStartTransition();
+			}
+		}
+		return;
+	}
+	if (currentSceneName_ == "STAGE_SELECT") {
+		if (demoSceneElapsed_ >= kDemoStageSelectSeconds) {
+			SetSelectedGameplayStageId(kDemoStageId);
+			ChangeScene("PLAYER_SELECT");
+		}
+		return;
+	}
+	if (currentSceneName_ == "PLAYER_SELECT") {
+		if (!isDemoAdvancePresentationStarted_ && demoSceneElapsed_ >= kDemoPlayerSelectSeconds) {
+			SetSelectedPlayerTypeName(kDemoPlayerTypeName);
+			if (PlayerSelectScene* playerSelectScene = dynamic_cast<PlayerSelectScene*>(scene_.get())) {
+				isDemoAdvancePresentationStarted_ = playerSelectScene->BeginDemoMikoConfirmation();
+			}
+		}
+		return;
+	}
+	if (currentSceneName_ == "GAMEPLAY") {
+		if (demoSceneElapsed_ >= kDemoGameplaySeconds) {
+			ChangeScene("TITLE", SceneTransitionType::FadeWhite);
+		}
+		return;
+	}
+
+	// リザルトなどへ先に到達した場合も、次のループをタイトルから再開する。
+	ChangeScene("TITLE", SceneTransitionType::FadeWhite);
+}
+
 /// <summary>
 /// スカイボックスの描画処理を行います。
 /// </summary>
@@ -486,6 +579,31 @@ void SceneManager::Draw2D() {
 	}
 	// シーン内の2D要素より後に描き、遷移色を常にゲーム画面の最前面へ置く。
 	DrawTransition();
+	// デモ停止方法は遷移中も見失わないよう、遷移オーバーレイよりさらに手前へ表示する。
+	DrawDemoPlayGuide();
+}
+
+void SceneManager::DrawDemoPlayGuide() {
+	if (!isDemoPlayActive_ || !demoGuideBackgroundSprite_ || !demoGuideTextObject_) {
+		return;
+	}
+	DirectXCommon* dxCommon = SpriteCommon::GetInstance()->GetDxCommon();
+	if (!dxCommon) {
+		return;
+	}
+
+	const float screenWidth = static_cast<float>(dxCommon->GetRenderWidth());
+	const float panelWidth = 330.0f;
+	const float panelHeight = 46.0f;
+	const float panelX = (std::max)(16.0f, screenWidth - panelWidth - 20.0f);
+	constexpr float panelY = 18.0f;
+	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
+	SceneUiUtility::DrawColorSprite(
+		demoGuideBackgroundSprite_.get(), panelX, panelY, panelWidth, panelHeight,
+		{0.02f, 0.03f, 0.06f, 0.82f});
+	demoGuideTextObject_->GetTransform().translate = {
+		panelX + panelWidth * 0.5f, panelY + panelHeight * 0.5f, 0.0f};
+	demoGuideTextObject_->Draw2D();
 }
 
 /// <summary>

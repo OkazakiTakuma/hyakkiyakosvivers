@@ -49,6 +49,45 @@
     <Filter Include="Engine\flame">
       <UniqueIdentifier>{9D1137CC-2DBB-4CF9-B2F1-83AB88E60B62}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Engine\flame\BaseScene">
+      <UniqueIdentifier>{760D2665-CA46-44FD-8DE6-49C566117A69}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\flame\BaseScene\Runtime">
+      <UniqueIdentifier>{044AE684-F439-436C-AB5D-B039EFDF73BB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\flame\BaseScene\Editor">
+      <UniqueIdentifier>{B751A7D4-E6A9-47A4-8BE0-77FCFE84FC2D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\flame\BaseScene\Details">
+      <UniqueIdentifier>{8C66BFF6-049B-4D15-B25C-FB64DB324EAC}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\flame\Core">
+      <UniqueIdentifier>{3D4F5B43-E209-4EE7-A229-E80823E30868}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\flame\Components">
+      <UniqueIdentifier>{D62C24C2-5D6D-47A7-A99E-D4C880BF467D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\flame\Components\Enemy">
+      <UniqueIdentifier>{9592157B-F590-482B-803E-7978BC3BA023}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\flame\Components\EnemyProjectile">
+      <UniqueIdentifier>{72733B3C-5F5C-43F2-A3D2-D00869B59C57}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\flame\Components\EnemySpawnPoint">
+      <UniqueIdentifier>{F8347772-FDC5-4E39-BCEE-615881501C06}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\flame\Components\Experience">
+      <UniqueIdentifier>{AB9470CA-FBD9-4827-B927-BFC1849DA290}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\flame\Components\ItemDrop">
+      <UniqueIdentifier>{20DA05A0-4297-4930-BF21-C17BF25D2A02}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\flame\Components\PlayerAttack">
+      <UniqueIdentifier>{76687485-A9C5-42ED-A475-461D7B8B41E9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\flame\Components\PlayerProjectile">
+      <UniqueIdentifier>{D5783F5E-7AD2-4D6B-AE08-9737598DC7C5}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Engine\flame\helpers">
       <UniqueIdentifier>{B613AC04-AD64-4D17-BEA5-3D172390F921}</UniqueIdentifier>
     </Filter>
@@ -94,6 +133,9 @@
       <Filter>Engine\3d\instancing</Filter>
     </ClCompile>
     <ClCompile Include="Engine\3d\instancing\InstancingModelCommon.cpp">
+      <Filter>Engine\3d\instancing</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\3d\instancing\GrassInstancingModel.cpp">
       <Filter>Engine\3d\instancing</Filter>
     </ClCompile>
     <ClCompile Include="Engine\3d\model\Model.cpp">
@@ -180,38 +222,59 @@
     <ClCompile Include="Engine\collision\CollisionPrimitive.cpp">
       <Filter>Engine\collision</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\flame\BaseScene.cpp">
-      <Filter>Engine\flame</Filter>
+    <ClCompile Include="Engine\flame\base_scene\BaseScene.cpp">
+      <Filter>Engine\flame\BaseScene</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\flame\BaseSceneEditor.cpp">
-      <Filter>Engine\flame</Filter>
+    <ClCompile Include="Engine\flame\base_scene\editor\BaseSceneEditor.cpp">
+      <Filter>Engine\flame\BaseScene\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\flame\BaseSceneRuntime.cpp">
-      <Filter>Engine\flame</Filter>
+    <ClCompile Include="Engine\flame\base_scene\editor\BaseSceneEnemyEditor.cpp">
+      <Filter>Engine\flame\BaseScene\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\flame\BaseSceneSerialization.cpp">
-      <Filter>Engine\flame</Filter>
+    <ClCompile Include="Engine\flame\base_scene\editor\BaseScenePlayerEditor.cpp">
+      <Filter>Engine\flame\BaseScene\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\flame\EnemyComponent.cpp">
-      <Filter>Engine\flame</Filter>
+    <ClCompile Include="Engine\flame\base_scene\editor\BaseSceneRenderingEditor.cpp">
+      <Filter>Engine\flame\BaseScene\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\flame\EnemyProjectileComponent.cpp">
-      <Filter>Engine\flame</Filter>
+    <ClCompile Include="Engine\flame\base_scene\runtime\BaseSceneCollisionRuntime.cpp">
+      <Filter>Engine\flame\BaseScene\Runtime</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\flame\EnemySpawnPointComponent.cpp">
-      <Filter>Engine\flame</Filter>
+    <ClCompile Include="Engine\flame\base_scene\runtime\BaseSceneEnemyRuntime.cpp">
+      <Filter>Engine\flame\BaseScene\Runtime</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\flame\FlameWork.cpp">
-      <Filter>Engine\flame</Filter>
+    <ClCompile Include="Engine\flame\base_scene\runtime\BaseSceneHud.cpp">
+      <Filter>Engine\flame\BaseScene\Runtime</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\flame\Game.cpp">
-      <Filter>Engine\flame</Filter>
+    <ClCompile Include="Engine\flame\base_scene\runtime\BaseScenePlayerProjectileRuntime.cpp">
+      <Filter>Engine\flame\BaseScene\Runtime</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\flame\PlayerAttackComponent.cpp">
-      <Filter>Engine\flame</Filter>
+    <ClCompile Include="Engine\flame\base_scene\runtime\BaseSceneRuntime.cpp">
+      <Filter>Engine\flame\BaseScene\Runtime</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\flame\PlayerProjectileComponent.cpp">
-      <Filter>Engine\flame</Filter>
+    <ClCompile Include="Engine\flame\base_scene\BaseSceneSerialization.cpp">
+      <Filter>Engine\flame\BaseScene</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\flame\components\Enemy\EnemyComponent.cpp">
+      <Filter>Engine\flame\Components\Enemy</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\flame\components\EnemyProjectile\EnemyProjectileComponent.cpp">
+      <Filter>Engine\flame\Components\EnemyProjectile</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\flame\components\EnemySpawnPoint\EnemySpawnPointComponent.cpp">
+      <Filter>Engine\flame\Components\EnemySpawnPoint</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\flame\core\FlameWork.cpp">
+      <Filter>Engine\flame\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\flame\core\Game.cpp">
+      <Filter>Engine\flame\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\flame\components\PlayerAttack\PlayerAttackComponent.cpp">
+      <Filter>Engine\flame\Components\PlayerAttack</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\flame\components\PlayerProjectile\PlayerProjectileComponent.cpp">
+      <Filter>Engine\flame\Components\PlayerProjectile</Filter>
     </ClCompile>
     <ClCompile Include="Engine\flame\repositories\PlayerStatusRepository.cpp">
       <Filter>Engine\flame\repositories</Filter>
@@ -291,6 +354,9 @@
       <Filter>Engine\3d\instancing</Filter>
     </ClInclude>
     <ClInclude Include="Engine\3d\instancing\InstancingModelCommon.h">
+      <Filter>Engine\3d\instancing</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\3d\instancing\GrassInstancingModel.h">
       <Filter>Engine\3d\instancing</Filter>
     </ClInclude>
     <ClInclude Include="Engine\3d\model\Model.h">
@@ -410,16 +476,19 @@
     <ClInclude Include="Engine\collision\CollisionPrimitive.h">
       <Filter>Engine\collision</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\flame\AbstractSceneFactory.h">
-      <Filter>Engine\flame</Filter>
+    <ClInclude Include="Engine\flame\core\AbstractSceneFactory.h">
+      <Filter>Engine\flame\Core</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\flame\BaseScene.h">
-      <Filter>Engine\flame</Filter>
+    <ClInclude Include="Engine\flame\base_scene\BaseScene.h">
+      <Filter>Engine\flame\BaseScene</Filter>
     </ClInclude>
     <ClInclude Include="Engine\flame\helpers\BaseSceneResourceCatalog.h">
       <Filter>Engine\flame\helpers</Filter>
     </ClInclude>
     <ClInclude Include="Engine\flame\helpers\BaseSceneCollisionHelpers.h">
+      <Filter>Engine\flame\helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\flame\helpers\CollisionSpatialGrid.h">
       <Filter>Engine\flame\helpers</Filter>
     </ClInclude>
     <ClInclude Include="Engine\flame\helpers\BaseSceneEditorGeometry.h">
@@ -431,29 +500,29 @@
     <ClInclude Include="Engine\flame\repositories\PlayerStatusRepository.h">
       <Filter>Engine\flame\repositories</Filter>
     </ClInclude>
-	<ClInclude Include="Engine\flame\EnemyComponent.h">
-	  <Filter>Engine\flame</Filter>
+	<ClInclude Include="Engine\flame\components\Enemy\EnemyComponent.h">
+	  <Filter>Engine\flame\Components\Enemy</Filter>
 	</ClInclude>
-	<ClInclude Include="Engine\flame\EnemyProjectileComponent.h">
-	  <Filter>Engine\flame</Filter>
+	<ClInclude Include="Engine\flame\components\EnemyProjectile\EnemyProjectileComponent.h">
+	  <Filter>Engine\flame\Components\EnemyProjectile</Filter>
 	</ClInclude>
-	<ClInclude Include="Engine\flame\StageResultData.h">
-	  <Filter>Engine\flame</Filter>
+	<ClInclude Include="Engine\flame\base_scene\StageResultData.h">
+	  <Filter>Engine\flame\BaseScene</Filter>
 	</ClInclude>
-    <ClInclude Include="Engine\flame\EnemySpawnPointComponent.h">
-      <Filter>Engine\flame</Filter>
+    <ClInclude Include="Engine\flame\components\EnemySpawnPoint\EnemySpawnPointComponent.h">
+      <Filter>Engine\flame\Components\EnemySpawnPoint</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\flame\ExperienceComponent.h">
-      <Filter>Engine\flame</Filter>
+    <ClInclude Include="Engine\flame\components\Experience\ExperienceComponent.h">
+      <Filter>Engine\flame\Components\Experience</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\flame\ItemDropComponent.h">
-      <Filter>Engine\flame</Filter>
+    <ClInclude Include="Engine\flame\components\ItemDrop\ItemDropComponent.h">
+      <Filter>Engine\flame\Components\ItemDrop</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\flame\PlayerAttackComponent.h">
-      <Filter>Engine\flame</Filter>
+    <ClInclude Include="Engine\flame\components\PlayerAttack\PlayerAttackComponent.h">
+      <Filter>Engine\flame\Components\PlayerAttack</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\flame\PlayerProjectileComponent.h">
-      <Filter>Engine\flame</Filter>
+    <ClInclude Include="Engine\flame\components\PlayerProjectile\PlayerProjectileComponent.h">
+      <Filter>Engine\flame\Components\PlayerProjectile</Filter>
     </ClInclude>
     <ClInclude Include="Engine\flame\repositories\ParticlePresetRepository.h">
       <Filter>Engine\flame\repositories</Filter>
@@ -461,17 +530,26 @@
     <ClInclude Include="Engine\flame\helpers\SceneJsonUtility.h">
       <Filter>Engine\flame\helpers</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\flame\Component.h">
-      <Filter>Engine\flame</Filter>
+    <ClInclude Include="Engine\flame\helpers\SceneUiUtility.h">
+      <Filter>Engine\flame\helpers</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\flame\FlameWork.h">
-      <Filter>Engine\flame</Filter>
+    <ClInclude Include="Engine\flame\base_scene\details\BaseSceneRuntimeDetails.h">
+      <Filter>Engine\flame\BaseScene\Details</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\flame\Game.h">
-      <Filter>Engine\flame</Filter>
+    <ClInclude Include="Engine\flame\base_scene\details\BaseSceneEditorDetails.h">
+      <Filter>Engine\flame\BaseScene\Details</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\flame\GameObject.h">
-      <Filter>Engine\flame</Filter>
+    <ClInclude Include="Engine\flame\core\Component.h">
+      <Filter>Engine\flame\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\flame\core\FlameWork.h">
+      <Filter>Engine\flame\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\flame\core\Game.h">
+      <Filter>Engine\flame\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\flame\core\GameObject.h">
+      <Filter>Engine\flame\Core</Filter>
     </ClInclude>
     <ClInclude Include="Engine\math\algorithm.h">
       <Filter>Engine\math</Filter>

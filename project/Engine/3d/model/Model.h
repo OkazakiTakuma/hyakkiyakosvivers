@@ -29,9 +29,9 @@ public:
 	/// <summary>
 	/// 現在の状態をもとに描画処理を行います。
 	/// </summary>
-	/// <param name="overrideMaterialResource">指定時はこの描画だけ別のマテリアルを使用します。</param>
+	/// <param name="overrideMaterialAddress">0以外なら、この描画だけ別のマテリアルCBVを使用します。</param>
 	/// <param name="overrideTextureFilePath">指定時は共有モデルを変更せず、この描画だけ別のテクスチャを使用します。</param>
-	void Draw(ID3D12Resource* overrideMaterialResource = nullptr, const std::string& overrideTextureFilePath = {});
+	void Draw(D3D12_GPU_VIRTUAL_ADDRESS overrideMaterialAddress = 0, const std::string& overrideTextureFilePath = {});
 	/// <summary>
 	/// 破棄時に必要な解放処理を行います。
 	/// </summary>

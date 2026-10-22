@@ -73,7 +73,7 @@
         ]
     },
     "巫女": {
-        "attack": 140.0,
+        "attack": 155.0,
         "attackSize": 100.0,
         "attackSlots": [
             {
@@ -103,10 +103,10 @@
             }
         ],
         "attackSpeed": 100.0,
-        "baseHealth": 150.0,
-        "baseSpeed": 0.15000000596046448,
+        "baseHealth": 180.0,
+        "baseSpeed": 0.18000002205371857,
         "damageInvincibilityDuration": 1.0,
-        "defense": 12.0,
+        "defense": 16.0,
         "experience": 0,
         "experienceCorrection": 100.0,
         "health": 100.0,
@@ -116,7 +116,7 @@
         "level": 1,
         "model": "miko.gltf",
         "name": "巫女",
-        "sizeScale": 0.455,
+        "sizeScale": 0.45500001311302185,
         "speed": 100.0,
         "statusSlots": [
             {

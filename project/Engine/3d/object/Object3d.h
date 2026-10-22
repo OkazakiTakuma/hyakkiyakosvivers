@@ -175,42 +175,37 @@ private:
 		int32_t enableAerialPerspective;
 		float paddingAtmosphere;
 	};
-	Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource;
 	CameraForGPU* cameraData = nullptr;
-
-	/// <summary>
-	/// CameraResource を作成し、利用できる状態にします。
-	/// </summary>
-	void CreateCameraResource();
 	/// <summary>
 	/// SkinningPaletteResource を作成し、利用できる状態にします。
 	/// </summary>
 	void CreateSkinningPaletteResource(uint32_t paletteCount);
 	void UpdateSkinningPaletteResource();
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResorceModel;
 	TransformationMatrix* transformationMatrix = nullptr;
-	/// <summary>
-	/// WVPResource を作成し、利用できる状態にします。
-	/// </summary>
-	void CreateWVPResource();
 	struct DirectionalLight {
 		Vector4 color;
 		Vector3 direction;
 		float intensity;
 	};
-	Microsoft::WRL::ComPtr<ID3D12Resource> lightResource;
 	DirectionalLight* directionallightData = nullptr;
-	/// <summary>
-	/// DirectionalLightResource を作成し、利用できる状態にします。
-	/// </summary>
-	void CreateDirectionalLightResource();
-	Microsoft::WRL::ComPtr<ID3D12Resource> pointLightResource;
 	PointLight* pointLightData = nullptr;
-	/// <summary>
-	/// PointLightResource を作成し、利用できる状態にします。
-	/// </summary>
-	void CreatePointLightResource();
+
+	// 頻繁に生成される敵・弾ごとのCommittedResource作成を1回にまとめます。
+	// Root CBVの開始アドレスは256バイト境界である必要があるため、各領域を固定間隔で配置します。
+	static constexpr size_t kConstantBufferStride = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;
+	static constexpr size_t kWvpOffset = kConstantBufferStride * 0;
+	static constexpr size_t kLightOffset = kConstantBufferStride * 1;
+	static constexpr size_t kCameraOffset = kConstantBufferStride * 2;
+	static constexpr size_t kPointLightOffset = kConstantBufferStride * 3;
+	static constexpr size_t kMaterialOffset = kConstantBufferStride * 4;
+	static constexpr size_t kShadowMapWvpOffset = kConstantBufferStride * 5;
+	static constexpr size_t kIdentitySkinningOffset = kConstantBufferStride * 6;
+	static constexpr size_t kCombinedBufferSize = kConstantBufferStride * 7;
+	Microsoft::WRL::ComPtr<ID3D12Resource> combinedBufferResource_;
+	uint8_t* combinedBufferData_ = nullptr;
+	void CreateCombinedBufferResource();
+	D3D12_GPU_VIRTUAL_ADDRESS GetCombinedGpuAddress(size_t offset) const;
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceCylinder;
 	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceCylinder;
@@ -233,14 +228,8 @@ private:
 	};
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResourceCylinder;
 	MaterialData* materialDataCylinder = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialOverrideResource_;
 	MaterialData* materialOverrideData_ = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12Resource> shadowMaterialResource;
-	MaterialData* shadowMaterialData = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12Resource> shadowWvpResource;
-	TransformationMatrix* shadowTransformationMatrix = nullptr;
 	// 既存の平面影と値を共有しない、シャドウマップ専用の変換バッファです。
-	Microsoft::WRL::ComPtr<ID3D12Resource> shadowMapWvpResource_;
 	TransformationMatrix* shadowMapTransformationMatrix_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> skinningPaletteResource;
 	Matrix4x4* skinningPaletteData = nullptr;
@@ -278,6 +267,5 @@ private:
 	std::map<std::string, Quaternion> jointRotationOffsets_;
 	std::map<std::string, Vector3> jointRotationOffsetEuler_;
 	bool isShadowEnabled_ = true;
-	float shadowPlaneY_ = 0.01f;
 	float shadowAlpha_ = 0.35f;
 };

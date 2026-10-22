@@ -1,6 +1,6 @@
 #pragma once
-#include "AbstractSceneFactory.h"
-#include "StageResultData.h"
+#include "core/AbstractSceneFactory.h"
+#include "base_scene/StageResultData.h"
 #include "Vector.h"
 
 #include <memory>
@@ -12,6 +12,7 @@
 
 class BaseScene;
 class Camera;
+class GameObject;
 class Sprite;
 
 /// <summary>シーン切り替え時に使用する画面演出です。</summary>
@@ -105,6 +106,8 @@ public:
 	void SetFallbackCamera(Camera* camera) { fallbackCamera_ = camera; }
 	void SetScenePlaying(bool isPlaying) { isScenePlaying_ = isPlaying; }
 	bool IsScenePlaying() const { return isScenePlaying_; }
+	/// <summary>F1で開始した自動デモが実行中かどうかを返します。</summary>
+	bool IsDemoPlayActive() const { return isDemoPlayActive_; }
 	void RequestFrameStep() { isFrameStepRequested_ = true; }
 	/// <summary>シーン遷移中でなければ、現在の配置JSONからシーンを再構築します。</summary>
 	bool ReloadCurrentSceneJson();
@@ -162,6 +165,10 @@ private:
 	void SwitchToNextScene();
 	/// <summary>経過時間から遷移のフェーズと画面被覆率を更新します。</summary>
 	void UpdateTransition();
+	/// <summary>F1入力と、タイトルからゲーム開始までを繰り返す自動デモの進行を更新します。</summary>
+	void UpdateDemoPlay();
+	/// <summary>デモ再生中であることと停止操作を、全シーン共通の最前面へ表示します。</summary>
+	void DrawDemoPlayGuide();
 	/// <summary>選択中のパターンに従って最前面の遷移オーバーレイを描画します。</summary>
 	void DrawTransition();
 	/// <summary>共有する単色スプライトの1枚を、指定矩形へ配置して描画します。</summary>
@@ -193,6 +200,10 @@ private:
 	static constexpr size_t kTransitionSpriteCount = 8;
 	/// <summary>実行時生成した1px白テクスチャを拡大して描く遷移用スプライトです。</summary>
 	std::array<std::unique_ptr<Sprite>, kTransitionSpriteCount> transitionSprites_{};
+	/// <summary>デモ再生中の操作案内を読みやすくする半透明パネルです。</summary>
+	std::unique_ptr<Sprite> demoGuideBackgroundSprite_;
+	/// <summary>デモ再生中に全シーンで表示するF1停止案内です。</summary>
+	std::unique_ptr<GameObject> demoGuideTextObject_;
 	TransitionPhase transitionPhase_ = TransitionPhase::Idle;
 	SceneTransitionSettings transitionSettings_{};
 	/// <summary>遷移開始時に確定し、途中の設定変更によるパターン切り替わりを防ぎます。</summary>
@@ -216,6 +227,16 @@ private:
 	int selectedSceneIndex_ = 0;
 	bool isScenePlaying_ = true;
 	bool isFrameStepRequested_ = false;
+	/// <summary>タイトル、ステージ1、巫女、ゲーム開始を巡回する自動デモの有効状態です。</summary>
+	bool isDemoPlayActive_ = false;
+	/// <summary>自動デモで現在のシーンを見せ始めてからの経過秒数です。</summary>
+	float demoSceneElapsed_ = 0.0f;
+	/// <summary>自動デモのタイマーをシーン切り替え時にリセットするための直前シーン名です。</summary>
+	std::string demoObservedSceneName_;
+	/// <summary>どの画面でF1を押しても、最初のタイトル表示からデモを始めるための要求です。</summary>
+	bool isDemoRestartRequested_ = false;
+	/// <summary>現在のシーンで通常の決定演出を開始済みかどうかです。</summary>
+	bool isDemoAdvancePresentationStarted_ = false;
 	/// <summary>シーンをまたいで引き継ぐプレイヤータイプです。初回は唯一開放済みの巫女を使用します。</summary>
 	std::string selectedPlayerTypeName_ = "巫女";
 	std::vector<std::string> gameplayStageIds_ = {"default"};

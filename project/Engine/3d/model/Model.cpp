@@ -319,11 +319,12 @@ void Model::Finalize() {
 /// <summary>
 /// 現在の状態をもとに描画処理を行います。
 /// </summary>
-void Model::Draw(ID3D12Resource* overrideMaterialResource, const std::string& overrideTextureFilePath) {
+void Model::Draw(D3D12_GPU_VIRTUAL_ADDRESS overrideMaterialAddress, const std::string& overrideTextureFilePath) {
 	modelCommon_->GetDxCommon()->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
 	modelCommon_->GetDxCommon()->GetCommandList()->IASetIndexBuffer(&indexBufferView);
-	ID3D12Resource* activeMaterialResource = overrideMaterialResource ? overrideMaterialResource : materialResource.Get();
-	modelCommon_->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(0, activeMaterialResource->GetGPUVirtualAddress());
+	const D3D12_GPU_VIRTUAL_ADDRESS activeMaterialAddress =
+		overrideMaterialAddress != 0 ? overrideMaterialAddress : materialResource->GetGPUVirtualAddress();
+	modelCommon_->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(0, activeMaterialAddress);
 	const std::string& activeTextureFilePath = overrideTextureFilePath.empty() ? modelData.material.textureFilePath : overrideTextureFilePath;
 	modelCommon_->GetDxCommon()->GetCommandList()->SetGraphicsRootDescriptorTable(3, TextureManager::GetInstance()->GetSRVHandleGPU(activeTextureFilePath));
 

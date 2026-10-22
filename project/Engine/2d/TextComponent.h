@@ -1,5 +1,5 @@
 #pragma once
-#include "../flame/Component.h"
+#include "core/Component.h"
 #include "Sprite.h"
 #include "SpriteCommon.h"
 #include "TextureManager.h"
@@ -63,6 +63,16 @@ public:
 	const std::string& GetFontName() const { return fontName_; }
 	void SetFontSize(float fontSize) { const float value = fontSize < 1.0f ? 1.0f : fontSize; if (fontSize_ != value) { fontSize_ = value; isTextureDirty_ = true; } }
 	float GetFontSize() const { return fontSize_; }
+	/// <summary>文字を収める最大領域を指定します。幅を指定すると自動改行し、高さを超える場合はフォントを縮小します。</summary>
+	void SetLayoutBounds(float maxWidth, float maxHeight) {
+		const float width = maxWidth > 0.0f ? maxWidth : 4096.0f;
+		const float height = maxHeight > 0.0f ? maxHeight : 4096.0f;
+		if (layoutMaxWidth_ != width || layoutMaxHeight_ != height) {
+			layoutMaxWidth_ = width;
+			layoutMaxHeight_ = height;
+			isTextureDirty_ = true;
+		}
+	}
 	void SetColor(const Vector4& color) { color_ = color; }
 	const Vector4& GetColor() const { return color_; }
 	void SetAnchor(Anchor anchor) { anchor_ = anchor; }
@@ -189,15 +199,27 @@ private:
 		IDWriteFactory* factory = GetDirectWriteFactory();
 		if (!factory) return;
 		const std::wstring requestedFont = fontName_ == "Default" ? L"Meiryo" : ToWideString(fontName_);
-		Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
-		if (FAILED(factory->CreateTextFormat(requestedFont.c_str(), nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
-			DWRITE_FONT_STRETCH_NORMAL, fontSize_, L"ja-jp", &format))) return;
-		format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
 		Microsoft::WRL::ComPtr<IDWriteTextLayout> layout;
-		if (FAILED(factory->CreateTextLayout(wideText.c_str(), static_cast<UINT32>(wideText.size()), format.Get(), 4096.0f, 4096.0f, &layout))) return;
-		// 先にレイアウトを計測し、文字列に必要な大きさだけのRenderTargetを確保する。
 		DWRITE_TEXT_METRICS metrics{};
-		if (FAILED(layout->GetMetrics(&metrics))) return;
+		// 指定領域がある文字は折り返し、それでも縦に収まらない場合だけ少しずつ縮小する。
+		const bool hasLayoutBounds = layoutMaxWidth_ < 4096.0f || layoutMaxHeight_ < 4096.0f;
+		const float minimumFontSize = (std::min)(fontSize_, 8.0f);
+		for (float fittedFontSize = fontSize_; fittedFontSize >= minimumFontSize; fittedFontSize -= 1.0f) {
+			Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
+			if (FAILED(factory->CreateTextFormat(requestedFont.c_str(), nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
+				DWRITE_FONT_STRETCH_NORMAL, fittedFontSize, L"ja-jp", &format))) return;
+			// 日本語や空白を含まない長い名前でも欄外へ出ないよう、領域指定時は文字単位で改行する。
+			format->SetWordWrapping(hasLayoutBounds ? DWRITE_WORD_WRAPPING_CHARACTER : DWRITE_WORD_WRAPPING_NO_WRAP);
+			Microsoft::WRL::ComPtr<IDWriteTextLayout> candidate;
+			if (FAILED(factory->CreateTextLayout(wideText.c_str(), static_cast<UINT32>(wideText.size()), format.Get(),
+				layoutMaxWidth_, 4096.0f, &candidate))) return;
+			DWRITE_TEXT_METRICS candidateMetrics{};
+			if (FAILED(candidate->GetMetrics(&candidateMetrics))) return;
+			layout = candidate;
+			metrics = candidateMetrics;
+			if (!hasLayoutBounds || candidateMetrics.height <= layoutMaxHeight_ || fittedFontSize <= minimumFontSize) break;
+		}
+		// 先にレイアウトを計測し、文字列に必要な大きさだけのRenderTargetを確保する。
 		const int width = (std::max)(1L, static_cast<LONG>(std::ceil(metrics.widthIncludingTrailingWhitespace)) + 6);
 		const int height = (std::max)(1L, static_cast<LONG>(std::ceil(metrics.height)) + 6);
 		Microsoft::WRL::ComPtr<IDWriteGdiInterop> gdiInterop;
@@ -256,6 +278,8 @@ private:
 	std::string text_ = "Text";
 	std::string fontName_ = "Default";
 	float fontSize_ = 32.0f;
+	float layoutMaxWidth_ = 4096.0f;
+	float layoutMaxHeight_ = 4096.0f;
 	Vector4 color_ = {1.0f, 1.0f, 1.0f, 1.0f};
 	Anchor anchor_ = Anchor::TopLeft;
 	/// <summary>文字テクスチャの再生成が必要かを表します。</summary>

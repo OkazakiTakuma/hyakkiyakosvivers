@@ -31,6 +31,8 @@ public:
 	static void SetPaused(bool paused) { isPaused_ = paused; }
 	static bool IsPaused() { return isPaused_; }
 	static float GetDeltaTime() { return isPaused_ ? 0.0f : deltaTime_; }
+	/// <summary>ポーズ中も進める画面演出向けに、実時間のフレーム間隔を返します。</summary>
+	static float GetUnscaledDeltaTime() { return deltaTime_; }
 	static float GetFrameRate() { return deltaTime_ > 0.0f ? 1.0f / deltaTime_ : 0.0f; }
 	static float GetFrameScale60() { return GetDeltaTime() * kReferenceFrameRate; }
 

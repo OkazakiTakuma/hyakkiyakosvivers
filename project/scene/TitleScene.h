@@ -1,7 +1,8 @@
 #pragma once
 
-#include "BaseScene.h"
+#include "base_scene/BaseScene.h"
 #include "sky/AtmosphereSky.h"
+#include "instancing/GrassInstancingModel.h"
 /// <summary>ゲーム開始とショップへの入口を表示するタイトルシーンです。</summary>
 class TitleScene: public BaseScene {
 public:
@@ -29,6 +30,8 @@ public:
 	void Finalize() override;
 	/// <summary>シーン遷移と共有所持金の参照に使うSceneManagerを設定します。</summary>
 	void SetSceneManager(SceneManager* manager) override { sceneManager = manager; }
+	/// <summary>通常のゲーム開始と同じタイトル退出演出を、デモ進行から開始します。</summary>
+	bool BeginDemoStartTransition();
 
 private:
 	enum class TitlePhase {
@@ -60,7 +63,7 @@ private:
 	/// <summary>球体モデルを使わず、空の散乱計算から太陽を描くタイトル専用Skyです。</summary>
 	std::unique_ptr<AtmosphereSky> atmosphereSky_;
 	/// <summary>タイトル背景の地面へ配置する草のインスタンシング描画です。</summary>
-	std::unique_ptr<InstancingModel> grassInstancingModel_;
+	std::unique_ptr<GrassInstancingModel> grassInstancingModel_;
 	/// <summary>画面全体を塗る背景です。</summary>
 	std::unique_ptr<Sprite> backgroundSprite_;
 	/// <summary>導入時に3Dシーンを黒から浮かび上がらせるフェードです。</summary>

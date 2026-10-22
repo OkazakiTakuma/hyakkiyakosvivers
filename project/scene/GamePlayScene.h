@@ -1,9 +1,11 @@
 #pragma once
-#include "BaseScene.h"
-#include "GameObject.h"
+#include "base_scene/BaseScene.h"
+#include "core/GameObject.h"
 #include "object/Object3dComponent.h"
 #include "particle/ParticleEmitterComponent.h"
+#include "sky/AtmosphereSky.h"
 #include "SpriteComponent.h"
+#include "instancing/GrassInstancingModel.h"
 
 
 class GamePlayScene: public BaseScene {
@@ -95,12 +97,45 @@ private:
 	/// SceneModels を読み込み、内部データへ反映します。
 	/// </summary>
 	void LoadSceneModels();
+	/// <summary>プレイヤーが力尽きて倒れるゲームオーバー演出を開始します。</summary>
+	void BeginDefeatPresentation();
+	/// <summary>敵や攻撃を止めたまま、プレイヤーの倒れ込みと暗転を更新します。</summary>
+	void UpdateDefeatPresentation();
+	/// <summary>倒れ込みの後半に暗幕と「力尽きた」表示を重ねます。</summary>
+	void DrawDefeatPresentation();
 	/// <summary>ポーズメニューの描画リソースを生成します。</summary>
 	void InitializePauseMenu();
+	/// <summary>霧と選択キャラクター固有の登場動作を使う開始演出を準備します。</summary>
+	void BeginStartPresentation();
+	/// <summary>ゲーム時間を止めたまま開始演出だけを更新します。</summary>
+	void UpdateStartPresentation();
+	/// <summary>2D霧と粒状の深度霧を同じ進行度でフェードイン・フェードアウトさせます。</summary>
+	void UpdateStartFogFade(float normalizedTime);
+	/// <summary>霧と開戦表示をHUDより手前へ描画します。</summary>
+	void DrawStartPresentation();
 	/// <summary>ポーズ中の項目選択と決定入力を処理します。</summary>
 	void UpdatePauseMenu();
 	/// <summary>ポーズ状態を切り替え、ゲーム時間へ反映します。</summary>
 	void SetPauseMenuOpen(bool isOpen);
+	/// <summary>ステージ1の太陽方向と夕方色を全3Dモデルへ反映します。</summary>
+	void ApplyStageOneEveningLight();
+	bool startPresentationInitialized_ = false;
+	bool startPresentationActive_ = false;
+	float startPresentationElapsed_ = 0.0f;
+	float startFogAlpha_ = 1.0f;
+	float startWhiteAlpha_ = 1.0f;
+	GameObject* startPresentationPlayer_ = nullptr;
+	EulerTransform startPresentationBaseTransform_{};
+	std::array<std::unique_ptr<Sprite>, 3> startFogSprites_;
+	std::unique_ptr<Sprite> startWhiteSprite_;
+	std::unique_ptr<Sprite> startMessageSprite_;
+	bool defeatPresentationActive_ = false;
+	bool defeatTransitionRequested_ = false;
+	float defeatPresentationElapsed_ = 0.0f;
+	GameObject* defeatPresentationPlayer_ = nullptr;
+	EulerTransform defeatPresentationBaseTransform_{};
+	float defeatFallDirection_ = 1.0f;
+	std::unique_ptr<GameObject> defeatMessageTextObject_;
 	/// <summary>
 	/// ImGui によるデバッグ用 UI の表示と編集処理を行います。
 	/// </summary>
@@ -110,7 +145,8 @@ private:
 	float lightIntensity = 1.0f;	
 	bool isParticleEmit = false;
 	SceneManager* sceneManager = nullptr;
+	std::unique_ptr<AtmosphereSky> atmosphereSky_ = nullptr;
 	std::unique_ptr<SkyBox> skyBox = nullptr;
-	std::unique_ptr<InstancingModel> instancingModel_ = nullptr;
+	std::unique_ptr<GrassInstancingModel> instancingModel_ = nullptr;
 
 };

@@ -77,9 +77,9 @@ void InstancingModelCommon::CreateRootSignature() {
     rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     rootParameters[3].Descriptor.ShaderRegister = 2;
 
-    // [4] b3: カメラ情報
+	// [4] b3: ViewProjectionとカメラ情報
     rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     rootParameters[4].Descriptor.ShaderRegister = 3;
 
     // [5] b4: 点光源

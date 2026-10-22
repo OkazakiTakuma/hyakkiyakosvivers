@@ -1,7 +1,7 @@
 #pragma once
 #include "../../collision/CollisionPrimitive.h"
-#include "../../flame/Component.h"
-#include "../../flame/GameObject.h"
+#include "core/Component.h"
+#include "core/GameObject.h"
 #include "../../math/MathConstants.h"
 #include "LineDrawer.h"
 #include <algorithm>

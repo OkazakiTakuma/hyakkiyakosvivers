@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BaseScene.h"
+#include "base_scene/BaseScene.h"
 
 /// <summary>ゲーム終了後のクリア／ゲームオーバーと最終戦績を表示します。</summary>
 class ResultScene : public BaseScene {

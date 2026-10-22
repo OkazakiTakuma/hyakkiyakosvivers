@@ -579,6 +579,77 @@
         "generatedBy": "generate_player_entrance_animations.js"
       }
     }
+,
+    {
+      "name": "ゲーム開始_猫",
+      "samplers": [
+        {
+          "input": 37,
+          "interpolation": "LINEAR",
+          "output": 38
+        },
+        {
+          "input": 37,
+          "interpolation": "LINEAR",
+          "output": 39
+        },
+        {
+          "input": 37,
+          "interpolation": "LINEAR",
+          "output": 40
+        },
+        {
+          "input": 37,
+          "interpolation": "LINEAR",
+          "output": 41
+        },
+        {
+          "input": 37,
+          "interpolation": "LINEAR",
+          "output": 42
+        }
+      ],
+      "channels": [
+        {
+          "sampler": 0,
+          "target": {
+            "node": 3,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 1,
+          "target": {
+            "node": 0,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 2,
+          "target": {
+            "node": 1,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 3,
+          "target": {
+            "node": 2,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 4,
+          "target": {
+            "node": 6,
+            "path": "rotation"
+          }
+        }
+      ],
+      "extras": {
+        "generatedBy": "generate_player_entrance_animations.js"
+      }
+    }
   ],
   "materials": [
     {
@@ -861,7 +932,7 @@
         0
       ],
       "max": [
-        1.05
+        1.75
       ]
     },
     {
@@ -895,6 +966,55 @@
     {
       "name": "選択登場_猫_tail_回転",
       "bufferView": 36,
+      "componentType": 5126,
+      "count": 5,
+      "type": "VEC4"
+    }
+,
+    {
+      "name": "ゲーム開始_猫_時間",
+      "bufferView": 37,
+      "componentType": 5126,
+      "count": 5,
+      "type": "SCALAR",
+      "min": [
+        0
+      ],
+      "max": [
+        1.35
+      ]
+    },
+    {
+      "name": "ゲーム開始_猫_spine_回転",
+      "bufferView": 38,
+      "componentType": 5126,
+      "count": 5,
+      "type": "VEC4"
+    },
+    {
+      "name": "ゲーム開始_猫_head_回転",
+      "bufferView": 39,
+      "componentType": 5126,
+      "count": 5,
+      "type": "VEC4"
+    },
+    {
+      "name": "ゲーム開始_猫_arm.L_回転",
+      "bufferView": 40,
+      "componentType": 5126,
+      "count": 5,
+      "type": "VEC4"
+    },
+    {
+      "name": "ゲーム開始_猫_arm.R_回転",
+      "bufferView": 41,
+      "componentType": 5126,
+      "count": 5,
+      "type": "VEC4"
+    },
+    {
+      "name": "ゲーム開始_猫_tail_回転",
+      "bufferView": 42,
       "componentType": 5126,
       "count": 5,
       "type": "VEC4"
@@ -1093,6 +1213,37 @@
       "byteOffset": 340,
       "byteLength": 80
     }
+,
+    {
+      "buffer": 2,
+      "byteOffset": 0,
+      "byteLength": 20
+    },
+    {
+      "buffer": 2,
+      "byteOffset": 20,
+      "byteLength": 80
+    },
+    {
+      "buffer": 2,
+      "byteOffset": 100,
+      "byteLength": 80
+    },
+    {
+      "buffer": 2,
+      "byteOffset": 180,
+      "byteLength": 80
+    },
+    {
+      "buffer": 2,
+      "byteOffset": 260,
+      "byteLength": 80
+    },
+    {
+      "buffer": 2,
+      "byteOffset": 340,
+      "byteLength": 80
+    }
   ],
   "samplers": [
     {
@@ -1109,6 +1260,11 @@
     {
       "byteLength": 420,
       "uri": "neko_entrance.bin"
+    }
+,
+    {
+      "byteLength": 420,
+      "uri": "neko_game_start.bin"
     }
   ]
 }

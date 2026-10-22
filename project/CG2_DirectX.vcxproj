@@ -81,7 +81,10 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+	  <!-- コンパイラとPDBサーバーの版違いでC1902にならないよう、デバッグ情報を各objへ格納する。 -->
+	  <DebugInformationFormat>OldStyle</DebugInformationFormat>
+	  <!-- 大規模なDebugビルドでC1060にならないよう、同時コンパイルによるヒープ消費を抑える。 -->
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>$(ProjectDir)externals\assimp\include;$(ProjectDir)engine\audio;$(ProjectDir)engine\3d;$(ProjectDir)engine\base;$(ProjectDir)engine\math;$(ProjectDir)externals\DirectXTex;$(ProjectDir)DirectXTex;$(ProjectDir)imgui;$(ProjectDir)engine\flame;$(ProjectDir)scene;$(ProjectDir)engine\2d;$(ProjectDir)externals\nlohmann;$(ProjectDir)externals\nlohmann</AdditionalIncludeDirectories>
       <UndefinePreprocessorDefinitions>
       </UndefinePreprocessorDefinitions>
@@ -108,6 +111,7 @@ copy  "$(WindowsSdkDir)bin\$(TargetPlatFormVersion)\x64\dxil.dll" "$(TargetDir)d
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+	  <DebugInformationFormat>OldStyle</DebugInformationFormat>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>$(ProjectDir)externals\assimp\include;$(ProjectDir)engine\audio;$(ProjectDir)engine\3d;$(ProjectDir)engine\base;$(ProjectDir)engine\math;$(ProjectDir)externals\DirectXTex;$(ProjectDir)DirectXTex;;$(ProjectDir)engine\flame;$(ProjectDir)scene;$(ProjectDir)engine\2d;$(ProjectDir)externals\nlohmann</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -136,6 +140,7 @@ copy  "$(WindowsSdkDir)bin\$(TargetPlatFormVersion)\x64\dxil.dll" "$(TargetDir)d
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+	  <DebugInformationFormat>OldStyle</DebugInformationFormat>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <Optimization>Disabled</Optimization>
       <WholeProgramOptimization>false</WholeProgramOptimization>
@@ -172,15 +177,22 @@ copy  "$(WindowsSdkDir)bin\$(TargetPlatFormVersion)\x64\dxil.dll" "$(TargetDir)d
     <ClCompile Include="Engine\3d\sky\SkyBoxCommon.cpp" />
     <ClCompile Include="Engine\3d\sky\AtmosphereSky.cpp" />
     <ClCompile Include="Engine\3d\utilities\SkeletonAnimationUtility.cpp" />
-    <ClCompile Include="Engine\flame\BaseScene.cpp" />
-    <ClCompile Include="Engine\flame\BaseSceneEditor.cpp" />
-    <ClCompile Include="Engine\flame\BaseSceneRuntime.cpp" />
-    <ClCompile Include="Engine\flame\BaseSceneSerialization.cpp" />
-    <ClCompile Include="Engine\flame\PlayerAttackComponent.cpp" />
-    <ClCompile Include="Engine\flame\PlayerProjectileComponent.cpp" />
-    <ClCompile Include="Engine\flame\EnemyComponent.cpp" />
-    <ClCompile Include="Engine\flame\EnemySpawnPointComponent.cpp" />
-    <ClCompile Include="Engine\flame\EnemyProjectileComponent.cpp" />
+    <ClCompile Include="Engine\flame\base_scene\BaseScene.cpp" />
+    <ClCompile Include="Engine\flame\base_scene\editor\BaseSceneEditor.cpp" />
+    <ClCompile Include="Engine\flame\base_scene\editor\BaseSceneEnemyEditor.cpp" />
+    <ClCompile Include="Engine\flame\base_scene\editor\BaseScenePlayerEditor.cpp" />
+    <ClCompile Include="Engine\flame\base_scene\editor\BaseSceneRenderingEditor.cpp" />
+    <ClCompile Include="Engine\flame\base_scene\runtime\BaseSceneCollisionRuntime.cpp" />
+    <ClCompile Include="Engine\flame\base_scene\runtime\BaseSceneEnemyRuntime.cpp" />
+    <ClCompile Include="Engine\flame\base_scene\runtime\BaseSceneHud.cpp" />
+    <ClCompile Include="Engine\flame\base_scene\runtime\BaseScenePlayerProjectileRuntime.cpp" />
+    <ClCompile Include="Engine\flame\base_scene\runtime\BaseSceneRuntime.cpp" />
+    <ClCompile Include="Engine\flame\base_scene\BaseSceneSerialization.cpp" />
+    <ClCompile Include="Engine\flame\components\PlayerAttack\PlayerAttackComponent.cpp" />
+    <ClCompile Include="Engine\flame\components\PlayerProjectile\PlayerProjectileComponent.cpp" />
+    <ClCompile Include="Engine\flame\components\Enemy\EnemyComponent.cpp" />
+    <ClCompile Include="Engine\flame\components\EnemySpawnPoint\EnemySpawnPointComponent.cpp" />
+    <ClCompile Include="Engine\flame\components\EnemyProjectile\EnemyProjectileComponent.cpp" />
     <ClCompile Include="Engine\flame\repositories\PlayerStatusRepository.cpp" />
     <ClCompile Include="Engine\audio\Audio.cpp" />
     <ClCompile Include="Engine\base\D3DResourceLeakChecker.cpp" />
@@ -191,13 +203,14 @@ copy  "$(WindowsSdkDir)bin\$(TargetPlatFormVersion)\x64\dxil.dll" "$(TargetDir)d
     <ClCompile Include="Engine\base\Logger.cpp" />
     <ClCompile Include="Engine\base\ImGuiManager.cpp" />
     <ClCompile Include="Engine\base\PerformanceMonitor.cpp" />
-    <ClCompile Include="Engine\flame\Game.cpp" />
-    <ClCompile Include="Engine\flame\FlameWork.cpp" />
+    <ClCompile Include="Engine\flame\core\Game.cpp" />
+    <ClCompile Include="Engine\flame\core\FlameWork.cpp" />
     <ClCompile Include="Engine\base\PostEffect.cpp" />
     <ClCompile Include="Engine\2d\LineDrawer.cpp" />
     <ClCompile Include="Engine\2d\LineCommon.cpp" />
     <ClCompile Include="Engine\3d\instancing\InstancingModel.cpp" />
     <ClCompile Include="Engine\3d\instancing\InstancingModelCommon.cpp" />
+    <ClCompile Include="Engine\3d\instancing\GrassInstancingModel.cpp" />
     <ClCompile Include="Engine\collision\CollisionPrimitive.cpp" />
     <ClCompile Include="Engine\math\Quaternion.cpp" />
     <ClCompile Include="Player\Player.cpp" />
@@ -360,23 +373,27 @@ copy  "$(WindowsSdkDir)bin\$(TargetPlatFormVersion)\x64\dxil.dll" "$(TargetDir)d
     <ClInclude Include="Engine\3d\sky\AtmosphereSystem.h" />
     <ClInclude Include="Engine\3d\utilities\SkeletonAnimationUtility.h" />
     <ClInclude Include="Engine\math\algorithm.h" />
-    <ClInclude Include="Engine\flame\AbstractSceneFactory.h" />
-    <ClInclude Include="Engine\flame\BaseScene.h" />
+    <ClInclude Include="Engine\flame\core\AbstractSceneFactory.h" />
+    <ClInclude Include="Engine\flame\base_scene\BaseScene.h" />
     <ClInclude Include="Engine\flame\helpers\BaseSceneResourceCatalog.h" />
     <ClInclude Include="Engine\flame\helpers\BaseSceneCollisionHelpers.h" />
+    <ClInclude Include="Engine\flame\helpers\CollisionSpatialGrid.h" />
     <ClInclude Include="Engine\flame\helpers\BaseSceneEditorGeometry.h" />
     <ClInclude Include="Engine\flame\repositories\EnemyStatusRepository.h" />
     <ClInclude Include="Engine\flame\repositories\PlayerStatusRepository.h" />
-	<ClInclude Include="Engine\flame\EnemyComponent.h" />
-	<ClInclude Include="Engine\flame\StageResultData.h" />
-	<ClInclude Include="Engine\flame\EnemyProjectileComponent.h" />
-    <ClInclude Include="Engine\flame\EnemySpawnPointComponent.h" />
-    <ClInclude Include="Engine\flame\ExperienceComponent.h" />
-    <ClInclude Include="Engine\flame\ItemDropComponent.h" />
-    <ClInclude Include="Engine\flame\PlayerAttackComponent.h" />
-    <ClInclude Include="Engine\flame\PlayerProjectileComponent.h" />
+	<ClInclude Include="Engine\flame\components\Enemy\EnemyComponent.h" />
+	<ClInclude Include="Engine\flame\base_scene\StageResultData.h" />
+	<ClInclude Include="Engine\flame\components\EnemyProjectile\EnemyProjectileComponent.h" />
+    <ClInclude Include="Engine\flame\components\EnemySpawnPoint\EnemySpawnPointComponent.h" />
+    <ClInclude Include="Engine\flame\components\Experience\ExperienceComponent.h" />
+    <ClInclude Include="Engine\flame\components\ItemDrop\ItemDropComponent.h" />
+    <ClInclude Include="Engine\flame\components\PlayerAttack\PlayerAttackComponent.h" />
+    <ClInclude Include="Engine\flame\components\PlayerProjectile\PlayerProjectileComponent.h" />
     <ClInclude Include="Engine\flame\repositories\ParticlePresetRepository.h" />
     <ClInclude Include="Engine\flame\helpers\SceneJsonUtility.h" />
+    <ClInclude Include="Engine\flame\helpers\SceneUiUtility.h" />
+    <ClInclude Include="Engine\flame\base_scene\details\BaseSceneRuntimeDetails.h" />
+    <ClInclude Include="Engine\flame\base_scene\details\BaseSceneEditorDetails.h" />
     <ClInclude Include="Engine\audio\Audio.h" />
     <ClInclude Include="Engine\base\struct.h" />
     <ClInclude Include="Engine\base\D3DResourceLeakChecker.h" />
@@ -400,8 +417,8 @@ copy  "$(WindowsSdkDir)bin\$(TargetPlatFormVersion)\x64\dxil.dll" "$(TargetDir)d
     <ClInclude Include="Engine\base\ImGuiManager.h" />
     <ClInclude Include="Engine\base\PerformanceMonitor.h" />
     <ClInclude Include="Engine\base\PipelineStateUtility.h" />
-    <ClInclude Include="Engine\flame\Game.h" />
-    <ClInclude Include="Engine\flame\FlameWork.h" />
+    <ClInclude Include="Engine\flame\core\Game.h" />
+    <ClInclude Include="Engine\flame\core\FlameWork.h" />
     <ClInclude Include="Engine\base\PostEffect.h" />
     <ClInclude Include="Engine\2d\LineDrawer.h" />
     <ClInclude Include="Engine\2d\LineCommon.h" />
@@ -409,6 +426,7 @@ copy  "$(WindowsSdkDir)bin\$(TargetPlatFormVersion)\x64\dxil.dll" "$(TargetDir)d
     <ClInclude Include="Engine\2d\TextComponent.h" />
     <ClInclude Include="Engine\3d\instancing\InstancingModel.h" />
     <ClInclude Include="Engine\3d\instancing\InstancingModelCommon.h" />
+    <ClInclude Include="Engine\3d\instancing\GrassInstancingModel.h" />
     <ClInclude Include="Engine\3d\collision\OBBColliderComponent.h" />
     <ClInclude Include="Engine\3d\object\Object3dComponent.h" />
     <ClInclude Include="Engine\3d\object\PointLightComponent.h" />
@@ -418,8 +436,8 @@ copy  "$(WindowsSdkDir)bin\$(TargetPlatFormVersion)\x64\dxil.dll" "$(TargetDir)d
 	<ClInclude Include="Engine\3d\particle\TrailRendererComponent.h" />
     <ClInclude Include="Engine\3d\collision\SphereColliderComponent.h" />
     <ClInclude Include="Engine\collision\CollisionPrimitive.h" />
-    <ClInclude Include="Engine\flame\Component.h" />
-    <ClInclude Include="Engine\flame\GameObject.h" />
+    <ClInclude Include="Engine\flame\core\Component.h" />
+    <ClInclude Include="Engine\flame\core\GameObject.h" />
     <ClInclude Include="Engine\math\Quaternion.h" />
     <ClInclude Include="Player\Player.h" />
     <ClInclude Include="scene\SceneFactory.h" />
