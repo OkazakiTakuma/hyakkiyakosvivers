@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BaseScene.h"
+#include "base_scene/BaseScene.h"
 
 /// <summary>プレイヤー選択後に、ゲームプレイで使用する配置パターンを選択します。</summary>
 class StageSelectScene : public BaseScene {
@@ -23,7 +23,7 @@ private:
 	std::vector<std::unique_ptr<Sprite>> cardBorderSprites_;
 	std::vector<std::unique_ptr<Sprite>> cardSprites_;
 	std::unique_ptr<GameObject> titleTextObject_;
-	std::unique_ptr<GameObject> selectedPlayerTextObject_;
+	std::unique_ptr<GameObject> selectedStageTextObject_;
 	std::unique_ptr<GameObject> instructionTextObject_;
 	std::unique_ptr<GameObject> pageTextObject_;
 	std::vector<std::unique_ptr<GameObject>> stageTextObjects_;

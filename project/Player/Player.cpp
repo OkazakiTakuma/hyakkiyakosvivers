@@ -1,6 +1,6 @@
 #include "Player.h"
 #include "MathConstants.h"
-#include "GameObject.h"
+#include "core/GameObject.h"
 #include "Input.h"
 #include "GameTime.h"
 #include "object/Object3dComponent.h"

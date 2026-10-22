@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../EnemyComponent.h"
+#include "components/Enemy/EnemyComponent.h"
 #include "../../base/StringUtility.h"
 
 #include <algorithm>

@@ -1,9 +1,9 @@
 #include "TitleScene.h"
 #include "SceneManager.h"
+#include "helpers/SceneUiUtility.h"
 #include "MathConstants.h"
 #include "PostEffect.h"
 #include <model/ModelManager.h>
-#include "instancing/InstancingModelCommon.h"
 
 #include <algorithm>
 #include <cmath>
@@ -32,49 +32,14 @@ float SmoothStep(float start, float end, float value) {
 	return rate * rate * (3.0f - 2.0f * rate);
 }
 
-std::unique_ptr<Sprite> CreateColorSprite() {
-	// 1枚の白テクスチャに色を乗算し、背景・パネル・ボタンへ使い回す。
-	auto sprite = std::make_unique<Sprite>();
-	sprite->Initialize("Resources/human/white.png");
-	return sprite;
-}
-
 std::unique_ptr<GameObject> CreateTextObject(
 	const std::string& text, float fontSize, const Vector4& color, const char* fontName = kUiFontName) {
-	// タイトルUIの文字はすべて中央基準で配置できるよう設定を統一する。
-	auto object = std::make_unique<GameObject>();
-	TextComponent* textComponent = object->AddComponent<TextComponent>();
-	textComponent->SetText(text);
-	textComponent->SetFontName(fontName);
-	textComponent->SetFontSize(fontSize);
-	textComponent->SetAnchor(TextComponent::Anchor::Center);
-	textComponent->SetColor(color);
-	return object;
+	return SceneUiUtility::CreateTextObject(text, fontSize, color, fontName);
 }
 
-void DrawColorSprite(Sprite* sprite, float x, float y, float width, float height, const Vector4& color) {
-	// 単色矩形として描画するため、位置・大きさ・色を描画直前にまとめて反映する。
-	EulerTransform transform = sprite->GetTransform();
-	transform.translate = {x, y, 0.0f};
-	sprite->SetTransform(transform);
-	sprite->SetSize({width, height});
-	sprite->SetColor(color);
-	sprite->Update();
-	sprite->Draw();
-}
-
-void DrawRotatedColorSprite(
-	Sprite* sprite, float centerX, float centerY, float width, float height, float rotation, const Vector4& color) {
-	EulerTransform transform = sprite->GetTransform();
-	transform.translate = {centerX, centerY, 0.0f};
-	transform.rotate.z = rotation;
-	sprite->SetTransform(transform);
-	sprite->SetAnchorPoint({0.5f, 0.5f});
-	sprite->SetSize({width, height});
-	sprite->SetColor(color);
-	sprite->Update();
-	sprite->Draw();
-}
+using SceneUiUtility::CreateColorSprite;
+using SceneUiUtility::DrawColorSprite;
+using SceneUiUtility::DrawRotatedColorSprite;
 }
 
 void TitleScene::Initialize() {
@@ -123,7 +88,7 @@ void TitleScene::Initialize() {
 		constexpr int kGrassSide = 321;
 		constexpr int kGrassInstanceCount = kGrassSide * kGrassSide;
 		constexpr float kSpacing = 0.3125f;
-		grassInstancingModel_ = std::make_unique<InstancingModel>();
+		grassInstancingModel_ = std::make_unique<GrassInstancingModel>();
 		grassInstancingModel_->Initialize(grassModel, kGrassInstanceCount);
 		// タイトルカメラから床の最遠端までは約85mあるため、端まで描画できる距離を確保する。
 		grassInstancingModel_->SetMaxDrawDistance(90.0f);
@@ -193,12 +158,12 @@ void TitleScene::CreateUi() {
 	shopTextObject_ = CreateTextObject("SHOP", 30.0f, {0.82f, 0.87f, 0.94f, 1.0f});
 	moneyTextObject_ = CreateTextObject("", 21.0f, {1.0f, 0.80f, 0.22f, 1.0f});
 	instructionTextObject_ = CreateTextObject(
-	    "W/S・上下キー・Pad上下: 選択    Enter・Pad A: 決定", 18.0f,
+	    "W/S・上下キー・Pad上下: 選択    Space・Pad A: 決定    F1: デモ開始 / 停止", 18.0f,
 	    {0.68f, 0.75f, 0.86f, 1.0f});
-	versionTextObject_ = CreateTextObject("PRESS ENTER / A BUTTON", 17.0f, {0.45f, 0.63f, 0.76f, 1.0f});
+	versionTextObject_ = CreateTextObject("PRESS SPACE / A BUTTON", 17.0f, {0.45f, 0.63f, 0.76f, 1.0f});
 	confirmationTextObject_ = CreateTextObject("本当にゲームデータを初期化しますか？", 27.0f, {1.0f, 0.92f, 0.82f, 1.0f});
 	confirmationInstructionTextObject_ = CreateTextObject(
-	    "Enter・Pad A: 初期化する    Esc・Pad B: キャンセル", 18.0f, {0.76f, 0.84f, 0.94f, 1.0f});
+	    "Space・Pad A: 初期化する    Esc・Pad B: キャンセル", 18.0f, {0.76f, 0.84f, 0.94f, 1.0f});
 }
 
 
@@ -226,15 +191,15 @@ void TitleScene::Update() {
 			isResetConfirmationOpen_ = false;
 			return;
 		}
-		if (input->TriggerKey(DIK_RETURN) || input->TriggerGamepadButton(XINPUT_GAMEPAD_A)) {
+		if (input->TriggerKey(DIK_SPACE) || input->TriggerGamepadButton(XINPUT_GAMEPAD_A)) {
 			sceneManager->ResetGameProgress();
-			BeginExitTransition("PLAYER_SELECT");
+			BeginExitTransition("STAGE_SELECT");
 		}
 		return;
 	}
 
 	const bool isConfirmTriggered =
-		input->TriggerKey(DIK_RETURN) || input->TriggerGamepadButton(XINPUT_GAMEPAD_A);
+		input->TriggerKey(DIK_SPACE) || input->TriggerGamepadButton(XINPUT_GAMEPAD_A);
 	if (titlePhase_ != TitlePhase::Menu) {
 		if (isConfirmTriggered) {
 			if (titlePhase_ == TitlePhase::WaitingForInput) {
@@ -257,12 +222,12 @@ void TitleScene::Update() {
 		selectedMenuIndex_ = (selectedMenuIndex_ + 1) % kMenuItemCount;
 	}
 	if (isConfirmTriggered) {
-		// Enter / Pad A は通常の決定操作として、現在選択中の項目を実行する。
+		// Space / Pad A は通常の決定操作として、現在選択中の項目を実行する。
 		if (selectedMenuIndex_ == 1) {
 			// 「初めから」は即時消去せず、もう一度明示的な決定操作を求める。
 			isResetConfirmationOpen_ = true;
 		} else {
-			BeginExitTransition(selectedMenuIndex_ == 0 ? "PLAYER_SELECT" : "SHOP");
+			BeginExitTransition(selectedMenuIndex_ == 0 ? "STAGE_SELECT" : "SHOP");
 		}
 	}
 }
@@ -304,6 +269,14 @@ void TitleScene::BeginExitTransition(const std::string& sceneName) {
 		exitEnemyStartScales_.push_back(enemy->GetTransform().scale);
 	}
 	titlePhase_ = TitlePhase::Exit;
+}
+
+bool TitleScene::BeginDemoStartTransition() {
+	if (titlePhase_ == TitlePhase::Exit) {
+		return false;
+	}
+	BeginExitTransition("STAGE_SELECT");
+	return true;
 }
 
 void TitleScene::UpdateExitPresentation() {
@@ -698,7 +671,6 @@ void TitleScene::Draw3D() {
 		return;
 	}
 
-	InstancingModelCommon::GetInstance()->SetDraw();
 	grassInstancingModel_->Draw(Object3dCommon::GetInstance()->GetDefaultCamera());
 }
 

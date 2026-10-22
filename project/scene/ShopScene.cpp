@@ -1,6 +1,7 @@
 #include "ShopScene.h"
 
 #include "SceneManager.h"
+#include "helpers/SceneUiUtility.h"
 #include "repositories/PlayerStatusRepository.h"
 
 #include <algorithm>
@@ -8,52 +9,60 @@
 #include <Xinput.h>
 
 namespace {
-/// <summary>保存データのキーに使用する、表示言語に依存しない商品IDです。</summary>
-constexpr std::array<const char*, 7> kUpgradeIds = {
-	"health", "attack", "defense", "speed", "experience_gain", "gold_gain", "level_up_reroll"
+enum class ShopUpgradeEffect {
+	BaseHealth,
+	AttackPercent,
+	DefensePercent,
+	BaseSpeed,
+	ExperienceGain,
+	GoldGain,
+	LevelUpReroll,
 };
-/// <summary>商品ごとの効果量を含む表示名です。</summary>
-constexpr std::array<const char*, 7> kUpgradeNames = {
-	"最大HP +10", "攻撃力 +5%", "防御力 +2%", "移動速度 +0.01",
-	"[全体] 獲得経験値 +10%", "[全体] 獲得G +10%", "[全体] レベルアップリロール解放"
+
+struct ShopUpgradeDefinition {
+	const char* id;
+	const char* label;
+	const char* amountSuffix;
+	ShopUpgradeEffect effect;
+	float amount;
+	int maxLevel;
+	bool isGlobal;
+	int fixedPrice;
 };
-/// <summary>通常強化は10段階、リロール解放は買い切りです。</summary>
-constexpr std::array<int, 7> kUpgradeMaxLevels = {10, 10, 10, 10, 10, 10, 1};
-/// <summary>このインデックス以降は、選択キャラクターに依存しない全体強化です。</summary>
-constexpr size_t kFirstGlobalUpgradeIndex = 4;
+
+constexpr int kProgressiveUpgradeBasePrice = 100;
+constexpr int kProgressiveUpgradePricePerLevel = 75;
+constexpr int kNoFixedPrice = -1;
+
+/// <summary>表示、価格計算、購入効果が参照するショップ商品の単一定義です。</summary>
+constexpr std::array<ShopUpgradeDefinition, 7> kUpgradeDefinitions = {{
+	{"health", "最大HP", "", ShopUpgradeEffect::BaseHealth, 10.0f, 10, false, kNoFixedPrice},
+	{"attack", "攻撃力", "%", ShopUpgradeEffect::AttackPercent, 5.0f, 10, false, kNoFixedPrice},
+	{"defense", "防御力", "%", ShopUpgradeEffect::DefensePercent, 2.0f, 10, false, kNoFixedPrice},
+	{"speed", "移動速度", "", ShopUpgradeEffect::BaseSpeed, 0.01f, 10, false, kNoFixedPrice},
+	{"experience_gain", "[全体] 獲得経験値", "%", ShopUpgradeEffect::ExperienceGain, 10.0f, 10, true, kNoFixedPrice},
+	{"gold_gain", "[全体] 獲得G", "%", ShopUpgradeEffect::GoldGain, 10.0f, 10, true, kNoFixedPrice},
+	{"level_up_reroll", "[全体] レベルアップリロール解放", "", ShopUpgradeEffect::LevelUpReroll, 0.0f, 1, true, 300},
+}};
+
+std::string GetUpgradeDisplayName(const ShopUpgradeDefinition& definition) {
+	std::ostringstream stream;
+	stream << definition.label;
+	if (definition.amount > 0.0f) {
+		stream << " +" << definition.amount << definition.amountSuffix;
+	}
+	return stream.str();
+}
 
 /// <summary>購入済みレベルに応じて次回購入価格を段階的に増加させます。</summary>
-int GetPrice(size_t itemIndex, int level) {
-	return itemIndex == 6 ? 300 : 100 + level * 75;
+int GetPrice(const ShopUpgradeDefinition& definition, int level) {
+	return definition.fixedPrice >= 0
+		? definition.fixedPrice
+		: kProgressiveUpgradeBasePrice + level * kProgressiveUpgradePricePerLevel;
 }
 
-/// <summary>中央揃えに統一したショップ用テキストオブジェクトを生成します。</summary>
-std::unique_ptr<GameObject> CreateText(const std::string& value, float size) {
-	auto object = std::make_unique<GameObject>();
-	TextComponent* text = object->AddComponent<TextComponent>();
-	text->SetText(value);
-	text->SetFontSize(size);
-	text->SetAnchor(TextComponent::Anchor::Center);
-	return object;
-}
-
-/// <summary>白テクスチャへ任意色を乗算して使う単色矩形スプライトを生成します。</summary>
-std::unique_ptr<Sprite> CreateColorSprite() {
-	auto sprite = std::make_unique<Sprite>();
-	sprite->Initialize("Resources/human/white.png");
-	return sprite;
-}
-
-/// <summary>単色スプライトの矩形と色を更新し、その場で描画します。</summary>
-void DrawColorSprite(Sprite* sprite, float x, float y, float width, float height, const Vector4& color) {
-	EulerTransform transform = sprite->GetTransform();
-	transform.translate = {x, y, 0.0f};
-	sprite->SetTransform(transform);
-	sprite->SetSize({width, height});
-	sprite->SetColor(color);
-	sprite->Update();
-	sprite->Draw();
-}
+using SceneUiUtility::CreateColorSprite;
+using SceneUiUtility::DrawColorSprite;
 }
 
 void ShopScene::Initialize() {
@@ -61,11 +70,11 @@ void ShopScene::Initialize() {
 	RefreshUnlockedPlayerTargets();
 	backgroundSprite_ = CreateColorSprite();
 	panelSprite_ = CreateColorSprite();
-	titleTextObject_ = CreateText("SHOP", 58.0f);
-	moneyTextObject_ = CreateText("", 30.0f);
-	for (auto& item : itemTextObjects_) item = CreateText("", 23.0f);
-	messageTextObject_ = CreateText("", 21.0f);
-	instructionTextObject_ = CreateText(
+	titleTextObject_ = SceneUiUtility::CreateTextObject("SHOP", 58.0f);
+	moneyTextObject_ = SceneUiUtility::CreateTextObject("", 30.0f);
+	for (auto& item : itemTextObjects_) item = SceneUiUtility::CreateTextObject("", 23.0f);
+	messageTextObject_ = SceneUiUtility::CreateTextObject("", 21.0f);
+	instructionTextObject_ = SceneUiUtility::CreateTextObject(
 	    "左右 / Pad左右: プレイヤー    上下 / Pad上下: 商品    Enter / Pad A: 購入    Q / Pad B: タイトルへ", 18.0f);
 	RefreshText();
 }
@@ -114,19 +123,18 @@ void ShopScene::RefreshText() {
 	    "所持金: " + std::to_string(sceneManager_->GetMoney()) + " G    対象: < " +
 	    (targetPlayerType.empty() ? "開放済みプレイヤーなし" : targetPlayerType) + " >");
 	for (size_t index = 0; index < itemTextObjects_.size(); ++index) {
-		// 前半4項目は選択キャラクター別、後半2項目はglobalキーから共通レベルを表示する。
-		const bool isGlobalUpgrade = index >= kFirstGlobalUpgradeIndex;
-		const int level = isGlobalUpgrade
-		    ? sceneManager_->GetGlobalShopUpgradeLevel(kUpgradeIds[index])
-		    : sceneManager_->GetShopUpgradeLevelForPlayer(targetPlayerType, kUpgradeIds[index]);
+		const ShopUpgradeDefinition& definition = kUpgradeDefinitions[index];
+		const int level = definition.isGlobal
+		    ? sceneManager_->GetGlobalShopUpgradeLevel(definition.id)
+		    : sceneManager_->GetShopUpgradeLevelForPlayer(targetPlayerType, definition.id);
 		std::ostringstream stream;
-		const int maxLevel = kUpgradeMaxLevels[index];
-		stream << (static_cast<int>(index) == selectedIndex_ ? ">  " : "   ") << kUpgradeNames[index];
-		if (index == 6) {
-			stream << (level >= maxLevel ? "    購入済み" : "    未購入    " + std::to_string(GetPrice(index, level)) + " G");
+		const int maxLevel = definition.maxLevel;
+		stream << (static_cast<int>(index) == selectedIndex_ ? ">  " : "   ") << GetUpgradeDisplayName(definition);
+		if (definition.effect == ShopUpgradeEffect::LevelUpReroll) {
+			stream << (level >= maxLevel ? "    購入済み" : "    未購入    " + std::to_string(GetPrice(definition, level)) + " G");
 		} else {
 			stream << "    Lv." << level << " / " << maxLevel;
-			if (level < maxLevel) stream << "    " << GetPrice(index, level) << " G";
+			if (level < maxLevel) stream << "    " << GetPrice(definition, level) << " G";
 			else stream << "    MAX";
 		}
 		TextComponent* text = itemTextObjects_[index]->GetComponent<TextComponent>();
@@ -139,10 +147,11 @@ void ShopScene::RefreshText() {
 
 void ShopScene::PurchaseSelectedUpgrade() {
 	if (!sceneManager_) return;
-	const char* upgradeId = kUpgradeIds[selectedIndex_];
+	const ShopUpgradeDefinition& definition = kUpgradeDefinitions[static_cast<size_t>(selectedIndex_)];
+	const char* upgradeId = definition.id;
 	const std::string targetPlayerType = GetTargetPlayerTypeName();
 	// 表示時と同じ分類で保存先を選び、別キャラクターの購入レベルとの混在を防ぐ。
-	const bool isGlobalUpgrade = static_cast<size_t>(selectedIndex_) >= kFirstGlobalUpgradeIndex;
+	const bool isGlobalUpgrade = definition.isGlobal;
 	// 表示状態が古い場合や外部から選択名を変更された場合も、支払い前に開放状態を再検証する。
 	if (!isGlobalUpgrade &&
 	    (targetPlayerType.empty() || !sceneManager_->IsPlayerTypeUnlocked(targetPlayerType))) {
@@ -153,13 +162,13 @@ void ShopScene::PurchaseSelectedUpgrade() {
 	const int level = isGlobalUpgrade
 	    ? sceneManager_->GetGlobalShopUpgradeLevel(upgradeId)
 	    : sceneManager_->GetShopUpgradeLevelForPlayer(targetPlayerType, upgradeId);
-	const int maxLevel = kUpgradeMaxLevels[selectedIndex_];
+	const int maxLevel = definition.maxLevel;
 	if (level >= maxLevel) {
 		message_ = "この強化は最大レベルです";
 		RefreshText();
 		return;
 	}
-	const int price = GetPrice(static_cast<size_t>(selectedIndex_), level);
+	const int price = GetPrice(definition, level);
 	// SpendMoney内で残高不足を判定し、支払いに成功した場合だけ能力値を変更する。
 	if (!sceneManager_->SpendMoney(price)) {
 		message_ = "お金が足りません";
@@ -173,11 +182,11 @@ void ShopScene::PurchaseSelectedUpgrade() {
 	} else {
 		// プレイヤー能力の保存先へ直接加算するため、次回のゲームプレイ開始時にも効果が残る。
 		PlayerStats stats = LoadPlayerStats(targetPlayerType);
-		switch (selectedIndex_) {
-		case 0: stats.baseHealth += 10.0f; break;
-		case 1: stats.attack += 5.0f; break;
-		case 2: stats.defense += 2.0f; break;
-		case 3: stats.baseSpeed += 0.01f; break;
+		switch (definition.effect) {
+		case ShopUpgradeEffect::BaseHealth: stats.baseHealth += definition.amount; break;
+		case ShopUpgradeEffect::AttackPercent: stats.attack += definition.amount; break;
+		case ShopUpgradeEffect::DefensePercent: stats.defense += definition.amount; break;
+		case ShopUpgradeEffect::BaseSpeed: stats.baseSpeed += definition.amount; break;
 		default: break;
 		}
 		SavePlayerStats(targetPlayerType, stats);
@@ -185,7 +194,7 @@ void ShopScene::PurchaseSelectedUpgrade() {
 		sceneManager_->SetShopUpgradeLevelForPlayer(targetPlayerType, upgradeId, level + 1);
 	}
 	// 次回起動時はこのレベルを読み戻すため、購入済み表示も終了前の状態から再開できる。
-	message_ = std::string(kUpgradeNames[selectedIndex_]) + " を購入しました";
+	message_ = GetUpgradeDisplayName(definition) + " を購入しました";
 	RefreshText();
 }
 

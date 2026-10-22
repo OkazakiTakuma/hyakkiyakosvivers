@@ -1,5 +1,5 @@
-#include "FlameWork.h"
-#include "Game.h"
+#include "core/FlameWork.h"
+#include "core/Game.h"
 #include <memory>
 
 /// <summary>

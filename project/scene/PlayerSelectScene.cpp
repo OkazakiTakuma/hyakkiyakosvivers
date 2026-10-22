@@ -1,6 +1,7 @@
 #include "PlayerSelectScene.h"
 
 #include "SceneManager.h"
+#include "helpers/SceneUiUtility.h"
 #include "repositories/PlayerStatusRepository.h"
 #include <model/ModelManager.h>
 
@@ -19,8 +20,7 @@ constexpr float kPi = 3.14159265f;
 constexpr float kPreviewBaseRotationY = 0.18f + kPi;
 constexpr Vector3 kPreviewBasePosition = {-2.15f, -1.25f, 0.45f};
 constexpr float kPreviewBaseScale = 1.20f;
-// タイトルへ戻る際、粒状の深度霧が先に十分増えてから前面の霧画像へつなぐ長さです。
-constexpr float kReturnToTitleFogTransitionSeconds = 1.65f;
+constexpr float kSelectionConfirmationDuration = 0.85f;
 
 float EaseOutCubic(float value) {
 	const float inverse = 1.0f - value;
@@ -31,35 +31,13 @@ float SmoothStep(float value) {
 	return value * value * (3.0f - 2.0f * value);
 }
 
-std::unique_ptr<Sprite> CreateColorSprite() {
-	// 白テクスチャへ描画時に色を乗算し、全パネルを同じ仕組みで描画する。
-	auto sprite = std::make_unique<Sprite>();
-	sprite->Initialize("Resources/human/white.png");
-	return sprite;
-}
-
 std::unique_ptr<GameObject> CreateTextObject(
 	const std::string& text, float fontSize, TextComponent::Anchor anchor = TextComponent::Anchor::Center) {
-	auto object = std::make_unique<GameObject>();
-	TextComponent* textComponent = object->AddComponent<TextComponent>();
-	textComponent->SetText(text);
-	textComponent->SetFontName(kUiFontName);
-	textComponent->SetFontSize(fontSize);
-	textComponent->SetAnchor(anchor);
-	return object;
+	return SceneUiUtility::CreateTextObject(text, fontSize, anchor, kUiFontName);
 }
 
-void DrawColorSprite(Sprite* sprite, float x, float y, float width, float height, const Vector4& color) {
-	EulerTransform transform = sprite->GetTransform();
-	transform.translate = {x, y, 0.0f};
-	transform.rotate.z = 0.0f;
-	sprite->SetAnchorPoint({0.0f, 0.0f});
-	sprite->SetTransform(transform);
-	sprite->SetSize({width, height});
-	sprite->SetColor(color);
-	sprite->Update();
-	sprite->Draw();
-}
+using SceneUiUtility::CreateColorSprite;
+using SceneUiUtility::DrawColorSprite;
 
 const PlayerAttackLevelStats* FindAttackLevel(const PlayerAttackStats& attack, const std::string& level) {
 	// 設定に指定レベルがない場合も、先頭レベルへ戻して詳細欄を空にしない。
@@ -82,6 +60,14 @@ std::string GetEntranceAnimationName(const std::string& playerTypeName) {
 	if (playerTypeName == "烏天狗") return "選択登場_烏天狗";
 	if (playerTypeName == "猫") return "選択登場_猫";
 	return "";
+}
+
+float GetEntranceAnimationDuration(const std::string& playerTypeName) {
+	// bin内の専用クリップと同じ長さにし、骨格と画面内移動を同時に決めポーズへ到達させる。
+	if (playerTypeName == "巫女") return 1.60f;
+	if (playerTypeName == "烏天狗") return 1.45f;
+	if (playerTypeName == "猫") return 1.75f;
+	return 1.20f;
 }
 }
 
@@ -110,6 +96,8 @@ void PlayerSelectScene::Initialize() {
 	previewCamera_->SetNearClip(0.1f);
 	previewCamera_->SetFarClip(100.0f);
 	CreateUi();
+	isSelectionConfirming_ = false;
+	selectionConfirmationElapsed_ = 0.0f;
 	RefreshSelectionPresentation();
 }
 
@@ -126,6 +114,7 @@ void PlayerSelectScene::CreateUi() {
 	weaponIconSprite_ = std::make_unique<Sprite>();
 	weaponIconSprite_->Initialize("Resources/circle.png");
 	weaponIconSprite_->SetAnchorPoint({0.5f, 0.5f});
+	confirmationFlashSprite_ = CreateColorSprite();
 
 	titleTextObject_ = CreateTextObject("キャラクター選択", 42.0f);
 	characterNameTextObject_ = CreateTextObject("", 40.0f);
@@ -205,19 +194,30 @@ void PlayerSelectScene::RebuildCharacterModel(const PlayerStats& stats) {
 	object3d->SetModel(stats.modelFilePath);
 	object3d->SetCamera(previewCamera_.get());
 	object3d->SetDrawSkeleton(false);
-	// 新規の専用クリップは一度だけ再生し、終端の決めポーズを維持する。
-	const std::string entranceAnimationName = GetEntranceAnimationName(stats.name);
-	if (stats.isAnimationModel && !entranceAnimationName.empty() && object3d->SetAnimation(entranceAnimationName, true)) {
+	// セレクト画面では歩行を使わず、新規の専用クリップだけを一度再生して決めポーズを維持する。
+	const std::string expectedEntranceAnimationName = GetEntranceAnimationName(stats.name);
+	std::string resolvedEntranceAnimationName;
+	if (stats.isAnimationModel) {
+		const std::vector<std::string>& animationNames = object3d->GetAnimationNames();
+		const auto expectedAnimation = std::find(animationNames.begin(), animationNames.end(), expectedEntranceAnimationName);
+		if (expectedAnimation != animationNames.end()) {
+			resolvedEntranceAnimationName = *expectedAnimation;
+		} else if (animationNames.size() >= 2) {
+			// Assimp側で名前が変換された場合も、追加した2番目のクリップを歩行の代わりに使用する。
+			resolvedEntranceAnimationName = animationNames[1];
+		}
+	}
+	if (!resolvedEntranceAnimationName.empty() && object3d->SetAnimation(resolvedEntranceAnimationName, true)) {
 		object3d->SetAnimationLooping(false);
 	} else {
-		object3d->SetAnimationPlaying(stats.isAnimationModel);
+		// 専用クリップを読み込めなかった場合も、既定の歩行へ戻さず初期姿勢で表示する。
+		object3d->ResetAnimationPoseToInitial();
 	}
 	object3d->SetDirectionalLight({1.0f, 0.92f, 0.80f, 1.0f}, {-0.35f, -0.75f, 0.55f}, 1.35f);
 	// プレビューでは衣装や肌の色を読み取りやすくし、環境マップ由来の鏡面反射をほぼ抑える。
 	object3d->SetPointLight({0.30f, 0.62f, 1.0f, 1.0f}, {-3.2f, 2.8f, -2.0f}, 0.75f, 9.0f, 1.6f);
 	object3d->SetEnvironmentMultiplier(0.02f);
 	UpdateCharacterEntranceAnimation();
-	characterModelObject_->Update();
 }
 
 void PlayerSelectScene::UpdateCharacterEntranceAnimation() {
@@ -227,8 +227,7 @@ void PlayerSelectScene::UpdateCharacterEntranceAnimation() {
 	transform.rotate = {0.0f, kPreviewBaseRotationY, 0.0f};
 	transform.scale = {kPreviewBaseScale, kPreviewBaseScale, kPreviewBaseScale};
 
-	float entranceDuration = 0.85f;
-	if (presentedPlayerTypeName_ == "猫") entranceDuration = 1.05f;
+	const float entranceDuration = GetEntranceAnimationDuration(presentedPlayerTypeName_);
 	const float normalizedTime = (std::min)(previewTime_ / entranceDuration, 1.0f);
 	const float remaining = 1.0f - normalizedTime;
 
@@ -294,6 +293,10 @@ std::string PlayerSelectScene::MakeWeaponDescription(const PlayerStats& stats) c
 
 void PlayerSelectScene::Update() {
 	if (playerTypeNames_.empty() || !sceneManager_) return;
+	if (isSelectionConfirming_) {
+		UpdateSelectionConfirmation();
+		return;
+	}
 	Input* input = Input::GetInstance();
 	const int playerCount = static_cast<int>(playerTypeNames_.size());
 	if (input->TriggerKey(DIK_A) || input->TriggerKey(DIK_LEFT) || input->TriggerGamepadLeft()) selectedPlayerIndex_ = (selectedPlayerIndex_ + playerCount - 1) % playerCount;
@@ -310,15 +313,62 @@ void PlayerSelectScene::Update() {
 	if (input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN) || input->TriggerGamepadButton(XINPUT_GAMEPAD_A)) {
 		const std::string& selectedPlayerType = playerTypeNames_[selectedPlayerIndex_];
 		if (sceneManager_->IsPlayerTypeUnlocked(selectedPlayerType)) {
-			sceneManager_->SetSelectedPlayerTypeName(selectedPlayerType);
-			sceneManager_->ChangeScene("STAGE_SELECT");
+			BeginSelectionConfirmation();
 		}
 		return;
 	}
 	if (input->TriggerKey(DIK_Q) || input->TriggerGamepadButton(XINPUT_GAMEPAD_B)) {
-		sceneManager_->ChangeScene(
-			"TITLE", SceneTransitionType::FadeWhite,
-			kReturnToTitleFogTransitionSeconds, kReturnToTitleFogTransitionSeconds);
+		sceneManager_->ChangeScene("STAGE_SELECT");
+	}
+}
+
+void PlayerSelectScene::BeginSelectionConfirmation() {
+	if (isSelectionConfirming_ || !sceneManager_ || selectedPlayerIndex_ < 0 ||
+		selectedPlayerIndex_ >= static_cast<int>(playerTypeNames_.size())) return;
+
+	isSelectionConfirming_ = true;
+	selectionConfirmationElapsed_ = 0.0f;
+	sceneManager_->SetSelectedPlayerTypeName(playerTypeNames_[selectedPlayerIndex_]);
+	if (characterModelObject_) {
+		selectionConfirmationBaseTransform_ = characterModelObject_->GetTransform();
+	}
+	instructionTextObject_->GetComponent<TextComponent>()->SetText("");
+}
+
+bool PlayerSelectScene::BeginDemoMikoConfirmation() {
+	if (isSelectionConfirming_ || !sceneManager_) {
+		return false;
+	}
+	const auto miko = std::find(playerTypeNames_.begin(), playerTypeNames_.end(), "巫女");
+	if (miko == playerTypeNames_.end() || !sceneManager_->IsPlayerTypeUnlocked("巫女")) {
+		return false;
+	}
+	selectedPlayerIndex_ = static_cast<int>(std::distance(playerTypeNames_.begin(), miko));
+	if (selectedPlayerIndex_ != presentedPlayerIndex_) {
+		RefreshSelectionPresentation();
+	}
+	BeginSelectionConfirmation();
+	return isSelectionConfirming_;
+}
+
+void PlayerSelectScene::UpdateSelectionConfirmation() {
+	selectionConfirmationElapsed_ += GameTime::GetDeltaTime();
+	const float progress = (std::clamp)(selectionConfirmationElapsed_ / kSelectionConfirmationDuration, 0.0f, 1.0f);
+	const float impact = std::sin(progress * kPi);
+
+	if (characterModelObject_) {
+		EulerTransform transform = selectionConfirmationBaseTransform_;
+		const float scale = 1.0f + impact * 0.13f;
+		transform.scale = scale * selectionConfirmationBaseTransform_.scale;
+		transform.translate.z -= EaseOutCubic(progress) * 0.42f;
+		transform.translate.y += impact * 0.10f;
+		transform.rotate.y += impact * 0.12f;
+		characterModelObject_->GetTransform() = transform;
+		characterModelObject_->Update();
+	}
+
+	if (selectionConfirmationElapsed_ >= kSelectionConfirmationDuration) {
+		sceneManager_->ChangeScene("GAMEPLAY");
 	}
 }
 
@@ -329,7 +379,7 @@ void PlayerSelectScene::Draw3D() {
 	if (dxCommon && dxCommon->GetRenderHeight() > 0) previewCamera_->SetAspectRatio(static_cast<float>(dxCommon->GetRenderWidth()) / static_cast<float>(dxCommon->GetRenderHeight()));
 	previewCamera_->Update();
 	if (Object3dComponent* object3d = characterModelObject_->GetComponent<Object3dComponent>()) object3d->SetCamera(previewCamera_.get());
-	characterModelObject_->Update();
+	// モデル更新はUpdateだけで行う。描画時にも更新すると骨格だけが倍速になり、フェード中にも進んでしまう。
 	characterModelObject_->Draw3D();
 }
 
@@ -365,7 +415,7 @@ void PlayerSelectScene::Draw2D() {
 	DrawColorSprite(weaponPanelSprite_.get(), rightX + innerMargin, weaponY, sectionWidth, weaponHeight, {0.12f, 0.075f, 0.035f, 0.96f});
 
 	// 武器欄の高さが小さい解像度では、枠内に収まるようアイコンも縮小する。
-	const float iconSize = (std::min)(96.0f, weaponHeight - 34.0f);
+	const float iconSize = (std::min)({96.0f, weaponHeight - 34.0f, sectionWidth * 0.24f});
 	const float iconX = rightX + innerMargin + 18.0f;
 	const float iconY = weaponY + (weaponHeight - iconSize) * 0.5f;
 	DrawColorSprite(weaponIconBackgroundSprite_.get(), iconX, iconY, iconSize, iconSize, {0.035f, 0.045f, 0.070f, 1.0f});
@@ -384,6 +434,14 @@ void PlayerSelectScene::Draw2D() {
 	weaponHeadingTextObject_->GetTransform().translate = {rightX + innerMargin + 18.0f, weaponY - 11.0f, 0.0f};
 	weaponNameTextObject_->GetTransform().translate = {iconX + iconSize + 20.0f, weaponY + 30.0f, 0.0f};
 	weaponTextObject_->GetTransform().translate = {iconX + iconSize + 20.0f, weaponY + 72.0f, 0.0f};
+	// 説明文は右端で自動改行し、縦にも収まらない場合は読みやすさを保てる範囲で縮小する。
+	const float weaponTextRight = rightX + innerMargin + sectionWidth - 18.0f;
+	const float weaponTextBottom = weaponY + weaponHeight - 14.0f;
+	weaponNameTextObject_->GetComponent<TextComponent>()->SetLayoutBounds(
+		(std::max)(1.0f, weaponTextRight - weaponNameTextObject_->GetTransform().translate.x), 34.0f);
+	weaponTextObject_->GetComponent<TextComponent>()->SetLayoutBounds(
+		(std::max)(1.0f, weaponTextRight - weaponTextObject_->GetTransform().translate.x),
+		(std::max)(1.0f, weaponTextBottom - weaponTextObject_->GetTransform().translate.y));
 	pageTextObject_->GetTransform().translate = {margin + leftWidth * 0.5f, bottom - 18.0f, 0.0f};
 	instructionTextObject_->GetTransform().translate = {width * 0.5f, height - 30.0f, 0.0f};
 	titleTextObject_->Draw2D();
@@ -396,6 +454,17 @@ void PlayerSelectScene::Draw2D() {
 	weaponTextObject_->Draw2D();
 	pageTextObject_->Draw2D();
 	instructionTextObject_->Draw2D();
+	if (isSelectionConfirming_) DrawSelectionConfirmation(width, height);
+}
+
+void PlayerSelectScene::DrawSelectionConfirmation(float width, float height) {
+	if (!confirmationFlashSprite_) return;
+	const float progress = (std::clamp)(selectionConfirmationElapsed_ / kSelectionConfirmationDuration, 0.0f, 1.0f);
+	const float flashOut = 1.0f - SmoothStep((std::min)(progress / 0.24f, 1.0f));
+
+	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
+	DrawColorSprite(confirmationFlashSprite_.get(), 0.0f, 0.0f, width, height,
+		{1.0f, 0.72f, 0.20f, flashOut * 0.30f});
 }
 
 void PlayerSelectScene::Finalize() {
@@ -409,6 +478,7 @@ void PlayerSelectScene::Finalize() {
 	weaponPanelSprite_.reset();
 	weaponIconBackgroundSprite_.reset();
 	weaponIconSprite_.reset();
+	confirmationFlashSprite_.reset();
 	titleTextObject_.reset();
 	characterNameTextObject_.reset();
 	characterStateTextObject_.reset();

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../BaseScene.h"
+#include "base_scene/BaseScene.h"
 #include "../../math/MathConstants.h"
 
 #include <cmath>

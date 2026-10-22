@@ -108,7 +108,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <ExternalWarningLevel>Level4</ExternalWarningLevel>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat>OldStyle</DebugInformationFormat>
       <SupportJustMyCode>false</SupportJustMyCode>
       <DisableSpecificWarnings>4865;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -136,6 +136,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <ExternalWarningLevel>Level4</ExternalWarningLevel>
+	  <DebugInformationFormat>OldStyle</DebugInformationFormat>
       <DisableSpecificWarnings>4865;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <GuardEHContMetadata>true</GuardEHContMetadata>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -166,6 +167,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <ExternalWarningLevel>Level4</ExternalWarningLevel>
+	  <DebugInformationFormat>OldStyle</DebugInformationFormat>
       <DisableSpecificWarnings>4865;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <GuardEHContMetadata>true</GuardEHContMetadata>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>

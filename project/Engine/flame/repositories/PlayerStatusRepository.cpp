@@ -222,7 +222,13 @@ std::vector<std::string> GetPlayerAttackLevels() {
 
 std::string NormalizePlayerAttackName(const std::string& attackName) {
 	// 旧設定で使われていた内部名を、新しい表示名へ読み替えてセーブ互換を保つ。
-	return attackName == "ArcHoming" ? "勾玉" : attackName;
+	if (attackName == "ArcHoming") {
+		return "勾玉";
+	}
+	if (attackName == "PoisonCloud") {
+		return "五行結界";
+	}
+	return attackName;
 }
 
 PlayerAttackLevelStats MakeDefaultPlayerAttackLevelStats(const std::string& level) {

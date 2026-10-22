@@ -1,15 +1,12 @@
-#include "Object3d.hlsli"
-
-struct TransformationMatrix
+struct GrassInstanceData
 {
-    float4x4 WVP;
-    float4x4 world;
-    float4x4 WorldInverseTranspose;
+    float3 position;
+    float scale;
+    float rotationY;
+    float3 padding;
 };
 
-// ★変更点1：ConstantBuffer から StructuredBuffer（構造化バッファの配列）に変更！
-// ピクセルシェーダーで t0(テクスチャ), t1(環境マップ) を使っているため、ここは t2 にします。
-StructuredBuffer<TransformationMatrix> gTransformationMatrices : register(t2);
+StructuredBuffer<GrassInstanceData> gInstances : register(t2);
 
 struct GrassParameter
 {
@@ -21,6 +18,21 @@ struct GrassParameter
 
 ConstantBuffer<GrassParameter> gGrass : register(b5);
 
+struct CameraData
+{
+    float4x4 viewProjection;
+    float3 worldPosition;
+    float environmentMultiplier;
+    float3 horizonColor;
+    float distanceFogDensity;
+    float heightFogDensity;
+    float aerialPerspectiveStrength;
+    int enableAerialPerspective;
+    float paddingAtmosphere;
+};
+
+ConstantBuffer<CameraData> gCamera : register(b3);
+
 struct VertexShaderInput
 {
     float4 position : POSITION;
@@ -30,12 +42,21 @@ struct VertexShaderInput
     uint instanceId : SV_InstanceID;
 };
 
-VertexShaderOutput main(VertexShaderInput input)
+struct GrassVertexShaderOutput
 {
-    VertexShaderOutput output;
+    float4 position : SV_POSITION;
+    float2 texcoord : TEXCOORD0;
+    float3 normal : NORMAL0;
+    float3 worldPosition : POSITION0;
+    float heightRate : TEXCOORD1;
+    float fogAmount : TEXCOORD2;
+};
+
+GrassVertexShaderOutput main(VertexShaderInput input)
+{
+    GrassVertexShaderOutput output;
     
-    // ★変更点3：自分のIDを使って、配列から自分専用の行列データを取り出す
-    TransformationMatrix mat = gTransformationMatrices[input.instanceId];
+    GrassInstanceData instance = gInstances[input.instanceId];
     
     float3 localPosition = input.position.xyz;
 
@@ -43,17 +64,40 @@ VertexShaderOutput main(VertexShaderInput input)
     float heightRate = saturate(localPosition.y / 0.75f);
 
     // 個体のワールド座標から位相をずらし、全ての草が同じ動きにならないようにする。
-    float phase = mat.world[3][0] * 0.35f + mat.world[3][2] * 0.21f;
+    float phase = instance.position.x * 0.35f + instance.position.z * 0.21f;
     float wind = sin(gGrass.time * gGrass.windFrequency + phase) * gGrass.windStrength;
     localPosition.x += wind * heightRate;
     localPosition.z += wind * 0.35f * heightRate;
 
-    float4 animatedPosition = float4(localPosition, 1.0f);
-    output.position = mul(animatedPosition, mat.WVP);
+    localPosition *= instance.scale;
+    const float rotationCos = cos(instance.rotationY);
+    const float rotationSin = sin(instance.rotationY);
+    const float3 rotatedPosition = float3(
+        localPosition.x * rotationCos + localPosition.z * rotationSin,
+        localPosition.y,
+        -localPosition.x * rotationSin + localPosition.z * rotationCos);
+    float4 worldPosition = float4(rotatedPosition + instance.position, 1.0f);
+    output.position = mul(worldPosition, gCamera.viewProjection);
     output.texcoord = input.texcoord;
-    
-    output.normal = normalize(mul(input.normal, (float3x3) mat.WorldInverseTranspose));
-    output.worldPosition = mul(animatedPosition, mat.world).xyz;
+
+    output.normal = normalize(float3(
+        input.normal.x * rotationCos + input.normal.z * rotationSin,
+        input.normal.y,
+        -input.normal.x * rotationSin + input.normal.z * rotationCos));
+    output.worldPosition = worldPosition.xyz;
+    output.heightRate = heightRate;
+
+    output.fogAmount = 0.0f;
+    if (gCamera.enableAerialPerspective != 0)
+    {
+        const float distanceFromCamera = length(worldPosition.xyz - gCamera.worldPosition);
+        const float distanceFog = 1.0f - exp(
+            -distanceFromCamera * max(gCamera.distanceFogDensity, 0.0f));
+        const float heightFog = exp(
+            -max(worldPosition.y, 0.0f) * max(gCamera.heightFogDensity, 0.0f));
+        output.fogAmount = saturate(
+            distanceFog * heightFog * max(gCamera.aerialPerspectiveStrength, 0.0f));
+    }
     
     return output;
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../flame/Component.h"
+#include "core/Component.h"
 #include "Vector.h"
 
 /// <summary>

@@ -1,6 +1,7 @@
 #include "ResultScene.h"
 
 #include "SceneManager.h"
+#include "helpers/SceneUiUtility.h"
 
 #include <algorithm>
 #include <cmath>
@@ -9,33 +10,9 @@
 #include <Xinput.h>
 
 namespace {
-/// <summary>単色背景・パネル用の白テクスチャスプライトを生成します。</summary>
-std::unique_ptr<Sprite> CreateColorSprite() {
-	auto sprite = std::make_unique<Sprite>();
-	sprite->Initialize("Resources/human/white.png");
-	return sprite;
-}
-
-/// <summary>中央揃えのリザルト用テキストオブジェクトを生成します。</summary>
-std::unique_ptr<GameObject> CreateTextObject(const std::string& text, float fontSize) {
-	auto object = std::make_unique<GameObject>();
-	TextComponent* textComponent = object->AddComponent<TextComponent>();
-	textComponent->SetText(text);
-	textComponent->SetFontSize(fontSize);
-	textComponent->SetAnchor(TextComponent::Anchor::Center);
-	return object;
-}
-
-/// <summary>白テクスチャへ位置・サイズ・色を設定して矩形として描画します。</summary>
-void DrawColorSprite(Sprite* sprite, float x, float y, float width, float height, const Vector4& color) {
-	EulerTransform transform = sprite->GetTransform();
-	transform.translate = {x, y, 0.0f};
-	sprite->SetTransform(transform);
-	sprite->SetSize({width, height});
-	sprite->SetColor(color);
-	sprite->Update();
-	sprite->Draw();
-}
+using SceneUiUtility::CreateColorSprite;
+using SceneUiUtility::CreateTextObject;
+using SceneUiUtility::DrawColorSprite;
 }
 
 /// <summary>

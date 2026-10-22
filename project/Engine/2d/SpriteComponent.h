@@ -1,5 +1,5 @@
 #pragma once
-#include "../flame/Component.h"
+#include "core/Component.h"
 #include "Sprite.h"
 #include "SpriteCommon.h"
 #include <memory>

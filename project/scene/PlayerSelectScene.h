@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BaseScene.h"
+#include "base_scene/BaseScene.h"
 
 /// <summary>左側の3Dモデルと右側の能力・初期武器情報からプレイヤーを選択します。</summary>
 class PlayerSelectScene : public BaseScene {
@@ -12,6 +12,8 @@ public:
 	void Finalize() override;
 	void SetSceneManager(SceneManager* manager) override { sceneManager_ = manager; }
 	bool IsParticleRenderingEnabled() const override { return false; }
+	/// <summary>巫女を選び、通常の決定操作と同じ確定演出をデモ進行から開始します。</summary>
+	bool BeginDemoMikoConfirmation();
 
 private:
 	/// <summary>左右2カラムのパネル、見出し、操作案内を生成します。</summary>
@@ -22,6 +24,12 @@ private:
 	void RebuildCharacterModel(const PlayerStats& stats);
 	/// <summary>キャラクターごとの登場モーションと、その後の待機回転を更新します。</summary>
 	void UpdateCharacterEntranceAnimation();
+	/// <summary>選択を確定し、入力を止めて決定演出を開始します。</summary>
+	void BeginSelectionConfirmation();
+	/// <summary>決定したキャラクターの強調動作とゲーム開始への遷移を更新します。</summary>
+	void UpdateSelectionConfirmation();
+	/// <summary>決定時のフラッシュを最前面へ描画します。</summary>
+	void DrawSelectionConfirmation(float width, float height);
 	/// <summary>右上の能力パネルへ表示する文字列を生成します。</summary>
 	std::string MakeStatusDescription(const PlayerStats& stats) const;
 	/// <summary>右下の初期武器パネルへ表示する文字列を生成します。</summary>
@@ -37,6 +45,10 @@ private:
 	int presentedPlayerIndex_ = -1;
 	/// <summary>プレビューモデルを緩やかに振るための経過時間です。</summary>
 	float previewTime_ = 0.0f;
+	/// <summary>決定演出中は選択移動と戻る入力を受け付けません。</summary>
+	bool isSelectionConfirming_ = false;
+	float selectionConfirmationElapsed_ = 0.0f;
+	EulerTransform selectionConfirmationBaseTransform_{};
 	/// <summary>登場モーションを選ぶため、現在表示しているプレイヤータイプ名を保持します。</summary>
 	std::string presentedPlayerTypeName_;
 	/// <summary>選択画面だけで使う3Dプレビュー用カメラです。</summary>
@@ -53,6 +65,7 @@ private:
 	std::unique_ptr<Sprite> weaponPanelSprite_;
 	std::unique_ptr<Sprite> weaponIconBackgroundSprite_;
 	std::unique_ptr<Sprite> weaponIconSprite_;
+	std::unique_ptr<Sprite> confirmationFlashSprite_;
 	// キャラクター名、能力、武器詳細、操作案内を描画する文字オブジェクトです。
 	std::unique_ptr<GameObject> titleTextObject_;
 	std::unique_ptr<GameObject> characterNameTextObject_;

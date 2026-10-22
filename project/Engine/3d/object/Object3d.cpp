@@ -28,25 +28,6 @@ Vector3 GetTranslateFromMatrix(const Matrix4x4& matrix)
 	return {matrix.m[3][0], matrix.m[3][1], matrix.m[3][2]};
 }
 
-Matrix4x4 MakePlanarShadowMatrix(const Vector3& lightDirection, float planeY)
-{
-	Vector3 direction = NormalizeReturnVector(lightDirection);
-	if (std::fabs(direction.y) < 0.001f) {
-		direction.y = direction.y < 0.0f ? -0.001f : 0.001f;
-	}
-
-	const float xFactor = direction.x / direction.y;
-	const float zFactor = direction.z / direction.y;
-	Matrix4x4 shadowMatrix = MakeIdentity4x4();
-	shadowMatrix.m[1][0] = -xFactor;
-	shadowMatrix.m[1][1] = 0.0f;
-	shadowMatrix.m[1][2] = -zFactor;
-	shadowMatrix.m[3][0] = xFactor * planeY;
-	shadowMatrix.m[3][1] = planeY;
-	shadowMatrix.m[3][2] = zFactor * planeY;
-	return shadowMatrix;
-}
-
 void DrawDebugWireSphere(const Vector3& center, float radius, const Vector4& color, bool ignoreDepth = false)
 {
 	constexpr uint32_t kSegmentCount = 8;
@@ -96,29 +77,7 @@ void Object3d::Initialize() {
 
 	environmentMultiplier = 0.0f;
 
-	CreateWVPResource();
-	CreateDirectionalLightResource();
-	CreateCameraResource();
-	CreatePointLightResource();
-	shadowWvpResource = dxCommon_->CreateBufferResource(sizeof(TransformationMatrix));
-	shadowWvpResource->Map(0, nullptr, reinterpret_cast<void**>(&shadowTransformationMatrix));
-	shadowTransformationMatrix->WVP = MakeIdentity4x4();
-	shadowTransformationMatrix->world = MakeIdentity4x4();
-	shadowTransformationMatrix->WorldInverseTranspose = MakeIdentity4x4();
-	shadowTransformationMatrix->lightWVP = MakeIdentity4x4();
-	shadowMapWvpResource_ = dxCommon_->CreateBufferResource(sizeof(TransformationMatrix));
-	shadowMapWvpResource_->Map(0, nullptr, reinterpret_cast<void**>(&shadowMapTransformationMatrix_));
-	*shadowMapTransformationMatrix_ = *shadowTransformationMatrix;
-	shadowMaterialResource = dxCommon_->CreateBufferResource(sizeof(MaterialData));
-	shadowMaterialResource->Map(0, nullptr, reinterpret_cast<void**>(&shadowMaterialData));
-	shadowMaterialData->color = {0.0f, 0.0f, 0.0f, shadowAlpha_};
-	shadowMaterialData->enableLighting = -1;
-	shadowMaterialData->uvTransform = MakeIdentity4x4();
-	shadowMaterialData->shininess = 1.0f;
-	shadowMaterialData->emissiveColor = {0.0f, 0.0f, 0.0f};
-	shadowMaterialData->emissiveIntensity = 0.0f;
-	materialOverrideResource_ = dxCommon_->CreateBufferResource(sizeof(MaterialData));
-	materialOverrideResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialOverrideData_));
+	CreateCombinedBufferResource();
 	materialOverrideData_->color = {1.0f, 1.0f, 1.0f, 1.0f};
 	materialOverrideData_->enableLighting = 1;
 	materialOverrideData_->uvTransform = MakeIdentity4x4();
@@ -146,21 +105,24 @@ void Object3d::SetEnvironmentMap(const std::string& textureFilePath) {
 /// <summary>
 /// WVPResource を作成し、利用できる状態にします。
 /// </summary>
-void Object3d::CreateWVPResource() {
-	wvpResorceModel = dxCommon_->CreateBufferResource(sizeof(TransformationMatrix));
-	wvpResorceModel->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrix));
+void Object3d::CreateCombinedBufferResource() {
+	combinedBufferResource_ = dxCommon_->CreateBufferResource(kCombinedBufferSize);
+	combinedBufferResource_->Map(0, nullptr, reinterpret_cast<void**>(&combinedBufferData_));
+	transformationMatrix = reinterpret_cast<TransformationMatrix*>(combinedBufferData_ + kWvpOffset);
+	directionallightData = reinterpret_cast<DirectionalLight*>(combinedBufferData_ + kLightOffset);
+	cameraData = reinterpret_cast<CameraForGPU*>(combinedBufferData_ + kCameraOffset);
+	pointLightData = reinterpret_cast<PointLight*>(combinedBufferData_ + kPointLightOffset);
+	materialOverrideData_ = reinterpret_cast<MaterialData*>(combinedBufferData_ + kMaterialOffset);
+	shadowMapTransformationMatrix_ = reinterpret_cast<TransformationMatrix*>(combinedBufferData_ + kShadowMapWvpOffset);
+	auto* identitySkinning = reinterpret_cast<Matrix4x4*>(combinedBufferData_ + kIdentitySkinningOffset);
+	*identitySkinning = MakeIdentity4x4();
+
 	transformationMatrix->WVP = MakeIdentity4x4();
 	transformationMatrix->world = MakeIdentity4x4();
 	transformationMatrix->WorldInverseTranspose = MakeIdentity4x4();
 	transformationMatrix->lightWVP = MakeIdentity4x4();
-}
+	*shadowMapTransformationMatrix_ = *transformationMatrix;
 
-/// <summary>
-/// CameraResource を作成し、利用できる状態にします。
-/// </summary>
-void Object3d::CreateCameraResource() {
-	cameraResource = dxCommon_->CreateBufferResource(sizeof(CameraForGPU));
-	cameraResource->Map(0, nullptr, reinterpret_cast<void**>(&cameraData));
 	cameraData->worldPosition = {0.0f, 0.0f, 0.0f};
 	cameraData->environmentMultiplier = environmentMultiplier;
 	cameraData->horizonColor = {0.0f, 0.0f, 0.0f};
@@ -169,6 +131,20 @@ void Object3d::CreateCameraResource() {
 	cameraData->aerialPerspectiveStrength = 0.0f;
 	cameraData->enableAerialPerspective = 0;
 	cameraData->paddingAtmosphere = 0.0f;
+
+	directionallightData->color = {1.0f, 1.0f, 1.0f, 1.0f};
+	directionallightData->direction = NormalizeReturnVector(Vector3(0.0f, -1.0f, 0.0f));
+	directionallightData->intensity = 1.0f;
+
+	pointLightData->color = {1.0f, 1.0f, 1.0f, 1.0f};
+	pointLightData->position = {0.0f, 0.0f, 0.0f};
+	pointLightData->intensity = 1.0f;
+	pointLightData->radius = 10.0f;
+	pointLightData->decay = 1.0f;
+}
+
+D3D12_GPU_VIRTUAL_ADDRESS Object3d::GetCombinedGpuAddress(size_t offset) const {
+	return combinedBufferResource_ ? combinedBufferResource_->GetGPUVirtualAddress() + offset : 0;
 }
 
 /// <summary>
@@ -199,15 +175,13 @@ void Object3d::CreateSkinningPaletteResource(uint32_t paletteCount) {
 }
 
 void Object3d::UpdateSkinningPaletteResource() {
-	if (!skinningPaletteData) {
-		CreateSkinningPaletteResource(1);
-	}
-	if (!skinningPaletteData || skinningPaletteCapacity_ == 0) {
+	if (!model || !model->HasSkinCluster()) {
 		return;
 	}
-
-	if (!model || !model->HasSkinCluster()) {
-		skinningPaletteData[0] = MakeIdentity4x4();
+	if (!skinningPaletteData) {
+		CreateSkinningPaletteResource(model->GetSkinningPaletteSize());
+	}
+	if (!skinningPaletteData || skinningPaletteCapacity_ == 0) {
 		return;
 	}
 
@@ -225,30 +199,6 @@ void Object3d::UpdateSkinningPaletteResource() {
 		return;
 	}
 	std::copy_n(skinningPalette_.begin(), copyCount, skinningPaletteData);
-}
-
-/// <summary>
-/// DirectionalLightResource を作成し、利用できる状態にします。
-/// </summary>
-void Object3d::CreateDirectionalLightResource() {
-	lightResource = dxCommon_->CreateBufferResource(sizeof(DirectionalLight));
-	lightResource->Map(0, nullptr, reinterpret_cast<void**>(&directionallightData));
-	directionallightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	directionallightData->direction = NormalizeReturnVector(Vector3(0.0f, -1.0f, 0.0f));
-	directionallightData->intensity = 1.0f;
-}
-
-/// <summary>
-/// PointLightResource を作成し、利用できる状態にします。
-/// </summary>
-void Object3d::CreatePointLightResource() {
-	pointLightResource = dxCommon_->CreateBufferResource(sizeof(PointLight));
-	pointLightResource->Map(0, nullptr, reinterpret_cast<void**>(&pointLightData));
-	pointLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	pointLightData->position = { 0.0f, 0.0f, 0.0f };
-	pointLightData->intensity = 1.0f;
-	pointLightData->radius = 10.0f;
-	pointLightData->decay = 1.0f;
 }
 
 /// <summary>
@@ -401,23 +351,11 @@ void Object3d::Update() {
 		transformationMatrix->WVP = wvpMatrix;
 		transformationMatrix->world = worldMatrix;
 		transformationMatrix->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
-		if (shadowTransformationMatrix && directionallightData) {
-			const Matrix4x4 shadowWorldMatrix = Multiply(worldMatrix, MakePlanarShadowMatrix(directionallightData->direction, shadowPlaneY_));
-			shadowTransformationMatrix->WVP = Multiply(shadowWorldMatrix, camera->GetViewProjectionMatrix());
-			shadowTransformationMatrix->world = shadowWorldMatrix;
-			shadowTransformationMatrix->WorldInverseTranspose = MakeIdentity4x4();
-		}
 	}
 	else {
 		transformationMatrix->WVP = worldMatrix;
 		transformationMatrix->world = worldMatrix;
 		transformationMatrix->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
-		if (shadowTransformationMatrix && directionallightData) {
-			const Matrix4x4 shadowWorldMatrix = Multiply(worldMatrix, MakePlanarShadowMatrix(directionallightData->direction, shadowPlaneY_));
-			shadowTransformationMatrix->WVP = shadowWorldMatrix;
-			shadowTransformationMatrix->world = shadowWorldMatrix;
-			shadowTransformationMatrix->WorldInverseTranspose = MakeIdentity4x4();
-		}
 	}
 
 
@@ -541,7 +479,7 @@ void Object3d::ResetAnimationPoseToInitial() {
 /// 現在の状態をもとに描画処理を行います。
 /// </summary>
 void Object3d::Draw() {
-	if (!dxCommon_ || !wvpResorceModel || !lightResource || !cameraResource || !pointLightResource) return;
+	if (!dxCommon_ || !combinedBufferResource_) return;
 
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList = dxCommon_->GetCommandList();
 	SrvManager::GetInstance()->PreDraw();
@@ -551,14 +489,14 @@ void Object3d::Draw() {
 	// isPointLight をシェーダーへ渡し、無効なオブジェクトでは局所光の計算を省略する。
 	pointLightData->enabled = isPointLightSet ? 1.0f : 0.0f;
 
-	commandList->SetGraphicsRootConstantBufferView(1, wvpResorceModel->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootConstantBufferView(2, lightResource->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootConstantBufferView(5, pointLightResource->GetGPUVirtualAddress());
-	if (!skinningPaletteResource) {
-		CreateSkinningPaletteResource(1);
-	}
-	commandList->SetGraphicsRootShaderResourceView(7, skinningPaletteResource->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(1, GetCombinedGpuAddress(kWvpOffset));
+	commandList->SetGraphicsRootConstantBufferView(2, GetCombinedGpuAddress(kLightOffset));
+	commandList->SetGraphicsRootConstantBufferView(4, GetCombinedGpuAddress(kCameraOffset));
+	commandList->SetGraphicsRootConstantBufferView(5, GetCombinedGpuAddress(kPointLightOffset));
+	const D3D12_GPU_VIRTUAL_ADDRESS skinningAddress = skinningPaletteResource
+		? skinningPaletteResource->GetGPUVirtualAddress()
+		: GetCombinedGpuAddress(kIdentitySkinningOffset);
+	commandList->SetGraphicsRootShaderResourceView(7, skinningAddress);
 	if (envMapTexturePath.empty()) {
 		envMapTexturePath = "Resources/rostock_laage_airport_4k.dds";
 	}
@@ -567,7 +505,7 @@ void Object3d::Draw() {
 	commandList->SetGraphicsRootDescriptorTable(6, envMapHandle);
 
 	if (model) {
-		model->Draw(materialOverrideResource_.Get(), modelTextureOverridePath_);
+		model->Draw(GetCombinedGpuAddress(kMaterialOffset), modelTextureOverridePath_);
 		DrawDebugSkeleton();
 	}
 	else if (cylinderIndexCount > 0) {
@@ -588,7 +526,7 @@ void Object3d::Draw() {
 	common->SetShadowReceiverDraw();
 	common->BindShadowMap();
 	if (model) {
-		model->Draw(materialOverrideResource_.Get(), modelTextureOverridePath_);
+		model->Draw(GetCombinedGpuAddress(kMaterialOffset), modelTextureOverridePath_);
 	} else if (cylinderIndexCount > 0 && isTextureSetCylinder) {
 		commandList->SetGraphicsRootConstantBufferView(0, materialResourceCylinder->GetGPUVirtualAddress());
 		commandList->SetGraphicsRootDescriptorTable(3, textureHandleCylinder);
@@ -600,7 +538,7 @@ void Object3d::Draw() {
 }
 
 void Object3d::DrawShadowMap() {
-	if (!dxCommon_ || !isShadowEnabled_ || !shadowMapWvpResource_ || !transformationMatrix) return;
+	if (!dxCommon_ || !isShadowEnabled_ || !combinedBufferResource_ || !transformationMatrix) return;
 	auto commandList = dxCommon_->GetCommandList();
 	SrvManager::GetInstance()->PreDraw();
 	Object3dCommon* common = Object3dCommon::GetInstance();
@@ -611,11 +549,13 @@ void Object3d::DrawShadowMap() {
 	shadowMapTransformationMatrix_->world = transformationMatrix->world;
 	shadowMapTransformationMatrix_->WorldInverseTranspose = transformationMatrix->WorldInverseTranspose;
 	shadowMapTransformationMatrix_->lightWVP = shadowMapTransformationMatrix_->WVP;
-	commandList->SetGraphicsRootConstantBufferView(1, shadowMapWvpResource_->GetGPUVirtualAddress());
-	if (!skinningPaletteResource) CreateSkinningPaletteResource(1);
-	commandList->SetGraphicsRootShaderResourceView(7, skinningPaletteResource->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(1, GetCombinedGpuAddress(kShadowMapWvpOffset));
+	const D3D12_GPU_VIRTUAL_ADDRESS skinningAddress = skinningPaletteResource
+		? skinningPaletteResource->GetGPUVirtualAddress()
+		: GetCombinedGpuAddress(kIdentitySkinningOffset);
+	commandList->SetGraphicsRootShaderResourceView(7, skinningAddress);
 	if (model) {
-		model->Draw(materialOverrideResource_.Get(), modelTextureOverridePath_);
+		model->Draw(GetCombinedGpuAddress(kMaterialOffset), modelTextureOverridePath_);
 	} else if (cylinderIndexCount > 0 && isTextureSetCylinder) {
 		commandList->SetGraphicsRootConstantBufferView(0, materialResourceCylinder->GetGPUVirtualAddress());
 		commandList->SetGraphicsRootDescriptorTable(3, textureHandleCylinder);
@@ -675,10 +615,15 @@ void Object3d::SetModel(Model* newModel) {
 		skeleton = SkeletonAnimationUtility::CreateSkeleton(model->GetRootNode());
 		hasSkeleton = !skeleton.joints.empty();
 		SkeletonAnimationUtility::UpdateMatrices(skeleton);
-		CreateSkinningPaletteResource(model->GetSkinningPaletteSize());
+		if (model->HasSkinCluster()) {
+			CreateSkinningPaletteResource(model->GetSkinningPaletteSize());
+		} else if (skinningPaletteResource) {
+			if (skinningPaletteData) skinningPaletteResource->Unmap(0, nullptr);
+			skinningPaletteResource.Reset();
+			skinningPaletteData = nullptr;
+			skinningPaletteCapacity_ = 0;
+		}
 		UpdateSkinningPaletteResource();
-	} else {
-		CreateSkinningPaletteResource(1);
 	}
 }
 
@@ -692,36 +637,23 @@ void Object3d::SetModel(const std::string& filePath) {
 /// 破棄時に必要な解放処理を行います。
 /// </summary>
 Object3d::~Object3d() {
-	if (wvpResorceModel) wvpResorceModel->Unmap(0, nullptr);
-	if (shadowWvpResource) shadowWvpResource->Unmap(0, nullptr);
-	if (shadowMapWvpResource_) shadowMapWvpResource_->Unmap(0, nullptr);
-	if (shadowMaterialResource) shadowMaterialResource->Unmap(0, nullptr);
-	if (materialOverrideResource_) materialOverrideResource_->Unmap(0, nullptr);
-	if (lightResource) lightResource->Unmap(0, nullptr);
+	if (combinedBufferResource_) combinedBufferResource_->Unmap(0, nullptr);
 	if (materialResourceCylinder) materialResourceCylinder->Unmap(0, nullptr);
 	if (skinningPaletteResource) skinningPaletteResource->Unmap(0, nullptr);
 
-	wvpResorceModel.Reset();
-	shadowWvpResource.Reset();
-	shadowMapWvpResource_.Reset();
-	shadowMaterialResource.Reset();
-	materialOverrideResource_.Reset();
-	lightResource.Reset();
-	cameraResource.Reset();
-	pointLightResource.Reset();
+	combinedBufferResource_.Reset();
 	vertexResourceCylinder.Reset();
 	indexResourceCylinder.Reset();
 	materialResourceCylinder.Reset();
 	skinningPaletteResource.Reset();
 
 	transformationMatrix = nullptr;
-	shadowTransformationMatrix = nullptr;
 	shadowMapTransformationMatrix_ = nullptr;
-	shadowMaterialData = nullptr;
 	materialOverrideData_ = nullptr;
 	cameraData = nullptr;
 	directionallightData = nullptr;
 	pointLightData = nullptr;
+	combinedBufferData_ = nullptr;
 	materialDataCylinder = nullptr;
 	skinningPaletteData = nullptr;
 	camera = nullptr;

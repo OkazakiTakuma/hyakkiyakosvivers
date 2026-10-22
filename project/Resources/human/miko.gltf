@@ -555,6 +555,77 @@
         "generatedBy": "generate_player_entrance_animations.js"
       }
     }
+,
+    {
+      "name": "ゲーム開始_巫女",
+      "samplers": [
+        {
+          "input": 47,
+          "interpolation": "LINEAR",
+          "output": 48
+        },
+        {
+          "input": 47,
+          "interpolation": "LINEAR",
+          "output": 49
+        },
+        {
+          "input": 47,
+          "interpolation": "LINEAR",
+          "output": 50
+        },
+        {
+          "input": 47,
+          "interpolation": "LINEAR",
+          "output": 51
+        },
+        {
+          "input": 47,
+          "interpolation": "LINEAR",
+          "output": 52
+        }
+      ],
+      "channels": [
+        {
+          "sampler": 0,
+          "target": {
+            "node": 3,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 1,
+          "target": {
+            "node": 0,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 2,
+          "target": {
+            "node": 1,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 3,
+          "target": {
+            "node": 2,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 4,
+          "target": {
+            "node": 6,
+            "path": "rotation"
+          }
+        }
+      ],
+      "extras": {
+        "generatedBy": "generate_player_entrance_animations.js"
+      }
+    }
   ],
   "materials": [
     {
@@ -968,7 +1039,7 @@
         0
       ],
       "max": [
-        0.85
+        1.6
       ]
     },
     {
@@ -1002,6 +1073,55 @@
     {
       "name": "選択登場_巫女_tail_回転",
       "bufferView": 46,
+      "componentType": 5126,
+      "count": 5,
+      "type": "VEC4"
+    }
+,
+    {
+      "name": "ゲーム開始_巫女_時間",
+      "bufferView": 47,
+      "componentType": 5126,
+      "count": 5,
+      "type": "SCALAR",
+      "min": [
+        0
+      ],
+      "max": [
+        1.35
+      ]
+    },
+    {
+      "name": "ゲーム開始_巫女_spine_回転",
+      "bufferView": 48,
+      "componentType": 5126,
+      "count": 5,
+      "type": "VEC4"
+    },
+    {
+      "name": "ゲーム開始_巫女_head_回転",
+      "bufferView": 49,
+      "componentType": 5126,
+      "count": 5,
+      "type": "VEC4"
+    },
+    {
+      "name": "ゲーム開始_巫女_arm.L_回転",
+      "bufferView": 50,
+      "componentType": 5126,
+      "count": 5,
+      "type": "VEC4"
+    },
+    {
+      "name": "ゲーム開始_巫女_arm.R_回転",
+      "bufferView": 51,
+      "componentType": 5126,
+      "count": 5,
+      "type": "VEC4"
+    },
+    {
+      "name": "ゲーム開始_巫女_tail_回転",
+      "bufferView": 52,
       "componentType": 5126,
       "count": 5,
       "type": "VEC4"
@@ -1262,6 +1382,37 @@
       "byteOffset": 340,
       "byteLength": 80
     }
+,
+    {
+      "buffer": 2,
+      "byteOffset": 0,
+      "byteLength": 20
+    },
+    {
+      "buffer": 2,
+      "byteOffset": 20,
+      "byteLength": 80
+    },
+    {
+      "buffer": 2,
+      "byteOffset": 100,
+      "byteLength": 80
+    },
+    {
+      "buffer": 2,
+      "byteOffset": 180,
+      "byteLength": 80
+    },
+    {
+      "buffer": 2,
+      "byteOffset": 260,
+      "byteLength": 80
+    },
+    {
+      "buffer": 2,
+      "byteOffset": 340,
+      "byteLength": 80
+    }
   ],
   "samplers": [
     {
@@ -1282,6 +1433,11 @@
     {
       "byteLength": 420,
       "uri": "miko_entrance.bin"
+    }
+,
+    {
+      "byteLength": 420,
+      "uri": "miko_game_start.bin"
     }
   ]
 }

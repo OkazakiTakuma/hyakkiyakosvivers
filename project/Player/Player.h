@@ -1,5 +1,5 @@
 #pragma once
-#include "../Engine/flame/Component.h"
+#include "core/Component.h"
 #include "Vector.h"
 #include <array>
 #include <cmath>

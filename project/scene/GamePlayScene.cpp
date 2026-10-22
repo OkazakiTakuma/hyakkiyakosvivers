@@ -1,13 +1,41 @@
 #include "GamePlayScene.h"
 #include "SceneManager.h"
+#include "helpers/SceneUiUtility.h"
 #include <cstring>
 #include <model/ModelManager.h>
-#include "instancing/InstancingModelCommon.h"
 #include "GameTime.h"
+#include "PostEffect.h"
 #include <Xinput.h>
+#include <algorithm>
 #include <cmath>
 
 namespace {
+constexpr const char* kStartFogTexturePath = "Resources/Texture/fog_transition.png";
+constexpr const char* kStartMessageTexturePath = "Resources/UI/game_start_hajime.png";
+constexpr float kStartPresentationDuration = 1.75f;
+constexpr float kDefeatPresentationDuration = 2.75f;
+
+float Saturate(float value) {
+	return (std::clamp)(value, 0.0f, 1.0f);
+}
+
+float SmoothStep01(float value) {
+	value = Saturate(value);
+	return value * value * (3.0f - 2.0f * value);
+}
+
+float EaseOutCubic(float value) {
+	const float inverse = 1.0f - Saturate(value);
+	return 1.0f - inverse * inverse * inverse;
+}
+
+const char* GetGameStartAnimationName(const std::string& playerType) {
+	if (playerType == "巫女") return "ゲーム開始_巫女";
+	if (playerType == "烏天狗") return "ゲーム開始_烏天狗";
+	if (playerType == "猫") return "ゲーム開始_猫";
+	return "";
+}
+
 #ifdef USE_IMGUI
 ImVec2 GetPrimaryWorkPos() {
 	const ImGuiPlatformIO& platformIO = ImGui::GetPlatformIO();
@@ -112,30 +140,9 @@ bool BeginEditorPanel(const char* name, const ImVec2& pos, const ImVec2& size) {
 }
 #endif
 
-std::unique_ptr<Sprite> CreatePauseColorSprite() {
-	auto sprite = std::make_unique<Sprite>();
-	sprite->Initialize("Resources/human/white.png");
-	return sprite;
-}
-
-std::unique_ptr<GameObject> CreatePauseTextObject(const std::string& text, float fontSize) {
-	auto object = std::make_unique<GameObject>();
-	TextComponent* textComponent = object->AddComponent<TextComponent>();
-	textComponent->SetText(text);
-	textComponent->SetFontSize(fontSize);
-	textComponent->SetAnchor(TextComponent::Anchor::Center);
-	return object;
-}
-
-void DrawPauseColorSprite(Sprite* sprite, float x, float y, float width, float height, const Vector4& color) {
-	EulerTransform transform = sprite->GetTransform();
-	transform.translate = {x, y, 0.0f};
-	sprite->SetTransform(transform);
-	sprite->SetSize({width, height});
-	sprite->SetColor(color);
-	sprite->Update();
-	sprite->Draw();
-}
+using SceneUiUtility::CreateColorSprite;
+using SceneUiUtility::CreateTextObject;
+using SceneUiUtility::DrawColorSprite;
 }
 
 /// <summary>
@@ -143,7 +150,34 @@ void DrawPauseColorSprite(Sprite* sprite, float x, float y, float width, float h
 /// </summary>
 void GamePlayScene::Initialize() {
 	LoadSceneModels();
+	atmosphereSky_ = std::make_unique<AtmosphereSky>();
+	atmosphereSky_->Initialize();
 	InitializePauseMenu();
+	TextureManager::GetInstance()->LoadTexture(kStartFogTexturePath);
+	for (auto& fogSprite : startFogSprites_) {
+		fogSprite = std::make_unique<Sprite>();
+		fogSprite->Initialize(kStartFogTexturePath);
+		fogSprite->SetAnchorPoint({0.0f, 0.0f});
+	}
+	startWhiteSprite_ = CreateColorSprite();
+	TextureManager::GetInstance()->LoadTexture(kStartMessageTexturePath);
+	startMessageSprite_ = std::make_unique<Sprite>();
+	startMessageSprite_->Initialize(kStartMessageTexturePath);
+	startMessageSprite_->SetAnchorPoint({0.5f, 0.5f});
+	startMessageSprite_->SetColor({1.0f, 1.0f, 1.0f, 0.0f});
+	startPresentationInitialized_ = false;
+	// SceneManagerの遷移中はゲームプレイ側のUpdateが止まるため、描画だけ先に白で覆って
+	// 開始演出が初回更新される前のステージを露出させない。
+	startPresentationActive_ = true;
+	startPresentationElapsed_ = 0.0f;
+	startFogAlpha_ = 1.0f;
+	startWhiteAlpha_ = 1.0f;
+	startPresentationPlayer_ = nullptr;
+	defeatPresentationActive_ = false;
+	defeatTransitionRequested_ = false;
+	defeatPresentationElapsed_ = 0.0f;
+	defeatPresentationPlayer_ = nullptr;
+	defeatMessageTextObject_ = CreateTextObject("力尽きた……", 48.0f);
 
 	std::vector<std::string> allTextures = {
 			"Resources/circle.png",
@@ -197,8 +231,12 @@ void GamePlayScene::LoadSceneModels() {
 		constexpr int kGrassSide = 537;
 		constexpr int kGrassInstanceCount = kGrassSide * kGrassSide;
 		constexpr float kSpacing = 0.1427f;
-		instancingModel_ = std::make_unique<InstancingModel>();
+		instancingModel_ = std::make_unique<GrassInstancingModel>();
 		instancingModel_->Initialize(grassModel, kGrassInstanceCount);
+		// 元の草原一辺を1周期とし、カメラの周囲だけをワールド座標と無関係に繰り返す。
+		// 半周期（約38.3）を描画距離（35）より大きく保ち、折り返しを視界外で行う。
+		const float grassLoopPeriod = kGrassSide * kSpacing;
+		instancingModel_->SetLoopPeriod(grassLoopPeriod, grassLoopPeriod);
 
 		const float offset = (kGrassSide - 1) * kSpacing * 0.5f;
 		for (int z = 0; z < kGrassSide; ++z) {
@@ -225,19 +263,34 @@ void GamePlayScene::LoadSceneModels() {
 /// 毎フレームの状態更新を行います。
 /// </summary>
 void GamePlayScene::Update() {
-	// クリアと死亡のどちらでも、シーン破棄前に最終戦績を確定してリザルトへ渡す。
-	if (IsStageCleared() || IsPlayerDefeated()) {
-		// 終了処理の多重実行を避けるため、結果を確定するフレームで入力モードも終了へ移す。
+	// 配置JSONはInitialize後に読み込まれるため、最初の更新でプレイヤーを捕捉して開始演出へ入る。
+	if (!startPresentationInitialized_) {
+		BeginStartPresentation();
+	}
+	ApplyStageOneEveningLight();
+	if (startPresentationActive_) {
+		UpdateStartPresentation();
+		ImGuiUpdate();
+		return;
+	}
+	if (defeatPresentationActive_) {
+		UpdateDefeatPresentation();
+		ImGuiUpdate();
+		return;
+	}
+	// クリア時は従来どおり即座に戦績を確定する。死亡時だけ倒れ込み演出を挟む。
+	if (IsStageCleared()) {
 		SetGameplayMode(GameplayMode::Finished);
 		const StageResultData resultData = GetStageResultData();
-		if (resultData.stageCleared) {
-			// クリア時だけ履歴と新規開放を記録する。死亡終了はクリア条件を満たさない。
-			sceneManager->RecordGameplayStageClear(sceneManager->GetSelectedGameplayStageId());
-		}
+		sceneManager->RecordGameplayStageClear(sceneManager->GetSelectedGameplayStageId());
 		// Gは取得時点で所持金へ保存済みなので、ここではリザルト表示用の戦績だけを渡す。
 		// 終了時にAddMoneyを呼ばないことで、取得時と終了時の二重加算を防止する。
 		sceneManager->SetStageResultData(resultData);
 		sceneManager->ChangeScene("RESULT");
+		return;
+	}
+	if (IsPlayerDefeated()) {
+		BeginDefeatPresentation();
 		return;
 	}
 	if (IsLevelUpSelectionActive()) {
@@ -305,18 +358,228 @@ void GamePlayScene::Update() {
 	ImGuiUpdate();
 }
 
+void GamePlayScene::BeginDefeatPresentation() {
+	defeatPresentationActive_ = true;
+	defeatTransitionRequested_ = false;
+	defeatPresentationElapsed_ = 0.0f;
+	defeatPresentationPlayer_ = nullptr;
+	SetGameplayMode(GameplayMode::Finished);
+
+	for (GameObject* object : GetMutableSceneObjects()) {
+		if (!object || !object->GetComponent<Player>()) continue;
+		defeatPresentationPlayer_ = object;
+		defeatPresentationBaseTransform_ = object->GetTransform();
+		// 毎回同じ側へ倒れる単調さを避けつつ、再生中は方向を固定する。
+		defeatFallDirection_ = std::sin(
+			defeatPresentationBaseTransform_.translate.x * 2.17f +
+			defeatPresentationBaseTransform_.translate.z * 1.31f) >= 0.0f ? 1.0f : -1.0f;
+		if (Object3dComponent* object3d = object->GetComponent<Object3dComponent>()) {
+			object3d->SetAnimationPlaying(false);
+		}
+		break;
+	}
+}
+
+void GamePlayScene::UpdateDefeatPresentation() {
+	defeatPresentationElapsed_ += GameTime::GetUnscaledDeltaTime();
+	// 倒れ始めに合わせて遠景から霧を押し込み、最後は足元まで濃霧で満たす。
+	const float fogProgress = SmoothStep01(Saturate((defeatPresentationElapsed_ - 0.42f) / 1.75f));
+	PostEffect::GetInstance()->SetFogSettings(
+		fogProgress > 0.002f,
+		{0.30f, 0.34f, 0.40f, 0.42f + fogProgress * 0.50f},
+		0.24f + fogProgress * 1.76f,
+		0.62f,
+		5.6f,
+		0.48f + fogProgress * 0.42f,
+		0.28f + fogProgress * 0.72f,
+		0.036f,
+		(1.0f - fogProgress) * 9.0f,
+		6.0f + (1.0f - fogProgress) * 38.0f,
+		true);
+
+	if (defeatPresentationPlayer_) {
+		EulerTransform transform = defeatPresentationBaseTransform_;
+		// 最初の一瞬は致命傷の衝撃でのけぞらせ、その後に膝から力が抜けるよう沈ませる。
+		const float recoilProgress = SmoothStep01(Saturate(defeatPresentationElapsed_ / 0.20f));
+		const float recoil = std::sin(recoilProgress * 3.14159265f);
+		const float collapseProgress = SmoothStep01(Saturate((defeatPresentationElapsed_ - 0.12f) / 0.48f));
+		const float fallProgress = SmoothStep01(Saturate((defeatPresentationElapsed_ - 0.48f) / 0.92f));
+
+		transform.rotate.x -= recoil * 0.12f;
+		transform.rotate.z += defeatFallDirection_ * fallProgress * 1.36f;
+		transform.translate.x += defeatFallDirection_ * fallProgress * 0.22f;
+		transform.translate.y -= collapseProgress * 0.10f + fallProgress * 0.08f;
+		transform.scale.y *= 1.0f - collapseProgress * 0.14f;
+		defeatPresentationPlayer_->GetTransform() = transform;
+		if (Object3dComponent* object3d = defeatPresentationPlayer_->GetComponent<Object3dComponent>()) {
+			object3d->Update();
+		}
+	}
+
+	if (defeatPresentationElapsed_ < kDefeatPresentationDuration || defeatTransitionRequested_) return;
+
+	const StageResultData resultData = GetStageResultData();
+	if (sceneManager) {
+		sceneManager->SetStageResultData(resultData);
+		sceneManager->ChangeScene("RESULT", SceneTransitionType::Fade, 0.35f, 0.35f);
+		defeatTransitionRequested_ = true;
+	}
+}
+
+void GamePlayScene::ApplyStageOneEveningLight() {
+	if (!sceneManager || sceneManager->GetSelectedGameplayStageId() != "default") {
+		return;
+	}
+
+	const AtmosphereSettings& atmosphere = AtmosphereSystem::GetInstance()->GetSettings();
+	const Vector3 sunDirection = NormalizeReturnVector(atmosphere.sunDirection);
+	const Vector3 lightDirection = {-sunDirection.x, -sunDirection.y, -sunDirection.z};
+	// 低い夕陽の暖色を残しながら、戦闘中の輪郭と地形の起伏が潰れない明るさにします。
+	const Vector4 sunlightColor = {1.0f, 0.48f, 0.20f, 1.0f};
+	constexpr float sunlightIntensity = 0.92f;
+	for (GameObject* object : GetMutableSceneObjects()) {
+		if (!object) continue;
+		if (Object3dComponent* object3d = object->GetComponent<Object3dComponent>()) {
+			object3d->SetDirectionalLight(sunlightColor, lightDirection, sunlightIntensity);
+		}
+	}
+	if (instancingModel_) {
+		instancingModel_->SetDirectionalLight(sunlightColor, lightDirection, sunlightIntensity);
+	}
+}
+
+void GamePlayScene::BeginStartPresentation() {
+	startPresentationInitialized_ = true;
+	startPresentationActive_ = true;
+	startPresentationElapsed_ = 0.0f;
+	startPresentationPlayer_ = nullptr;
+
+	for (GameObject* object : GetMutableSceneObjects()) {
+		if (object && object->GetComponent<Player>()) {
+			startPresentationPlayer_ = object;
+			startPresentationBaseTransform_ = object->GetTransform();
+			Player* player = object->GetComponent<Player>();
+			if (Object3dComponent* object3d = object->GetComponent<Object3dComponent>()) {
+				const char* animationName = GetGameStartAnimationName(player->GetPlayerTypeName());
+				if (animationName[0] != '\0' && object3d->SetAnimation(animationName, true)) {
+					object3d->SetAnimationLooping(false);
+					object3d->SetAnimationPlaying(true);
+				}
+			}
+			break;
+		}
+	}
+
+	// SceneManagerにはエディタ用の最低限の更新だけをさせ、敵・攻撃・生存時間を進めない。
+	SetGameplayMode(GameplayMode::Intro);
+	UpdateStartFogFade(0.0f);
+}
+
+void GamePlayScene::UpdateStartPresentation() {
+	startPresentationElapsed_ += GameTime::GetUnscaledDeltaTime();
+	const float normalizedTime = Saturate(startPresentationElapsed_ / kStartPresentationDuration);
+	const float entranceProgress = EaseOutCubic(Saturate(normalizedTime / 0.78f));
+	const float remaining = 1.0f - entranceProgress;
+	UpdateStartFogFade(normalizedTime);
+
+	if (startPresentationPlayer_) {
+		EulerTransform transform = startPresentationBaseTransform_;
+		const Player* player = startPresentationPlayer_->GetComponent<Player>();
+		const std::string playerType = player ? player->GetPlayerTypeName() : std::string{};
+
+		if (playerType == "巫女") {
+			// 霧の上から静かに降り、少し回りながら定位置へ着地する。
+			transform.translate.y += remaining * remaining * 3.2f;
+			transform.rotate.y += remaining * 0.65f;
+			const float scale = 0.84f + entranceProgress * 0.16f;
+			transform.scale = scale * startPresentationBaseTransform_.scale;
+		} else if (playerType == "烏天狗") {
+			// 左奥から高速で飛び込み、着地直前に正面へ向き直る。
+			transform.translate.x -= remaining * 4.2f;
+			transform.translate.y += remaining * 1.15f;
+			transform.translate.z += remaining * 1.4f;
+			transform.rotate.y -= remaining * 1.15f;
+		} else if (playerType == "猫") {
+			// 右側から弧を描いて跳び込み、着地時に一度だけ身体を縮める。
+			const float jumpArc = std::sin(entranceProgress * 3.14159265f);
+			transform.translate.x += remaining * 2.2f;
+			transform.translate.y += -remaining * 0.55f + jumpArc * 1.45f;
+			transform.rotate.z -= remaining * 0.28f;
+			transform.scale.x *= 0.78f + entranceProgress * 0.22f + jumpArc * 0.08f;
+			transform.scale.y *= 0.70f + entranceProgress * 0.30f + jumpArc * 0.17f;
+			transform.scale.z = transform.scale.x;
+		} else {
+			const float scale = 0.75f + entranceProgress * 0.25f;
+			transform.scale = scale * startPresentationBaseTransform_.scale;
+			transform.translate.y += remaining * 1.2f;
+		}
+
+		startPresentationPlayer_->GetTransform() = transform;
+		// 世界全体を止めたまま、変更したTransformだけを描画オブジェクトへ同期する。
+		if (Object3dComponent* object3d = startPresentationPlayer_->GetComponent<Object3dComponent>()) {
+			// 戦闘時間は止めつつ、この専用骨格アニメーションだけ実時間で進める。
+			GameTime::SetPaused(false);
+			object3d->Update();
+			GameTime::SetPaused(true);
+		}
+	}
+
+	if (startPresentationElapsed_ >= kStartPresentationDuration) {
+		if (startPresentationPlayer_) {
+			startPresentationPlayer_->GetTransform() = startPresentationBaseTransform_;
+			if (Object3dComponent* object3d = startPresentationPlayer_->GetComponent<Object3dComponent>()) {
+				// 専用クリップの最終姿勢を残さず、通常の歩行クリップへ戻して待機させる。
+				if (object3d->SetAnimation("歩行", true)) {
+					object3d->SetAnimationLooping(true);
+					object3d->SetAnimationPlaying(false);
+				}
+				object3d->Update();
+			}
+		}
+		startPresentationActive_ = false;
+		UpdateStartFogFade(1.0f);
+		SetGameplayMode(GameplayMode::Playing);
+	}
+}
+
+void GamePlayScene::UpdateStartFogFade(float normalizedTime) {
+	// 開始直後から濃霧を用意し、晴れ始めるまでは不透明な白幕で完全に覆う。
+	// 白幕が退いた時点で濃霧が見えるため、ステージが一度露出してから霧が増える逆転を防ぐ。
+	const float fadeOutCoverage = 1.0f - SmoothStep01((normalizedTime - 0.18f) / 0.66f);
+	const float coverage = fadeOutCoverage;
+	const float clearProgress = 1.0f - coverage;
+	const float frontMistVisibility = SmoothStep01((coverage - 0.80f) / 0.16f);
+	startFogAlpha_ = frontMistVisibility;
+	// 晴れ始めから短時間だけ白を退かせ、真っ白→濃霧→視界開放の順に見せる。
+	startWhiteAlpha_ = 1.0f - SmoothStep01((normalizedTime - 0.18f) / 0.12f);
+
+	// 粒量と密度を落としながら霧の開始距離を奥へ送り、近景から順に視界を開く。
+	PostEffect::GetInstance()->SetFogSettings(
+		coverage > 0.002f,
+		{0.78f, 0.84f, 0.91f, 0.92f * coverage},
+		1.72f * coverage * coverage,
+		0.30f + clearProgress * 0.28f,
+		7.2f + clearProgress * 2.8f,
+		0.74f,
+		0.92f * coverage,
+		0.052f,
+		clearProgress * 14.0f,
+		18.0f + clearProgress * 46.0f,
+		true);
+}
+
 void GamePlayScene::InitializePauseMenu() {
 	SetGameplayMode(GameplayMode::Playing);
 	selectedPauseMenuItem_ = static_cast<int>(PauseMenuItem::Resume);
-	pauseOverlaySprite_ = CreatePauseColorSprite();
-	pausePanelSprite_ = CreatePauseColorSprite();
-	pauseSelectionSprite_ = CreatePauseColorSprite();
-	pauseTitleTextObject_ = CreatePauseTextObject("PAUSE", 52.0f);
+	pauseOverlaySprite_ = CreateColorSprite();
+	pausePanelSprite_ = CreateColorSprite();
+	pauseSelectionSprite_ = CreateColorSprite();
+	pauseTitleTextObject_ = CreateTextObject("PAUSE", 52.0f);
 	pauseMenuTextObjects_.clear();
-	pauseMenuTextObjects_.push_back(CreatePauseTextObject("ゲームに戻る", 29.0f));
-	pauseMenuTextObjects_.push_back(CreatePauseTextObject("ステージをやり直す", 29.0f));
-	pauseMenuTextObjects_.push_back(CreatePauseTextObject("ステージ選択へ戻る", 29.0f));
-	pauseInstructionTextObject_ = CreatePauseTextObject(
+	pauseMenuTextObjects_.push_back(CreateTextObject("ゲームに戻る", 29.0f));
+	pauseMenuTextObjects_.push_back(CreateTextObject("ステージをやり直す", 29.0f));
+	pauseMenuTextObjects_.push_back(CreateTextObject("ステージ選択へ戻る", 29.0f));
+	pauseInstructionTextObject_ = CreateTextObject(
 	    "W / S・上下キー・Pad上下: 選択    Space / Enter・Pad A: 決定    Esc・Pad Start / B: 戻る", 17.0f);
 }
 
@@ -368,6 +631,9 @@ void GamePlayScene::UpdatePauseMenu() {
 /// スカイボックスの描画処理を行います。
 /// </summary>
 void GamePlayScene::DrawSkyBox() {
+	if (sceneManager && sceneManager->GetSelectedGameplayStageId() == "default" && atmosphereSky_) {
+		atmosphereSky_->Draw();
+	}
 	BaseScene::DrawSkyBox();
 	if (isShowSkyBox_ && skyBox) {
 		 skyBox->Draw();
@@ -390,6 +656,14 @@ void GamePlayScene::Draw2D() {
 }
 
 void GamePlayScene::DrawOverlay2D() {
+	if (startPresentationActive_) {
+		DrawStartPresentation();
+		return;
+	}
+	if (defeatPresentationActive_) {
+		DrawDefeatPresentation();
+		return;
+	}
 	if (GetGameplayMode() != GameplayMode::Paused || !pauseOverlaySprite_ || !pausePanelSprite_ || !pauseSelectionSprite_) {
 		return;
 	}
@@ -407,10 +681,10 @@ void GamePlayScene::DrawOverlay2D() {
 	const float itemGap = 18.0f;
 
 	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
-	DrawPauseColorSprite(pauseOverlaySprite_.get(), 0.0f, 0.0f, screenWidth, screenHeight, {0.0f, 0.0f, 0.0f, 0.68f});
-	DrawPauseColorSprite(pausePanelSprite_.get(), panelX, panelY, panelWidth, panelHeight, {0.025f, 0.08f, 0.15f, 0.98f});
+	DrawColorSprite(pauseOverlaySprite_.get(), 0.0f, 0.0f, screenWidth, screenHeight, {0.0f, 0.0f, 0.0f, 0.68f});
+	DrawColorSprite(pausePanelSprite_.get(), panelX, panelY, panelWidth, panelHeight, {0.025f, 0.08f, 0.15f, 0.98f});
 	const float selectedY = firstItemY + selectedPauseMenuItem_ * (itemHeight + itemGap);
-	DrawPauseColorSprite(pauseSelectionSprite_.get(), panelX + 40.0f, selectedY, itemWidth, itemHeight,
+	DrawColorSprite(pauseSelectionSprite_.get(), panelX + 40.0f, selectedY, itemWidth, itemHeight,
 	    {0.08f, 0.48f, 0.62f, 0.98f});
 
 	pauseTitleTextObject_->GetTransform().translate = {screenWidth * 0.5f, panelY + 72.0f, 0.0f};
@@ -426,6 +700,99 @@ void GamePlayScene::DrawOverlay2D() {
 	}
 	pauseInstructionTextObject_->GetTransform().translate = {screenWidth * 0.5f, panelY + panelHeight - 35.0f, 0.0f};
 	pauseInstructionTextObject_->Draw2D();
+}
+
+void GamePlayScene::DrawDefeatPresentation() {
+	DirectXCommon* dxCommon = SpriteCommon::GetInstance()->GetDxCommon();
+	if (!dxCommon || !pauseOverlaySprite_ || !defeatMessageTextObject_) return;
+	const float screenWidth = static_cast<float>(dxCommon->GetRenderWidth());
+	const float screenHeight = static_cast<float>(dxCommon->GetRenderHeight());
+	const float fogProgress = SmoothStep01(Saturate((defeatPresentationElapsed_ - 0.48f) / 1.55f));
+	const float darkness = SmoothStep01(Saturate((defeatPresentationElapsed_ - 1.72f) / 0.90f));
+	const float textAlpha = SmoothStep01(Saturate((defeatPresentationElapsed_ - 1.52f) / 0.48f));
+
+	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
+	// 左右と下から速度の異なる霧を重ね、単純な白フェードではなく包み込まれる動きを作る。
+	const float fogAlpha[] = {0.82f, 0.64f, 0.48f};
+	const float fogOffsetX[] = {-0.38f, 0.34f, -0.10f};
+	const float fogOffsetY[] = {0.04f, -0.06f, 0.28f};
+	const float fogUvSpeedX[] = {-0.16f, 0.13f, -0.22f};
+	const float fogUvSpeedY[] = {0.07f, 0.10f, -0.05f};
+	for (size_t index = 0; index < startFogSprites_.size(); ++index) {
+		Sprite* fogSprite = startFogSprites_[index].get();
+		if (!fogSprite) continue;
+		EulerTransform transform = fogSprite->GetTransform();
+		transform.translate = {
+			screenWidth * fogOffsetX[index] * (1.0f - fogProgress),
+			screenHeight * fogOffsetY[index] * (1.0f - fogProgress), 0.0f};
+		fogSprite->SetTransform(transform);
+		fogSprite->SetSize({screenWidth * 1.18f, screenHeight * 1.18f});
+		fogSprite->SetColor({0.72f, 0.77f, 0.84f, fogProgress * fogAlpha[index]});
+		EulerTransform uvTransform = fogSprite->GetUVTransform();
+		uvTransform.scale = {0.92f + index * 0.31f, 1.12f + index * 0.18f, 1.0f};
+		uvTransform.translate = {
+			defeatPresentationElapsed_ * fogUvSpeedX[index],
+			defeatPresentationElapsed_ * fogUvSpeedY[index], 0.0f};
+		fogSprite->SetUVTransform(uvTransform);
+		fogSprite->Update();
+		fogSprite->Draw();
+	}
+	// 霧が十分にプレイヤーを隠してから黒へ落とし、倒れ姿が急に消えないようにする。
+	DrawColorSprite(pauseOverlaySprite_.get(), 0.0f, 0.0f, screenWidth, screenHeight,
+		{0.012f, 0.016f, 0.024f, darkness});
+	defeatMessageTextObject_->GetTransform().translate = {screenWidth * 0.5f, screenHeight * 0.42f, 0.0f};
+	defeatMessageTextObject_->GetComponent<TextComponent>()->SetColor({0.92f, 0.86f, 0.86f, textAlpha});
+	defeatMessageTextObject_->Draw2D();
+}
+
+void GamePlayScene::DrawStartPresentation() {
+	DirectXCommon* dxCommon = SpriteCommon::GetInstance()->GetDxCommon();
+	if (!dxCommon) return;
+	const float screenWidth = static_cast<float>(dxCommon->GetRenderWidth());
+	const float screenHeight = static_cast<float>(dxCommon->GetRenderHeight());
+	const float normalizedTime = Saturate(startPresentationElapsed_ / kStartPresentationDuration);
+
+	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
+	const float fogScales[3][2] = {{0.90f, 1.34f}, {1.32f, 0.94f}, {1.80f, 1.55f}};
+	const float fogSpeeds[3][2] = {{-0.20f, 0.10f}, {0.17f, 0.14f}, {-0.25f, -0.08f}};
+	const float fogStrengths[3] = {0.82f, 0.62f, 0.42f};
+	for (size_t index = 0; index < startFogSprites_.size(); ++index) {
+		Sprite* sprite = startFogSprites_[index].get();
+		if (!sprite) continue;
+		EulerTransform transform = sprite->GetTransform();
+		transform.translate = {0.0f, 0.0f, 0.0f};
+		sprite->SetTransform(transform);
+		sprite->SetSize({screenWidth, screenHeight});
+		sprite->SetColor({1.0f, 1.0f, 1.0f, startFogAlpha_ * fogStrengths[index]});
+		EulerTransform uvTransform = sprite->GetUVTransform();
+		uvTransform.scale = {fogScales[index][0], fogScales[index][1], 1.0f};
+		uvTransform.translate = {
+			startPresentationElapsed_ * fogSpeeds[index][0],
+			startPresentationElapsed_ * fogSpeeds[index][1], 0.0f};
+		sprite->SetUVTransform(uvTransform);
+		sprite->Update();
+		sprite->Draw();
+	}
+	// 霧画像より手前に単色白を描き、晴れ始める前は模様や背景を一切見せない。
+	if (startWhiteAlpha_ > 0.0f) {
+		DrawColorSprite(startWhiteSprite_.get(), 0.0f, 0.0f, screenWidth, screenHeight,
+			{1.0f, 1.0f, 1.0f, startWhiteAlpha_});
+	}
+
+	if (!startMessageSprite_) return;
+	// 着地の余韻で「始め！」を一度だけ強く出し、操作開始までに消す。
+	const float textIn = SmoothStep01((normalizedTime - 0.60f) / 0.10f);
+	const float textOut = 1.0f - SmoothStep01((normalizedTime - 0.84f) / 0.14f);
+	const float textAlpha = textIn * textOut;
+	const float textScale = 0.72f + EaseOutCubic(textIn) * 0.28f;
+	const float textureWidth = (std::min)(screenWidth * 0.52f, 620.0f);
+	EulerTransform messageTransform = startMessageSprite_->GetTransform();
+	messageTransform.translate = {screenWidth * 0.5f, screenHeight * 0.42f, 0.0f};
+	startMessageSprite_->SetTransform(messageTransform);
+	startMessageSprite_->SetSize({textureWidth * textScale, textureWidth * 0.5f * textScale});
+	startMessageSprite_->SetColor({1.0f, 1.0f, 1.0f, textAlpha});
+	startMessageSprite_->Update();
+	startMessageSprite_->Draw();
 }
 
 /// <summary>
@@ -445,8 +812,6 @@ void GamePlayScene::Draw3D() {
 	}
 
 	if (isShowInstancing_ && instancingModel_) {
-		InstancingModelCommon::GetInstance()->SetDraw();
-
 		instancingModel_->Draw(Object3dCommon::GetInstance()->GetDefaultCamera());
 	}
 
@@ -457,6 +822,22 @@ void GamePlayScene::Draw3D() {
 /// </summary>
 void GamePlayScene::Finalize() {
 	SetPauseMenuOpen(false);
+	if (atmosphereSky_) {
+		atmosphereSky_->Finalize();
+		atmosphereSky_.reset();
+	}
+	// 演出途中でシーンが破棄された場合も、深度霧を次のシーンへ残さない。
+	if (startPresentationActive_ || defeatPresentationActive_) {
+		UpdateStartFogFade(1.0f);
+	}
+	for (auto& fogSprite : startFogSprites_) fogSprite.reset();
+	startWhiteSprite_.reset();
+	startMessageSprite_.reset();
+	startPresentationPlayer_ = nullptr;
+	defeatPresentationActive_ = false;
+	defeatTransitionRequested_ = false;
+	defeatPresentationPlayer_ = nullptr;
+	defeatMessageTextObject_.reset();
 	pauseOverlaySprite_.reset();
 	pausePanelSprite_.reset();
 	pauseSelectionSprite_.reset();

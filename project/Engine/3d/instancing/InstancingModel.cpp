@@ -1,9 +1,89 @@
 #include "InstancingModel.h"
 #include "../object/Object3dCommon.h"
+#include "../sky/AtmosphereSystem.h"
 #include "TextureManager.h"
-#include "GameTime.h"
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
+
+namespace {
+struct FrustumPlane {
+	Vector3 normal{};
+	float distance = 0.0f;
+};
+
+using FrustumPlanes = std::array<FrustumPlane, 6>;
+
+FrustumPlane MakeNormalizedPlane(float x, float y, float z, float distance) {
+	const float length = std::sqrt(x * x + y * y + z * z);
+	if (length <= 0.000001f) {
+		return {};
+	}
+	const float inverseLength = 1.0f / length;
+	return {{x * inverseLength, y * inverseLength, z * inverseLength}, distance * inverseLength};
+}
+
+FrustumPlanes ExtractFrustumPlanes(const Matrix4x4& viewProjection) {
+	// このプロジェクトは行ベクトルで座標変換するため、クリップ空間の各条件を列から取り出す。
+	return {
+		MakeNormalizedPlane(
+			viewProjection.m[0][3] + viewProjection.m[0][0],
+			viewProjection.m[1][3] + viewProjection.m[1][0],
+			viewProjection.m[2][3] + viewProjection.m[2][0],
+			viewProjection.m[3][3] + viewProjection.m[3][0]),
+		MakeNormalizedPlane(
+			viewProjection.m[0][3] - viewProjection.m[0][0],
+			viewProjection.m[1][3] - viewProjection.m[1][0],
+			viewProjection.m[2][3] - viewProjection.m[2][0],
+			viewProjection.m[3][3] - viewProjection.m[3][0]),
+		MakeNormalizedPlane(
+			viewProjection.m[0][3] + viewProjection.m[0][1],
+			viewProjection.m[1][3] + viewProjection.m[1][1],
+			viewProjection.m[2][3] + viewProjection.m[2][1],
+			viewProjection.m[3][3] + viewProjection.m[3][1]),
+		MakeNormalizedPlane(
+			viewProjection.m[0][3] - viewProjection.m[0][1],
+			viewProjection.m[1][3] - viewProjection.m[1][1],
+			viewProjection.m[2][3] - viewProjection.m[2][1],
+			viewProjection.m[3][3] - viewProjection.m[3][1]),
+		MakeNormalizedPlane(
+			viewProjection.m[0][2], viewProjection.m[1][2],
+			viewProjection.m[2][2], viewProjection.m[3][2]),
+		MakeNormalizedPlane(
+			viewProjection.m[0][3] - viewProjection.m[0][2],
+			viewProjection.m[1][3] - viewProjection.m[1][2],
+			viewProjection.m[2][3] - viewProjection.m[2][2],
+			viewProjection.m[3][3] - viewProjection.m[3][2])};
+}
+
+bool IsBoundsInsideFrustum(
+	const Vector3& minBounds, const Vector3& maxBounds,
+	const Vector3& offset, const FrustumPlanes& planes) {
+	const Vector3 center = {
+		(minBounds.x + maxBounds.x) * 0.5f + offset.x,
+		(minBounds.y + maxBounds.y) * 0.5f + offset.y,
+		(minBounds.z + maxBounds.z) * 0.5f + offset.z};
+	const Vector3 extents = {
+		(maxBounds.x - minBounds.x) * 0.5f,
+		(maxBounds.y - minBounds.y) * 0.5f,
+		(maxBounds.z - minBounds.z) * 0.5f};
+
+	for (const FrustumPlane& plane : planes) {
+		const float signedDistance =
+			plane.normal.x * center.x + plane.normal.y * center.y +
+			plane.normal.z * center.z + plane.distance;
+		const float projectedRadius =
+			std::abs(plane.normal.x) * extents.x +
+			std::abs(plane.normal.y) * extents.y +
+			std::abs(plane.normal.z) * extents.z;
+		if (signedDistance + projectedRadius < 0.0f) {
+			return false;
+		}
+	}
+	return true;
+}
+}
 
 /// <summary>
 /// 必要なリソースを準備し、オブジェクトを初期化します。
@@ -11,11 +91,20 @@
 void InstancingModel::Initialize(Model* model, uint32_t maxInstanceCount) {
     model_ = model;
     maxInstanceCount_ = maxInstanceCount;
+	modelBoundingRadius_ = 0.0f;
+	if (model_) {
+		for (const VertexData& vertex : model_->GetModelData().vertices) {
+			const float radiusSquared =
+				vertex.position.x * vertex.position.x +
+				vertex.position.y * vertex.position.y +
+				vertex.position.z * vertex.position.z;
+			modelBoundingRadius_ = (std::max)(modelBoundingRadius_, std::sqrt(radiusSquared));
+		}
+	}
 
     chunks_.reserve(128);
     chunkLookup_.reserve(128);
 
-    CreateInstanceBuffer();
     CreateConstantBuffers();
 }
 
@@ -23,23 +112,9 @@ void InstancingModel::Initialize(Model* model, uint32_t maxInstanceCount) {
 /// 破棄時に必要な解放処理を行います。
 /// </summary>
 InstancingModel::~InstancingModel() {
-    if (instanceBuffer_) instanceBuffer_->Unmap(0, nullptr);
     if (lightResource_) lightResource_->Unmap(0, nullptr);
     if (cameraResource_) cameraResource_->Unmap(0, nullptr);
     if (pointLightResource_) pointLightResource_->Unmap(0, nullptr);
-    if (grassResource_) grassResource_->Unmap(0, nullptr);
-}
-
-/// <summary>
-/// InstanceBuffer を作成し、利用できる状態にします。
-/// </summary>
-void InstancingModel::CreateInstanceBuffer() {
-    auto dxCommon = Object3dCommon::GetInstance()->GetDxCommon();
-
-    uint32_t bufferSize = sizeof(InstancingMatrixData) * maxInstanceCount_;
-    instanceBuffer_ = dxCommon->CreateBufferResource(bufferSize);
-
-    instanceBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&mappedData_));
 }
 
 /// <summary>
@@ -56,8 +131,15 @@ void InstancingModel::CreateConstantBuffers() {
 
     cameraResource_ = dxCommon->CreateBufferResource(sizeof(CameraForGPU));
     cameraResource_->Map(0, nullptr, reinterpret_cast<void**>(&cameraData_));
+    cameraData_->viewProjection = MakeIdentity4x4();
     cameraData_->worldPosition = { 0.0f, 0.0f, -10.0f };
     cameraData_->environmentMultiplier = 0.0f;
+	cameraData_->horizonColor = {0.0f, 0.0f, 0.0f};
+	cameraData_->distanceFogDensity = 0.0f;
+	cameraData_->heightFogDensity = 0.0f;
+	cameraData_->aerialPerspectiveStrength = 0.0f;
+	cameraData_->enableAerialPerspective = 0;
+	cameraData_->paddingAtmosphere = 0.0f;
 
     pointLightResource_ = dxCommon->CreateBufferResource(sizeof(PointLight));
     pointLightResource_->Map(0, nullptr, reinterpret_cast<void**>(&pointLightData_));
@@ -67,12 +149,6 @@ void InstancingModel::CreateConstantBuffers() {
     pointLightData_->radius = 10.0f;
     pointLightData_->decay = 1.0f;
 
-    grassResource_ = dxCommon->CreateBufferResource(sizeof(GrassParameter));
-    grassResource_->Map(0, nullptr, reinterpret_cast<void**>(&grassData_));
-    grassData_->time = 0.0f;
-    grassData_->windStrength = 0.08f;
-    grassData_->windFrequency = 2.0f;
-    grassData_->padding = 0.0f;
 }
 
 void InstancingModel::AddInstance(const EulerTransform& transform) {
@@ -103,7 +179,34 @@ void InstancingModel::AddInstance(const EulerTransform& transform) {
         chunkIt = chunkLookup_.find(key);
     }
 
-    chunks_[chunkIt->second].transforms.push_back(transform);
+	InstanceChunk& chunk = chunks_[chunkIt->second];
+	const float maximumScale = (std::max)({
+		std::abs(transform.scale.x),
+		std::abs(transform.scale.y),
+		std::abs(transform.scale.z)});
+	const float instanceRadius = modelBoundingRadius_ * maximumScale;
+	const Vector3 instanceMin = {
+		transform.translate.x - instanceRadius,
+		transform.translate.y - instanceRadius,
+		transform.translate.z - instanceRadius};
+	const Vector3 instanceMax = {
+		transform.translate.x + instanceRadius,
+		transform.translate.y + instanceRadius,
+		transform.translate.z + instanceRadius};
+	if (chunk.transforms.empty()) {
+		chunk.minBounds = instanceMin;
+		chunk.maxBounds = instanceMax;
+	} else {
+		chunk.minBounds = {
+			(std::min)(chunk.minBounds.x, instanceMin.x),
+			(std::min)(chunk.minBounds.y, instanceMin.y),
+			(std::min)(chunk.minBounds.z, instanceMin.z)};
+		chunk.maxBounds = {
+			(std::max)(chunk.maxBounds.x, instanceMax.x),
+			(std::max)(chunk.maxBounds.y, instanceMax.y),
+			(std::max)(chunk.maxBounds.z, instanceMax.z)};
+	}
+	chunk.transforms.push_back(transform);
     ++instanceCount_;
 	visibilityCacheValid_ = false;
 }
@@ -117,37 +220,49 @@ void InstancingModel::Draw(Camera* camera) {
 
     const Vector3 cameraPosition = camera->GetTranslate();
 	const Matrix4x4 viewProjection = camera->GetViewProjectionMatrix();
-	const bool cameraUnchanged = visibilityCacheValid_ &&
+	// 距離判定に加えて視錐台も使うため、位置またはカメラ行列が変わった場合だけ可視一覧を更新する。
+	const bool visibilityUnchanged = visibilityCacheValid_ &&
 		cameraPosition.x == cachedCameraPosition_.x &&
 		cameraPosition.y == cachedCameraPosition_.y &&
 		cameraPosition.z == cachedCameraPosition_.z &&
 		std::memcmp(&viewProjection, &cachedViewProjection_, sizeof(Matrix4x4)) == 0;
 
 	uint32_t visibleInstanceCount = cachedVisibleInstanceCount_;
-	if (!cameraUnchanged) {
+	if (!visibilityUnchanged) {
 		const float maxDistanceSquared = maxDrawDistance_ * maxDrawDistance_;
+		const FrustumPlanes frustumPlanes = ExtractFrustumPlanes(viewProjection);
 		visibleInstanceCount = 0;
 		for (const InstanceChunk& chunk : chunks_) {
+			// 草原の元データは保持したまま、各軸でカメラに最も近い周期分のコピーを描画する。
+			// 折り返し境界は最大描画距離より外にあるため、画面内で草が飛ぶことはない。
+			Vector3 loopOffset{};
+			if (loopPeriodX_ > 0.0f) {
+				loopOffset.x = std::round((cameraPosition.x - chunk.center.x) / loopPeriodX_) * loopPeriodX_;
+			}
+			if (loopPeriodZ_ > 0.0f) {
+				loopOffset.z = std::round((cameraPosition.z - chunk.center.z) / loopPeriodZ_) * loopPeriodZ_;
+			}
 			const float chunkRadius = kChunkSize * 0.7072f;
-			const float dx = chunk.center.x - cameraPosition.x;
-			const float dz = chunk.center.z - cameraPosition.z;
+			const float dx = chunk.center.x + loopOffset.x - cameraPosition.x;
+			const float dz = chunk.center.z + loopOffset.z - cameraPosition.z;
 			const float chunkDistance = maxDrawDistance_ + chunkRadius;
 			if (dx * dx + dz * dz > chunkDistance * chunkDistance) {
 				continue;
 			}
+			if (!IsBoundsInsideFrustum(
+					chunk.minBounds, chunk.maxBounds, loopOffset, frustumPlanes)) {
+				continue;
+			}
 
 			for (const EulerTransform& transform : chunk.transforms) {
-				const float instanceDx = transform.translate.x - cameraPosition.x;
-				const float instanceDz = transform.translate.z - cameraPosition.z;
+				const Vector3 drawPosition = transform.translate + loopOffset;
+				const float instanceDx = drawPosition.x - cameraPosition.x;
+				const float instanceDz = drawPosition.z - cameraPosition.z;
 				if (instanceDx * instanceDx + instanceDz * instanceDz > maxDistanceSquared) {
 					continue;
 				}
 
-				const Matrix4x4 worldMatrix = MakeAffineMatrix(
-					transform.scale, transform.rotate, transform.translate);
-				mappedData_[visibleInstanceCount].world = worldMatrix;
-				mappedData_[visibleInstanceCount].WVP = Multiply(worldMatrix, viewProjection);
-				mappedData_[visibleInstanceCount].WorldInverseTranspose = MakeIdentity4x4();
+				WriteVisibleInstance(visibleInstanceCount, transform, drawPosition);
 				++visibleInstanceCount;
 			}
 		}
@@ -159,17 +274,22 @@ void InstancingModel::Draw(Camera* camera) {
 
     if (visibleInstanceCount == 0) return;
 
-    cameraData_->worldPosition = camera->GetTranslate();
-    grassData_->time += GameTime::GetDeltaTime();
+    cameraData_->viewProjection = viewProjection;
+    cameraData_->worldPosition = cameraPosition;
+	const AtmosphereSettings& atmosphere = AtmosphereSystem::GetInstance()->GetSettings();
+	cameraData_->horizonColor = atmosphere.horizonColor;
+	cameraData_->distanceFogDensity = atmosphere.distanceFogDensity;
+	cameraData_->heightFogDensity = atmosphere.heightFogDensity;
+	cameraData_->aerialPerspectiveStrength = atmosphere.aerialPerspectiveStrength;
+	cameraData_->enableAerialPerspective = atmosphere.enabled ? 1 : 0;
 
     auto commandList = Object3dCommon::GetInstance()->GetDxCommon()->GetCommandList();
+	PrepareDraw(commandList.Get());
 
     SrvManager::GetInstance()->PreDraw();
 
-    // [2] t2: インスタンシングデータ（SRV）
-    commandList->SetGraphicsRootShaderResourceView(2, instanceBuffer_->GetGPUVirtualAddress());
-
     commandList->IASetVertexBuffers(0, 1, &model_->vertexBufferView);
+    commandList->IASetIndexBuffer(&model_->indexBufferView);
     // [0] b0: マテリアル
     commandList->SetGraphicsRootConstantBufferView(0, model_->materialResource->GetGPUVirtualAddress());
     // [1] t0: テクスチャ
@@ -181,16 +301,14 @@ void InstancingModel::Draw(Camera* camera) {
     commandList->SetGraphicsRootConstantBufferView(4, cameraResource_->GetGPUVirtualAddress());
     // [5] b4: 点光源
     commandList->SetGraphicsRootConstantBufferView(5, pointLightResource_->GetGPUVirtualAddress());
-	// [7] b5: 草の風パラメータ
-	commandList->SetGraphicsRootConstantBufferView(7, grassResource_->GetGPUVirtualAddress());
 
     std::string envPath = envMapTexturePath_.empty()
         ? "Resources/rostock_laage_airport_4k.dds"
         : envMapTexturePath_;
     commandList->SetGraphicsRootDescriptorTable(6, TextureManager::GetInstance()->GetSRVHandleGPU(envPath));
 
-    uint32_t vertexCount = model_->GetVertexCount();
-    commandList->DrawInstanced(vertexCount, visibleInstanceCount, 0, 0);
+    const uint32_t indexCount = static_cast<uint32_t>(model_->GetModelData().indices.size());
+    commandList->DrawIndexedInstanced(indexCount, visibleInstanceCount, 0, 0, 0);
 
     // 配置を保持する。固定配置の草原などは、毎フレーム AddInstance し直さなくてよい。
 }

@@ -1,6 +1,6 @@
 #pragma once
-#include "../../flame/Component.h"
-#include "../../flame/GameObject.h"
+#include "core/Component.h"
+#include "core/GameObject.h"
 #include "Object3d.h"
 #include "Object3dCommon.h"
 #include <memory>

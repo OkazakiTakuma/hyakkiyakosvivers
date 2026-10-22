@@ -1,5 +1,5 @@
 #pragma once
-#include "../PlayerAttackComponent.h"
+#include "components/PlayerAttack/PlayerAttackComponent.h"
 #include "../../../Player/Player.h"
 #include <array>
 #include <json_fwd.hpp>

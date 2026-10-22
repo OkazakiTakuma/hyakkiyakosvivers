@@ -1,6 +1,7 @@
 #include "StageSelectScene.h"
 
 #include "SceneManager.h"
+#include "helpers/SceneUiUtility.h"
 
 #include <algorithm>
 #include <cctype>
@@ -11,31 +12,10 @@ namespace {
 constexpr int kCardsPerRow = 3;
 constexpr int kRowsPerPage = 2;
 constexpr int kCardsPerPage = kCardsPerRow * kRowsPerPage;
-
-std::unique_ptr<Sprite> CreateColorSprite() {
-	auto sprite = std::make_unique<Sprite>();
-	sprite->Initialize("Resources/human/white.png");
-	return sprite;
-}
-
-std::unique_ptr<GameObject> CreateTextObject(const std::string& text, float fontSize) {
-	auto object = std::make_unique<GameObject>();
-	TextComponent* textComponent = object->AddComponent<TextComponent>();
-	textComponent->SetText(text);
-	textComponent->SetFontSize(fontSize);
-	textComponent->SetAnchor(TextComponent::Anchor::Center);
-	return object;
-}
-
-void DrawColorSprite(Sprite* sprite, float x, float y, float width, float height, const Vector4& color) {
-	EulerTransform transform = sprite->GetTransform();
-	transform.translate = {x, y, 0.0f};
-	sprite->SetTransform(transform);
-	sprite->SetSize({width, height});
-	sprite->SetColor(color);
-	sprite->Update();
-	sprite->Draw();
-}
+constexpr float kReturnToTitleTransitionSeconds = 1.65f;
+using SceneUiUtility::CreateColorSprite;
+using SceneUiUtility::CreateTextObject;
+using SceneUiUtility::DrawColorSprite;
 }
 
 void StageSelectScene::Initialize() {
@@ -61,16 +41,17 @@ void StageSelectScene::CreateUi() {
 	cardSprites_.clear();
 	stageTextObjects_.clear();
 	titleTextObject_ = CreateTextObject("ステージを選択", 48.0f);
-	const std::string selectedPlayer = sceneManager_ ? sceneManager_->GetSelectedPlayerTypeName() : "Unknown";
-	selectedPlayerTextObject_ = CreateTextObject("選択中のプレイヤー: " + selectedPlayer, 22.0f);
+	selectedStageTextObject_ = CreateTextObject("", 22.0f);
 	instructionTextObject_ = CreateTextObject(
-	    "A / D・左右キー・Pad左右: 選択    Space / Enter・Pad A: 決定    Q・Pad B: プレイヤー選択へ戻る", 19.0f);
+	    "A / D・左右キー・Pad左右: 選択    Space / Enter・Pad A: 決定    Q・Pad B: タイトルへ戻る", 19.0f);
 	pageTextObject_ = CreateTextObject("", 18.0f);
 	for (const std::string& stageId : stageIds_) {
 		cardBorderSprites_.push_back(CreateColorSprite());
 		cardSprites_.push_back(CreateColorSprite());
 		stageTextObjects_.push_back(CreateTextObject(MakeStageDescription(stageId), 25.0f));
 	}
+	// 末尾の1枚は草原プレビューを暗くする専用オーバーレイ。カード用の添字には含めない。
+	cardBorderSprites_.push_back(CreateColorSprite());
 }
 
 std::string StageSelectScene::MakeStageDescription(const std::string& stageId) const {
@@ -93,7 +74,7 @@ std::string StageSelectScene::MakeStageDescription(const std::string& stageId) c
 		return displayName + "\n\nLOCKED\n" + prerequisite + "クリアで開放";
 	}
 	if (stageId == "default") {
-		return displayName + "\n\n無限平原\n全方向へループする広いフィールド";
+		return displayName + "\n\n夕暮れの無限平原\n全方向へループする広いフィールド";
 	}
 	if (stageId == "stage2") {
 		return displayName + "\n\n横長回廊\n上下は壁、左右は無限にループ";
@@ -115,15 +96,17 @@ void StageSelectScene::Update() {
 	}
 	if (input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN) || input->TriggerGamepadButton(XINPUT_GAMEPAD_A)) {
 		const std::string& selectedStageId = stageIds_[selectedStageIndex_];
-		// ロック中カードも内容確認のため選択はできるが、ゲームプレイへの決定だけを拒否する。
+		// ロック中カードも内容確認のため選択はできるが、次のキャラクター選択への決定だけを拒否する。
 		if (sceneManager_->IsGameplayStageUnlocked(selectedStageId)) {
 			sceneManager_->SetSelectedGameplayStageId(selectedStageId);
-			sceneManager_->ChangeScene("GAMEPLAY");
+			sceneManager_->ChangeScene("PLAYER_SELECT");
 		}
 		return;
 	}
 	if (input->TriggerKey(DIK_Q) || input->TriggerGamepadButton(XINPUT_GAMEPAD_B)) {
-		sceneManager_->ChangeScene("PLAYER_SELECT");
+		sceneManager_->ChangeScene(
+			"TITLE", SceneTransitionType::FadeWhite,
+			kReturnToTitleTransitionSeconds, kReturnToTitleTransitionSeconds);
 	}
 }
 
@@ -148,7 +131,21 @@ void StageSelectScene::Draw2D() {
 	const float firstRowY = 145.0f;
 
 	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
-	DrawColorSprite(backgroundSprite_.get(), 0.0f, 0.0f, screenWidth, screenHeight, {0.02f, 0.04f, 0.075f, 1.0f});
+	const bool isGrasslandSelected =
+		selectedStageIndex_ >= 0 && selectedStageIndex_ < stageCount && stageIds_[selectedStageIndex_] == "default";
+	if (isGrasslandSelected) {
+		if (backgroundSprite_->GetTextureFilePath() != "Resources/terrain/grass.png") {
+			backgroundSprite_->SetTexture("Resources/terrain/grass.png");
+		}
+		DrawColorSprite(backgroundSprite_.get(), 0.0f, 0.0f, screenWidth, screenHeight, {0.94f, 0.55f, 0.28f, 1.0f});
+		// ステージ1の低い夕陽に合わせ、草原へ赤紫の薄暮レイヤーを重ねる。
+		DrawColorSprite(cardBorderSprites_.back().get(), 0.0f, 0.0f, screenWidth, screenHeight, {0.12f, 0.025f, 0.08f, 0.48f});
+	} else {
+		if (backgroundSprite_->GetTextureFilePath() != "Resources/human/white.png") {
+			backgroundSprite_->SetTexture("Resources/human/white.png");
+		}
+		DrawColorSprite(backgroundSprite_.get(), 0.0f, 0.0f, screenWidth, screenHeight, {0.02f, 0.04f, 0.075f, 1.0f});
+	}
 	for (int row = 0; row < kRowsPerPage; ++row) {
 		const int rowStart = pageStart + row * kCardsPerRow;
 		const int rowEnd = (std::min)(rowStart + kCardsPerRow, pageEnd);
@@ -181,14 +178,18 @@ void StageSelectScene::Draw2D() {
 	}
 
 	titleTextObject_->GetTransform().translate = {screenWidth * 0.5f, 48.0f, 0.0f};
-	selectedPlayerTextObject_->GetTransform().translate = {screenWidth * 0.5f, 100.0f, 0.0f};
+	const std::string selectedStageName = stageCount > 0
+		? (sceneManager_ ? sceneManager_->GetGameplayStageDisplayName(stageIds_[selectedStageIndex_]) : stageIds_[selectedStageIndex_])
+		: "---";
+	selectedStageTextObject_->GetComponent<TextComponent>()->SetText("選択中のステージ: " + selectedStageName);
+	selectedStageTextObject_->GetTransform().translate = {screenWidth * 0.5f, 100.0f, 0.0f};
 	instructionTextObject_->GetTransform().translate = {screenWidth * 0.5f, screenHeight - 32.0f, 0.0f};
 	std::ostringstream pageStream;
 	pageStream << (currentPage + 1) << " / " << pageCount;
 	pageTextObject_->GetComponent<TextComponent>()->SetText(pageStream.str());
 	pageTextObject_->GetTransform().translate = {screenWidth * 0.5f, screenHeight - 65.0f, 0.0f};
 	titleTextObject_->Draw2D();
-	selectedPlayerTextObject_->Draw2D();
+	selectedStageTextObject_->Draw2D();
 	instructionTextObject_->Draw2D();
 	pageTextObject_->Draw2D();
 }
@@ -198,7 +199,7 @@ void StageSelectScene::Finalize() {
 	cardBorderSprites_.clear();
 	cardSprites_.clear();
 	titleTextObject_.reset();
-	selectedPlayerTextObject_.reset();
+	selectedStageTextObject_.reset();
 	instructionTextObject_.reset();
 	pageTextObject_.reset();
 	stageTextObjects_.clear();
