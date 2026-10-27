@@ -36,6 +36,13 @@ const char* GetGameStartAnimationName(const std::string& playerType) {
 	return "";
 }
 
+const char* GetDefeatAnimationName(const std::string& playerType) {
+	if (playerType == "巫女") return "力尽きる完全_巫女";
+	if (playerType == "烏天狗") return "力尽きる完全_烏天狗";
+	if (playerType == "猫") return "力尽きる完全_猫";
+	return "";
+}
+
 #ifdef USE_IMGUI
 ImVec2 GetPrimaryWorkPos() {
 	const ImGuiPlatformIO& platformIO = ImGui::GetPlatformIO();
@@ -286,6 +293,8 @@ void GamePlayScene::Update() {
 		// Gは取得時点で所持金へ保存済みなので、ここではリザルト表示用の戦績だけを渡す。
 		// 終了時にAddMoneyを呼ばないことで、取得時と終了時の二重加算を防止する。
 		sceneManager->SetStageResultData(resultData);
+		// Finishedで止めたゲーム時間を戻し、SceneManagerの遷移タイマーを進める。
+		GameTime::SetPaused(false);
 		sceneManager->ChangeScene("RESULT");
 		return;
 	}
@@ -368,16 +377,36 @@ void GamePlayScene::BeginDefeatPresentation() {
 	for (GameObject* object : GetMutableSceneObjects()) {
 		if (!object || !object->GetComponent<Player>()) continue;
 		defeatPresentationPlayer_ = object;
-		defeatPresentationBaseTransform_ = object->GetTransform();
-		// 毎回同じ側へ倒れる単調さを避けつつ、再生中は方向を固定する。
-		defeatFallDirection_ = std::sin(
-			defeatPresentationBaseTransform_.translate.x * 2.17f +
-			defeatPresentationBaseTransform_.translate.z * 1.31f) >= 0.0f ? 1.0f : -1.0f;
 		if (Object3dComponent* object3d = object->GetComponent<Object3dComponent>()) {
-			object3d->SetAnimationPlaying(false);
+			const Player* player = object->GetComponent<Player>();
+			const char* animationName = player ? GetDefeatAnimationName(player->GetPlayerTypeName()) : "";
+			if (animationName[0] != '\0' && object3d->SetAnimation(animationName, true)) {
+				object3d->SetAnimationLooping(false);
+				// 死亡判定フレームから先頭姿勢を反映し、歩行姿勢が一瞬残るのを防ぐ。
+				object3d->RestartAnimation();
+			} else {
+				// 専用クリップを持たない追加キャラクターでも、歩行姿勢のまま倒れ続けないよう停止する。
+				object3d->SetAnimationPlaying(false);
+			}
 		}
 		break;
 	}
+}
+
+bool GamePlayScene::BeginDemoDefeatPresentation() {
+	if (defeatPresentationActive_ || IsStageCleared()) {
+		return false;
+	}
+	for (GameObject* object : GetMutableSceneObjects()) {
+		if (!object) continue;
+		if (Player* player = object->GetComponent<Player>()) {
+			// HPを0にして、リザルトへ渡す結果も通常の敗北と同じ状態に揃える。
+			player->SetCurrentHealth(0.0f);
+			BeginDefeatPresentation();
+			return true;
+		}
+	}
+	return false;
 }
 
 void GamePlayScene::UpdateDefeatPresentation() {
@@ -398,21 +427,11 @@ void GamePlayScene::UpdateDefeatPresentation() {
 		true);
 
 	if (defeatPresentationPlayer_) {
-		EulerTransform transform = defeatPresentationBaseTransform_;
-		// 最初の一瞬は致命傷の衝撃でのけぞらせ、その後に膝から力が抜けるよう沈ませる。
-		const float recoilProgress = SmoothStep01(Saturate(defeatPresentationElapsed_ / 0.20f));
-		const float recoil = std::sin(recoilProgress * 3.14159265f);
-		const float collapseProgress = SmoothStep01(Saturate((defeatPresentationElapsed_ - 0.12f) / 0.48f));
-		const float fallProgress = SmoothStep01(Saturate((defeatPresentationElapsed_ - 0.48f) / 0.92f));
-
-		transform.rotate.x -= recoil * 0.12f;
-		transform.rotate.z += defeatFallDirection_ * fallProgress * 1.36f;
-		transform.translate.x += defeatFallDirection_ * fallProgress * 0.22f;
-		transform.translate.y -= collapseProgress * 0.10f + fallProgress * 0.08f;
-		transform.scale.y *= 1.0f - collapseProgress * 0.14f;
-		defeatPresentationPlayer_->GetTransform() = transform;
 		if (Object3dComponent* object3d = defeatPresentationPlayer_->GetComponent<Object3dComponent>()) {
+			// 世界は停止したまま、この専用BINだけを実時間相当で進める。
+			GameTime::SetPaused(false);
 			object3d->Update();
+			GameTime::SetPaused(true);
 		}
 	}
 
@@ -421,6 +440,8 @@ void GamePlayScene::UpdateDefeatPresentation() {
 	const StageResultData resultData = GetStageResultData();
 	if (sceneManager) {
 		sceneManager->SetStageResultData(resultData);
+		// Finishedで止めたゲーム時間を戻し、SceneManagerのフェードを進める。
+		GameTime::SetPaused(false);
 		sceneManager->ChangeScene("RESULT", SceneTransitionType::Fade, 0.35f, 0.35f);
 		defeatTransitionRequested_ = true;
 	}

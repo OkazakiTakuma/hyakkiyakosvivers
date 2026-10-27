@@ -60,7 +60,7 @@ public:
 		if (!owner) {
 			return;
 		}
-		const auto* projectile = owner->GetComponent<PlayerProjectileComponent>();
+		const auto* projectile = owner->GetComponent<PlayerAttackEntityComponent>();
 		// 命中などで弾が終了した場合は、フェード用の時間が残っていても描画しない。
 		if (!projectile || !projectile->IsEnabled() || projectile->IsExpired()) {
 			return;
@@ -111,7 +111,7 @@ public:
 	}
 
 private:
-	/// <summary>透明度の減衰にだけ使用する残り秒数です。弾の寿命はPlayerProjectileComponentが管理します。</summary>
+	/// <summary>透明度の減衰にだけ使用する残り秒数です。弾の寿命はPlayerAttackEntityComponentが管理します。</summary>
 	float remainingLifeTime_ = 0.0f;
 };
 
@@ -130,7 +130,7 @@ public:
 
 	void Draw3D() override {
 		GameObject* owner = GetOwner();
-		const auto* projectile = owner ? owner->GetComponent<PlayerProjectileComponent>() : nullptr;
+		const auto* projectile = owner ? owner->GetComponent<PlayerAttackEntityComponent>() : nullptr;
 		if (!owner || !projectile || !projectile->IsEnabled() || projectile->IsExpired()) {
 			return;
 		}
@@ -236,7 +236,7 @@ public:
 
 	void Draw3D() override {
 		GameObject* owner = GetOwner();
-		const auto* projectile = owner ? owner->GetComponent<PlayerProjectileComponent>() : nullptr;
+		const auto* projectile = owner ? owner->GetComponent<PlayerAttackEntityComponent>() : nullptr;
 		if (!owner || !projectile || !projectile->IsEnabled() || projectile->IsExpired()) {
 			return;
 		}
@@ -320,7 +320,7 @@ public:
 
 	void Draw3D() override {
 		GameObject* owner = GetOwner();
-		const auto* projectile = owner ? owner->GetComponent<PlayerProjectileComponent>() : nullptr;
+		const auto* projectile = owner ? owner->GetComponent<PlayerAttackEntityComponent>() : nullptr;
 		if (!owner || !projectile || projectile->IsExpired()) {
 			return;
 		}
@@ -429,7 +429,7 @@ public:
 
 	void Draw3D() override {
 		GameObject* owner = GetOwner();
-		const auto* projectile = owner ? owner->GetComponent<EnemyProjectileComponent>() : nullptr;
+		const auto* projectile = owner ? owner->GetComponent<EnemyAttackEntityComponent>() : nullptr;
 		if (!owner || !projectile || projectile->IsExpired()) {
 			return;
 		}
@@ -566,11 +566,11 @@ bool ShouldSkipColliderPair(GameObject* objectA, GameObject* objectB) {
 		return true;
 	}
 	const bool isProjectileA =
-	    objectA->GetComponent<EnemyProjectileComponent>() != nullptr ||
-	    objectA->GetComponent<PlayerProjectileComponent>() != nullptr;
+	    objectA->GetComponent<EnemyAttackEntityComponent>() != nullptr ||
+	    objectA->GetComponent<PlayerAttackEntityComponent>() != nullptr;
 	const bool isProjectileB =
-	    objectB->GetComponent<EnemyProjectileComponent>() != nullptr ||
-	    objectB->GetComponent<PlayerProjectileComponent>() != nullptr;
+	    objectB->GetComponent<EnemyAttackEntityComponent>() != nullptr ||
+	    objectB->GetComponent<PlayerAttackEntityComponent>() != nullptr;
 	return (isEnemyA && isEnemyB) || isProjectileA || isProjectileB;
 }
 

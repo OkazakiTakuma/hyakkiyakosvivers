@@ -1,0 +1,6 @@
+newmtl OonusaWhite
+Ka 1.000 1.000 1.000
+Kd 1.000 1.000 1.000
+Ks 0.100 0.100 0.100
+Ns 16.0
+map_Kd human/white.png

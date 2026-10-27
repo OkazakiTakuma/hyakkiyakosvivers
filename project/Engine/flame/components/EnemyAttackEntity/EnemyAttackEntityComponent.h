@@ -8,7 +8,7 @@
 #include <cmath>
 
 /// <summary>敵弾が使用する移動軌道です。</summary>
-enum class EnemyProjectileMotionType {
+enum class EnemyAttackEntityMotionType {
 	/// <summary>生成時に決めた方向へ直進します。</summary>
 	Linear,
 	/// <summary>固定中心の周囲を回りながら半径を広げます。</summary>
@@ -20,7 +20,7 @@ enum class EnemyProjectileMotionType {
 };
 
 /// <summary>敵弾の移動、攻撃力、寿命、命中状態を管理します。</summary>
-class EnemyProjectileComponent : public Component {
+class EnemyAttackEntityComponent : public Component {
 public:
 	void Initialize() override;
 	void Update() override;
@@ -29,8 +29,8 @@ public:
 	const Vector3& GetDirection() const;
 	/// <summary>このフレームの移動前に弾がいたワールド座標を返します。</summary>
 	const Vector3& GetPreviousPosition() const;
-	void SetMotionType(EnemyProjectileMotionType motionType);
-	EnemyProjectileMotionType GetMotionType() const;
+	void SetMotionType(EnemyAttackEntityMotionType motionType);
+	EnemyAttackEntityMotionType GetMotionType() const;
 	void SetExpandingOrbit(
 		const Vector3& center, float angle, float initialRadius, float angularSpeed, float radialSpeed, float height);
 	/// <summary>指定した中心へ収束する螺旋軌道を設定します。</summary>
@@ -53,7 +53,7 @@ private:
 	/// <summary>高速移動時のすり抜けを防ぐ連続判定に使用する直前座標です。</summary>
 	Vector3 previousPosition_{};
 	/// <summary>通常弾と3種類の竜巻軌道を切り替える移動方式です。</summary>
-	EnemyProjectileMotionType motionType_ = EnemyProjectileMotionType::Linear;
+	EnemyAttackEntityMotionType motionType_ = EnemyAttackEntityMotionType::Linear;
 	/// <summary>螺旋軌道の生成時に固定するワールド座標中心です。</summary>
 	Vector3 orbitCenter_{};
 	float orbitAngle_ = 0.0f;

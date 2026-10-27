@@ -7,6 +7,7 @@
 #include "SceneManager.h"
 #include "StringUtility.h"
 
+#include <algorithm>
 #include <array>
 #include <filesystem>
 #include <fstream>
@@ -712,7 +713,7 @@ void BaseScene::SaveEditorObjects() {
 		if (object->GetComponent<ExperienceComponent>()) {
 			continue;
 		}
-		if (object->GetComponent<EnemyProjectileComponent>()) {
+		if (object->GetComponent<EnemyAttackEntityComponent>()) {
 			continue;
 		}
 		if (object->GetParentName().empty() || !FindObjectByName(object->GetParentName())) {
@@ -883,7 +884,9 @@ void BaseScene::LoadEditorObjects() {
 				object3dComponent->SetDrawSkeleton(isAnimationModel);
 			}
 			player->ResetToSpawnPoint();
-			player->SetCurrentHealth(player->GetMaxHealth());
+			// 通常ステージは最大体力で開始し、検証用配置だけはstartingHealthで開始値を指定できる。
+			const float startingHealth = playerJson.value("startingHealth", player->GetMaxHealth());
+			player->SetCurrentHealth((std::clamp)(startingHealth, 0.0f, player->GetMaxHealth()));
 			// 選択タイプで開始する新規プレイでは、保存された配置用レベル・経験値ではなく初期値へ戻す。
 			player->SetLevel(playerTypeOverride_.empty() ? playerJson.value("level", player->GetStats().level) : playerStats.level);
 			player->SetExperience(playerTypeOverride_.empty() ? playerJson.value("experience", player->GetStats().experience) : playerStats.experience);
@@ -913,7 +916,15 @@ void BaseScene::LoadEditorObjects() {
 
 		for (const ComponentSerializationRegistration& registration : GetComponentSerializationRegistrations()) {
 			if (objectJson.contains(registration.jsonKey) || registration.loadExistingWithoutJson) {
-				registration.load(object, objectJson.value(registration.jsonKey, nlohmann::json::object()));
+				nlohmann::json componentJson = objectJson.value(registration.jsonKey, nlohmann::json::object());
+				// ゲーム開始時に選択キャラクターへ差し替えたPlayerでは、配置時のモデルに
+				// 保存されたテクスチャを引き継がない。たとえば巫女のテクスチャを
+				// ドッペルゲンガーへ貼るとUVが一致せず、頭頂部が地肌のように見える。
+				if (typeName == "Player" && !playerTypeOverride_.empty() &&
+					std::string(registration.jsonKey) == "object3d") {
+					componentJson.erase("modelTextureFilePath");
+				}
+				registration.load(object, componentJson);
 			}
 		}
 	}

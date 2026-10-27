@@ -70,7 +70,7 @@
     <Filter Include="Engine\flame\Components\Enemy">
       <UniqueIdentifier>{9592157B-F590-482B-803E-7978BC3BA023}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Engine\flame\Components\EnemyProjectile">
+    <Filter Include="Engine\flame\Components\EnemyAttackEntity">
       <UniqueIdentifier>{72733B3C-5F5C-43F2-A3D2-D00869B59C57}</UniqueIdentifier>
     </Filter>
     <Filter Include="Engine\flame\Components\EnemySpawnPoint">
@@ -85,7 +85,7 @@
     <Filter Include="Engine\flame\Components\PlayerAttack">
       <UniqueIdentifier>{76687485-A9C5-42ED-A475-461D7B8B41E9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Engine\flame\Components\PlayerProjectile">
+    <Filter Include="Engine\flame\Components\PlayerAttackEntity">
       <UniqueIdentifier>{D5783F5E-7AD2-4D6B-AE08-9737598DC7C5}</UniqueIdentifier>
     </Filter>
     <Filter Include="Engine\flame\helpers">
@@ -246,7 +246,7 @@
     <ClCompile Include="Engine\flame\base_scene\runtime\BaseSceneHud.cpp">
       <Filter>Engine\flame\BaseScene\Runtime</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\flame\base_scene\runtime\BaseScenePlayerProjectileRuntime.cpp">
+    <ClCompile Include="Engine\flame\base_scene\runtime\BaseScenePlayerAttackEntityRuntime.cpp">
       <Filter>Engine\flame\BaseScene\Runtime</Filter>
     </ClCompile>
     <ClCompile Include="Engine\flame\base_scene\runtime\BaseSceneRuntime.cpp">
@@ -258,8 +258,8 @@
     <ClCompile Include="Engine\flame\components\Enemy\EnemyComponent.cpp">
       <Filter>Engine\flame\Components\Enemy</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\flame\components\EnemyProjectile\EnemyProjectileComponent.cpp">
-      <Filter>Engine\flame\Components\EnemyProjectile</Filter>
+    <ClCompile Include="Engine\flame\components\EnemyAttackEntity\EnemyAttackEntityComponent.cpp">
+      <Filter>Engine\flame\Components\EnemyAttackEntity</Filter>
     </ClCompile>
     <ClCompile Include="Engine\flame\components\EnemySpawnPoint\EnemySpawnPointComponent.cpp">
       <Filter>Engine\flame\Components\EnemySpawnPoint</Filter>
@@ -273,8 +273,8 @@
     <ClCompile Include="Engine\flame\components\PlayerAttack\PlayerAttackComponent.cpp">
       <Filter>Engine\flame\Components\PlayerAttack</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\flame\components\PlayerProjectile\PlayerProjectileComponent.cpp">
-      <Filter>Engine\flame\Components\PlayerProjectile</Filter>
+    <ClCompile Include="Engine\flame\components\PlayerAttackEntity\PlayerAttackEntityComponent.cpp">
+      <Filter>Engine\flame\Components\PlayerAttackEntity</Filter>
     </ClCompile>
     <ClCompile Include="Engine\flame\repositories\PlayerStatusRepository.cpp">
       <Filter>Engine\flame\repositories</Filter>
@@ -503,8 +503,8 @@
 	<ClInclude Include="Engine\flame\components\Enemy\EnemyComponent.h">
 	  <Filter>Engine\flame\Components\Enemy</Filter>
 	</ClInclude>
-	<ClInclude Include="Engine\flame\components\EnemyProjectile\EnemyProjectileComponent.h">
-	  <Filter>Engine\flame\Components\EnemyProjectile</Filter>
+	<ClInclude Include="Engine\flame\components\EnemyAttackEntity\EnemyAttackEntityComponent.h">
+	  <Filter>Engine\flame\Components\EnemyAttackEntity</Filter>
 	</ClInclude>
 	<ClInclude Include="Engine\flame\base_scene\StageResultData.h">
 	  <Filter>Engine\flame\BaseScene</Filter>
@@ -521,8 +521,8 @@
     <ClInclude Include="Engine\flame\components\PlayerAttack\PlayerAttackComponent.h">
       <Filter>Engine\flame\Components\PlayerAttack</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\flame\components\PlayerProjectile\PlayerProjectileComponent.h">
-      <Filter>Engine\flame\Components\PlayerProjectile</Filter>
+    <ClInclude Include="Engine\flame\components\PlayerAttackEntity\PlayerAttackEntityComponent.h">
+      <Filter>Engine\flame\Components\PlayerAttackEntity</Filter>
     </ClInclude>
     <ClInclude Include="Engine\flame\repositories\ParticlePresetRepository.h">
       <Filter>Engine\flame\repositories</Filter>

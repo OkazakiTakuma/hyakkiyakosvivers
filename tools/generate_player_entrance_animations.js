@@ -69,6 +69,10 @@ function rotationTrack(node, frames) {
   return { node, path: "rotation", frames };
 }
 
+function translationTrack(node, frames) {
+  return { node, path: "translation", frames };
+}
+
 function replaceAccessorMaximum(source, accessorName, maximum) {
   const escapedName = accessorName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const pattern = new RegExp(`("name"\\s*:\\s*"${escapedName}"[\\s\\S]*?"max"\\s*:\\s*\\[\\s*)[-+0-9.eE]+`);
@@ -155,6 +159,58 @@ const models = [
       rotationTrack("tail", [[0, -0.66, 0.28], [0, 1.02, -0.40], [0, -0.82, 0.34], [0, 0.34, -0.14], [0, 0, 0]]),
     ],
   },
+  {
+    gltf: "project/Resources/human/miko.gltf",
+    bin: "miko_defeat_baked.bin",
+    animation: "力尽きる完全_巫女",
+    times: [0.0, 0.18, 0.42, 0.78, 1.16, 1.52],
+    tracks: [
+      rotationTrack("root", [[0, 0, 0], [-0.08, 0, 0.04], [0.04, 0, 0.18], [0.08, 0, 0.62], [0.04, 0, 1.14], [0, 0, 1.36]]),
+      translationTrack("root", [[0, 0, 0], [0, 0.03, 0], [-0.03, -0.02, 0], [-0.10, -0.06, 0], [-0.18, -0.10, 0], [-0.22, -0.12, 0]]),
+      rotationTrack("spine", [[0, 0, 0], [-0.22, 0, 0], [0.10, 0, 0.05], [0.40, 0, 0.14], [0.66, 0, 0.24], [0.76, 0, 0.30]]),
+      rotationTrack("head", [[0, 0, 0], [0.14, 0, 0], [-0.08, 0, 0], [-0.24, 0, -0.06], [-0.42, 0, -0.12], [-0.50, 0, -0.16]]),
+      rotationTrack("arm.L", [[0, 0, 0], [-0.18, 0, -0.22], [-0.42, 0.06, -0.46], [-0.18, 0.10, -0.78], [0.12, 0.08, -1.02], [0.24, 0.04, -1.12]]),
+      rotationTrack("arm.R", [[0, 0, 0], [-0.18, 0, 0.22], [-0.42, -0.06, 0.46], [-0.18, -0.10, 0.78], [0.12, -0.08, 1.02], [0.24, -0.04, 1.12]]),
+      rotationTrack("leg.L", [[0, 0, 0], [0.06, 0, 0], [0.30, 0, 0.08], [0.54, 0, 0.16], [0.68, 0, 0.20], [0.72, 0, 0.22]]),
+      rotationTrack("leg.R", [[0, 0, 0], [0.04, 0, 0], [0.20, 0, -0.06], [0.42, 0, -0.12], [0.54, 0, -0.16], [0.58, 0, -0.18]]),
+      rotationTrack("tail", [[0, 0, 0], [0, 0.10, 0], [0, -0.18, 0.08], [0, -0.34, 0.15], [0, -0.48, 0.20], [0, -0.56, 0.22]]),
+    ],
+  },
+  {
+    gltf: "project/Resources/doppelganger/doppelganger.gltf",
+    bin: "doppelganger_defeat_baked.bin",
+    animation: "力尽きる完全_烏天狗",
+    times: [0.0, 0.16, 0.38, 0.72, 1.10, 1.48],
+    tracks: [
+      rotationTrack("root", [[0, 0, 0], [-0.12, 0, -0.06], [0.06, 0, -0.24], [0.12, 0, -0.72], [0.06, 0, -1.22], [0, 0, -1.42]]),
+      translationTrack("root", [[0, 0, 0], [0, 0.04, 0], [0.04, 0, 0], [0.13, -0.05, 0], [0.23, -0.10, 0], [0.28, -0.13, 0]]),
+      rotationTrack("pelvis", [[0, 0, 0], [0, -0.18, 0.08], [0, 0.26, -0.14], [0.08, 0.44, -0.28], [0.14, 0.54, -0.38], [0.18, 0.58, -0.42]]),
+      rotationTrack("spine", [[0, 0, 0], [-0.28, -0.16, 0.14], [-0.10, 0.30, -0.20], [0.34, 0.48, -0.38], [0.58, 0.56, -0.52], [0.68, 0.58, -0.58]]),
+      rotationTrack("head", [[0, 0, 0], [0.20, 0.16, -0.08], [-0.12, -0.24, 0.12], [-0.30, -0.34, 0.20], [-0.44, -0.40, 0.26], [-0.50, -0.42, 0.28]]),
+      rotationTrack("arm.L", [[0, 0, 0], [-0.44, 0.10, 0.62], [-0.72, 0.18, 0.98], [-0.34, 0.26, 1.24], [0.10, 0.30, 1.40], [0.28, 0.32, 1.48]]),
+      rotationTrack("arm.R", [[0, 0, 0], [0.34, -0.12, -0.48], [0.58, -0.20, -0.76], [0.30, -0.28, -1.02], [-0.08, -0.32, -1.28], [-0.24, -0.34, -1.40]]),
+      rotationTrack("leg.L", [[0, 0, 0], [0.10, 0, 0], [0.38, 0, 0.12], [0.64, 0, 0.22], [0.76, 0, 0.30], [0.80, 0, 0.34]]),
+      rotationTrack("leg.R", [[0, 0, 0], [-0.04, 0, 0], [0.18, 0, -0.10], [0.46, 0, -0.22], [0.62, 0, -0.30], [0.68, 0, -0.34]]),
+    ],
+  },
+  {
+    gltf: "project/Resources/cat/neko.gltf",
+    bin: "neko_defeat_baked.bin",
+    animation: "力尽きる完全_猫",
+    times: [0.0, 0.14, 0.34, 0.64, 1.02, 1.46],
+    tracks: [
+      rotationTrack("root", [[0, 0, 0], [0.14, 0, 0.03], [0.26, 0, 0.16], [0.18, 0, 0.54], [0.08, 0, 1.02], [0, 0, 1.24]]),
+      translationTrack("root", [[0, 0, 0], [0, -0.01, 0], [-0.02, -0.05, 0], [-0.07, -0.10, 0], [-0.14, -0.15, 0], [-0.17, -0.17, 0]]),
+      rotationTrack("pelvis", [[0, 0, 0], [-0.14, 0, 0], [0.20, 0, 0.08], [0.48, 0, 0.18], [0.62, 0, 0.26], [0.66, 0, 0.30]]),
+      rotationTrack("spine", [[0, 0, 0], [0.42, 0, 0], [0.78, 0, 0.08], [0.32, 0, 0.18], [0.54, 0, 0.28], [0.62, 0, 0.34]]),
+      rotationTrack("head", [[0, 0, 0], [-0.26, 0, 0], [-0.48, 0, -0.06], [-0.18, 0, -0.14], [-0.36, 0, -0.22], [-0.44, 0, -0.26]]),
+      rotationTrack("arm.L", [[0, 0, 0], [-0.36, 0, 0.42], [-0.72, 0, 0.76], [-0.22, 0.06, 1.00], [0.14, 0.08, 1.18], [0.24, 0.08, 1.26]]),
+      rotationTrack("arm.R", [[0, 0, 0], [-0.36, 0, -0.42], [-0.72, 0, -0.76], [-0.22, -0.06, -1.00], [0.14, -0.08, -1.18], [0.24, -0.08, -1.26]]),
+      rotationTrack("leg.L", [[0, 0, 0], [0.24, 0, 0.12], [0.58, 0, 0.28], [0.76, 0, 0.42], [0.84, 0, 0.50], [0.86, 0, 0.54]]),
+      rotationTrack("leg.R", [[0, 0, 0], [0.24, 0, -0.12], [0.58, 0, -0.28], [0.76, 0, -0.42], [0.84, 0, -0.50], [0.86, 0, -0.54]]),
+      rotationTrack("tail", [[0, 0, 0], [0, 0.72, -0.24], [0, -0.88, 0.34], [0, 0.46, -0.30], [0, -0.24, 0.18], [0, -0.48, 0.26]]),
+    ],
+  },
 ];
 
 for (const definition of models) {
@@ -202,20 +258,41 @@ for (const definition of models) {
   for (const track of definition.tracks) {
     const nodeIndex = nodeIndices.get(track.node);
     if (nodeIndex === undefined) throw new Error(`${definition.gltf}: node ${track.node} was not found`);
-    const baseRotation = gltf.nodes[nodeIndex].rotation || [0, 0, 0, 1];
-    const rotations = track.frames.flatMap((euler) =>
-      normalizeQuaternion(multiplyQuaternion(quaternionFromEuler(euler), baseRotation)),
-    );
-    const valueBytes = appendFloats(rotations);
+    if (track.frames.length !== definition.times.length) {
+      throw new Error(`${definition.animation}/${track.node}/${track.path}: keyframe count mismatch`);
+    }
+    let values;
+    let accessorType;
+    let accessorSuffix;
+    if (track.path === "rotation") {
+      const baseRotation = gltf.nodes[nodeIndex].rotation || [0, 0, 0, 1];
+      values = track.frames.flatMap((euler) =>
+        normalizeQuaternion(multiplyQuaternion(quaternionFromEuler(euler), baseRotation)),
+      );
+      accessorType = "VEC4";
+      accessorSuffix = "回転";
+    } else if (track.path === "translation") {
+      const baseTranslation = gltf.nodes[nodeIndex].translation || [0, 0, 0];
+      values = track.frames.flatMap((offset) => [
+        baseTranslation[0] + offset[0],
+        baseTranslation[1] + offset[1],
+        baseTranslation[2] + offset[2],
+      ]);
+      accessorType = "VEC3";
+      accessorSuffix = "移動";
+    } else {
+      throw new Error(`${definition.animation}: unsupported track path ${track.path}`);
+    }
+    const valueBytes = appendFloats(values);
     const bufferViewIndex = gltf.bufferViews.length + newBufferViews.length;
     newBufferViews.push({ buffer: newBufferIndex, byteOffset: valueBytes.offset, byteLength: valueBytes.length });
     const accessorIndex = gltf.accessors.length + newAccessors.length;
     newAccessors.push({
-      name: `${definition.animation}_${track.node}_回転`,
+      name: `${definition.animation}_${track.node}_${accessorSuffix}`,
       bufferView: bufferViewIndex,
       componentType: 5126,
       count: definition.times.length,
-      type: "VEC4",
+      type: accessorType,
     });
     samplers.push({ input: timeAccessorIndex, interpolation: "LINEAR", output: accessorIndex });
     channels.push({ sampler: samplers.length - 1, target: { node: nodeIndex, path: track.path } });

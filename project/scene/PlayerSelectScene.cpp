@@ -80,7 +80,8 @@ void PlayerSelectScene::Initialize() {
 		// 前回選択が使用可能なら維持し、そうでなければ初期開放キャラクターへ戻す。
 		const std::string& currentType = sceneManager_->GetSelectedPlayerTypeName();
 		const auto found = std::find(playerTypeNames_.begin(), playerTypeNames_.end(), currentType);
-		if (found != playerTypeNames_.end() && sceneManager_->IsPlayerTypeUnlocked(currentType)) {
+		if (found != playerTypeNames_.end() &&
+			(sceneManager_->IsDemoPlayActive() || sceneManager_->IsPlayerTypeUnlocked(currentType))) {
 			selectedPlayerIndex_ = static_cast<int>(std::distance(playerTypeNames_.begin(), found));
 		} else {
 			const auto initialPlayer = std::find(playerTypeNames_.begin(), playerTypeNames_.end(), "巫女");
@@ -137,7 +138,8 @@ void PlayerSelectScene::RefreshSelectionPresentation() {
 	previewTime_ = 0.0f;
 	// 選択されたタイプのJSON設定を、右側の全表示項目の共通入力として使う。
 	const PlayerStats stats = LoadPlayerStats(playerTypeNames_[selectedPlayerIndex_]);
-	const bool unlocked = !sceneManager_ || sceneManager_->IsPlayerTypeUnlocked(stats.name);
+	// 自動デモでは進行データを変更せず、未開放キャラクターも順番に検証できるよう表示を開放する。
+	const bool unlocked = !sceneManager_ || sceneManager_->IsDemoPlayActive() || sceneManager_->IsPlayerTypeUnlocked(stats.name);
 	characterNameTextObject_->GetComponent<TextComponent>()->SetText(stats.name);
 	characterNameTextObject_->GetComponent<TextComponent>()->SetColor(unlocked ? Vector4{1.0f, 0.94f, 0.72f, 1.0f} : Vector4{0.58f, 0.60f, 0.66f, 1.0f});
 	statusTextObject_->GetComponent<TextComponent>()->SetText(unlocked ? MakeStatusDescription(stats) : "？？？\n\n未開放のため能力は表示されません");
@@ -335,15 +337,16 @@ void PlayerSelectScene::BeginSelectionConfirmation() {
 	instructionTextObject_->GetComponent<TextComponent>()->SetText("");
 }
 
-bool PlayerSelectScene::BeginDemoMikoConfirmation() {
+bool PlayerSelectScene::BeginDemoPlayerConfirmation(const std::string& playerTypeName) {
 	if (isSelectionConfirming_ || !sceneManager_) {
 		return false;
 	}
-	const auto miko = std::find(playerTypeNames_.begin(), playerTypeNames_.end(), "巫女");
-	if (miko == playerTypeNames_.end() || !sceneManager_->IsPlayerTypeUnlocked("巫女")) {
+	const auto playerType = std::find(playerTypeNames_.begin(), playerTypeNames_.end(), playerTypeName);
+	if (playerType == playerTypeNames_.end()) {
 		return false;
 	}
-	selectedPlayerIndex_ = static_cast<int>(std::distance(playerTypeNames_.begin(), miko));
+	// デモ専用経路では通常の開放条件を変更せず、全キャラクターを検証対象にする。
+	selectedPlayerIndex_ = static_cast<int>(std::distance(playerTypeNames_.begin(), playerType));
 	if (selectedPlayerIndex_ != presentedPlayerIndex_) {
 		RefreshSelectionPresentation();
 	}

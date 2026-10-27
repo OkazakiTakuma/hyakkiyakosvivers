@@ -47,7 +47,7 @@ void BaseScene::UpdatePlayerAttacks() {
 	size_t nextLaserTargetIndex = 0;
 
 	for (PlayerAttackShotRequest& request : shotRequests) {
-		if (request.motionType == PlayerProjectileMotionType::SkyLaser) {
+		if (request.motionType == PlayerAttackEntityMotionType::SkyLaser) {
 			// 画面内に標的が残っていない分のレーザーは生成しない。
 			if (nextLaserTargetIndex >= laserTargets.size()) {
 				continue;
@@ -55,7 +55,7 @@ void BaseScene::UpdatePlayerAttacks() {
 			const Vector3 targetPosition = laserTargets[nextLaserTargetIndex++]->GetTransform().translate;
 			request.position = {targetPosition.x, targetPosition.y + 3.0f, targetPosition.z};
 		}
-		CreateRuntimePlayerProjectile(request);
+		CreateRuntimePlayerAttackEntity(request);
 	}
 }
 
@@ -593,29 +593,29 @@ void BaseScene::UpdateEnemyAttacks() {
 		}
 	}
 	for (const EnemyShotRequest& request : shotRequests) {
-		CreateRuntimeEnemyProjectile(request);
+		CreateRuntimeEnemyAttackEntity(request);
 	}
 }
 
 /// <summary>敵の発射要求から、移動・描画・当たり判定を持つ敵弾を生成します。</summary>
-GameObject* BaseScene::CreateRuntimeEnemyProjectile(const EnemyShotRequest& request) {
+GameObject* BaseScene::CreateRuntimeEnemyAttackEntity(const EnemyShotRequest& request) {
 	auto object = std::make_unique<GameObject>();
 	// 軌道タイプは移動だけでなく、竜巻ごとの名前・色・軌跡表現の選択にも使用する。
-	const bool isContractingTornado = request.motionType == EnemyProjectileMotionType::ContractingOrbit;
-	const bool isGiantTornado = request.motionType == EnemyProjectileMotionType::Homing;
-	const bool isTornado = request.motionType == EnemyProjectileMotionType::ExpandingOrbit ||
-	    request.motionType == EnemyProjectileMotionType::ContractingOrbit || isGiantTornado;
+	const bool isContractingTornado = request.motionType == EnemyAttackEntityMotionType::ContractingOrbit;
+	const bool isGiantTornado = request.motionType == EnemyAttackEntityMotionType::Homing;
+	const bool isTornado = request.motionType == EnemyAttackEntityMotionType::ExpandingOrbit ||
+	    request.motionType == EnemyAttackEntityMotionType::ContractingOrbit || isGiantTornado;
 	object->SetName(MakeUniqueObjectName(
 	    isGiantTornado ? "BossGiantTornado"
-	    : isContractingTornado ? "BossConvergingTornado" : isTornado ? "BossTornado" : "EnemyProjectile"));
-	object->SetEditorType("EnemyProjectile");
+	    : isContractingTornado ? "BossConvergingTornado" : isTornado ? "BossTornado" : "EnemyAttackEntity"));
+	object->SetEditorType("EnemyAttackEntity");
 	object->GetTransform().translate = request.position;
 	object->GetTransform().scale = {request.size, request.size, request.size};
 	object->GetTransform().rotate.y = std::atan2(request.direction.x, request.direction.z);
 
-	EnemyProjectileComponent* projectile = object->AddComponent<EnemyProjectileComponent>();
+	EnemyAttackEntityComponent* projectile = object->AddComponent<EnemyAttackEntityComponent>();
 	projectile->SetDirection(request.direction);
-	if (request.motionType == EnemyProjectileMotionType::ExpandingOrbit) {
+	if (request.motionType == EnemyAttackEntityMotionType::ExpandingOrbit) {
 		projectile->SetExpandingOrbit(
 		    request.orbitCenter,
 		    request.orbitAngle,
@@ -623,7 +623,7 @@ GameObject* BaseScene::CreateRuntimeEnemyProjectile(const EnemyShotRequest& requ
 		    request.orbitAngularSpeed,
 		    request.orbitRadialSpeed,
 		    request.orbitHeight);
-	} else if (request.motionType == EnemyProjectileMotionType::ContractingOrbit) {
+	} else if (request.motionType == EnemyAttackEntityMotionType::ContractingOrbit) {
 		projectile->SetContractingOrbit(
 		    request.orbitCenter,
 		    request.orbitAngle,
@@ -717,7 +717,7 @@ GameObject* BaseScene::CreateRuntimeEnemyProjectile(const EnemyShotRequest& requ
 }
 
 /// <summary>有効な敵弾とプレイヤーのコライダーを判定し、命中時にダメージと弾の消滅を処理します。</summary>
-void BaseScene::UpdateEnemyProjectileHits() {
+void BaseScene::UpdateEnemyAttackEntityHits() {
 	// プレイヤーの実コライダー範囲を登録し、高速弾は移動線分を包む範囲で候補検索する。
 	collisionSpatialGrid_.Clear();
 	collisionDebugStats_.enemyProjectileCandidates = 0;
@@ -746,7 +746,7 @@ void BaseScene::UpdateEnemyProjectileHits() {
 	}
 
 	for (const auto& projectileObject : sceneObjects_) {
-		EnemyProjectileComponent* projectile = projectileObject->GetComponent<EnemyProjectileComponent>();
+		EnemyAttackEntityComponent* projectile = projectileObject->GetComponent<EnemyAttackEntityComponent>();
 		if (!projectile || !projectile->IsEnabled() || projectile->IsExpired()) {
 			continue;
 		}

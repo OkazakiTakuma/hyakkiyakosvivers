@@ -119,6 +119,8 @@ public:
 	/// <summary>内部ステージIDをプレイヤー向けの表示名へ変換します。</summary>
 	std::string GetGameplayStageDisplayName(const std::string& stageId) const;
 	const std::vector<std::string>& GetGameplayStageIds() const { return gameplayStageIds_; }
+	/// <summary>プレイヤー向けステージ選択へ表示するステージIDだけを返します。</summary>
+	std::vector<std::string> GetSelectableGameplayStageIds() const;
 	/// <summary>指定したステージが現在の進行度で選択可能かを返します。</summary>
 	bool IsGameplayStageUnlocked(const std::string& stageId) const;
 	/// <summary>指定ステージの開放に必要なクリア済みステージIDを返します。条件なしなら空文字です。</summary>
@@ -165,7 +167,7 @@ private:
 	void SwitchToNextScene();
 	/// <summary>経過時間から遷移のフェーズと画面被覆率を更新します。</summary>
 	void UpdateTransition();
-	/// <summary>F1入力と、タイトルからゲーム開始までを繰り返す自動デモの進行を更新します。</summary>
+	/// <summary>F1入力と、キャラクター選択から敗北リザルトまでを繰り返す自動デモの進行を更新します。</summary>
 	void UpdateDemoPlay();
 	/// <summary>デモ再生中であることと停止操作を、全シーン共通の最前面へ表示します。</summary>
 	void DrawDemoPlayGuide();
@@ -227,16 +229,20 @@ private:
 	int selectedSceneIndex_ = 0;
 	bool isScenePlaying_ = true;
 	bool isFrameStepRequested_ = false;
-	/// <summary>タイトル、ステージ1、巫女、ゲーム開始を巡回する自動デモの有効状態です。</summary>
+	/// <summary>キャラクター選択、検証ステージ、敗北リザルトを巡回する自動デモの有効状態です。</summary>
 	bool isDemoPlayActive_ = false;
 	/// <summary>自動デモで現在のシーンを見せ始めてからの経過秒数です。</summary>
 	float demoSceneElapsed_ = 0.0f;
 	/// <summary>自動デモのタイマーをシーン切り替え時にリセットするための直前シーン名です。</summary>
 	std::string demoObservedSceneName_;
-	/// <summary>どの画面でF1を押しても、最初のタイトル表示からデモを始めるための要求です。</summary>
+	/// <summary>どの画面でF1を押しても、キャラクター選択からデモを始めるための要求です。</summary>
 	bool isDemoRestartRequested_ = false;
 	/// <summary>現在のシーンで通常の決定演出を開始済みかどうかです。</summary>
 	bool isDemoAdvancePresentationStarted_ = false;
+	/// <summary>自動デモで順番に使用する、Defaultを除いた全プレイヤータイプです。</summary>
+	std::vector<std::string> demoPlayerTypeNames_;
+	/// <summary>次のデモ周回で使用するプレイヤータイプの位置です。</summary>
+	size_t demoPlayerTypeIndex_ = 0;
 	/// <summary>シーンをまたいで引き継ぐプレイヤータイプです。初回は唯一開放済みの巫女を使用します。</summary>
 	std::string selectedPlayerTypeName_ = "巫女";
 	std::vector<std::string> gameplayStageIds_ = {"default"};

@@ -3,7 +3,7 @@
 #include "camera/Camera.h"
 #include "camera/CameraComponent.h"
 #include "components/Enemy/EnemyComponent.h"
-#include "components/EnemyProjectile/EnemyProjectileComponent.h"
+#include "components/EnemyAttackEntity/EnemyAttackEntityComponent.h"
 #include "components/EnemySpawnPoint/EnemySpawnPointComponent.h"
 #include "components/Experience/ExperienceComponent.h"
 #include "components/ItemDrop/ItemDropComponent.h"
@@ -31,7 +31,7 @@
 #include "particle/ParticleEmitterComponent.h"
 #include "particle/GlowBillboardComponent.h"
 #include "components/PlayerAttack/PlayerAttackComponent.h"
-#include "components/PlayerProjectile/PlayerProjectileComponent.h"
+#include "components/PlayerAttackEntity/PlayerAttackEntityComponent.h"
 #include "../../../Player/Player.h"
 #include "collision/SphereColliderComponent.h"
 #include "SpriteComponent.h"
@@ -282,14 +282,14 @@ private:
 	/// <summary>プレイヤーのワールド座標は変えず、周囲の地形タイルだけを再配置します。</summary>
 	void UpdateLoopingTerrain();
 	void UpdateEnemyAttacks();
-	void UpdateEnemyProjectileHits();
+	void UpdateEnemyAttackEntityHits();
 	void UpdatePlayerAttacks();
-	void UpdatePlayerProjectileHits();
+	void UpdatePlayerAttackEntityHits();
 	/// <summary>近接する同単位の通常経験値を、合計値を保ったまま次の単位へ圧縮します。</summary>
 	void UpdateExperienceCompression();
 	void UpdateItemDrops();
 	void UpdateBossUpgradeRewards();
-	void CleanupExpiredPlayerProjectiles();
+	void CleanupExpiredPlayerAttackEntities();
 	/// <summary>シーン内で最初に見つかった有効なプレイヤーを返します。</summary>
 	Player* FindActivePlayer() const;
 	void UpdatePlayerHealthHud();
@@ -331,7 +331,7 @@ private:
 	GameObject* CreateRuntimeEnemy(
 		const std::string& enemyTypeName, const Vector3& position, GameObject* target,
 		const EnemySpawnPointComponent::EnemyStatMultipliers& statMultipliers = {});
-	GameObject* CreateRuntimeEnemyProjectile(const EnemyShotRequest& request);
+	GameObject* CreateRuntimeEnemyAttackEntity(const EnemyShotRequest& request);
 	GameObject* CreateRuntimeExperience(const EnemyStats& enemyStats, const Vector3& position, GameObject* target);
 	GameObject* CreateRuntimeItemDrop(ItemDropType type, const Vector3& position, GameObject* target, float healAmount = 0.0f, int moneyAmount = 0);
 	/// <summary>指定回数の強化を内包したボス報酬を1個だけ生成します。</summary>
@@ -342,7 +342,7 @@ private:
 	void QueueBossAcquisitionOffers(Player* player, int offerCount);
 	/// <summary>予約された取得候補を1件ずつ確認画面へ表示します。</summary>
 	bool ShowNextBossAcquisitionOffer();
-	GameObject* CreateRuntimePlayerProjectile(const PlayerAttackShotRequest& request);
+	GameObject* CreateRuntimePlayerAttackEntity(const PlayerAttackShotRequest& request);
 	GameObject* FindNearestEnemy(const Vector3& position) const;
 /// <summary>
 /// 文字列からエディタ生成タイプへ変換します。

@@ -118,11 +118,12 @@ void BaseScene::Finalize() {
 
 void BaseScene::SetGameplayMode(GameplayMode mode) {
 	gameplayMode_ = mode;
-	// UIがゲーム世界を占有するモードだけ時間を止め、停止理由を一か所で管理する。
+	// UIがゲーム世界を占有するモードと終了演出中は時間を止め、停止理由を一か所で管理する。
 	const bool shouldPause = mode == GameplayMode::Intro ||
 		mode == GameplayMode::Paused ||
 		mode == GameplayMode::LevelUpSelection ||
-		mode == GameplayMode::BossReward;
+		mode == GameplayMode::BossReward ||
+		mode == GameplayMode::Finished;
 	GameTime::SetPaused(shouldPause);
 }
 
@@ -144,14 +145,14 @@ void BaseScene::UpdateSceneObjects() {
 	// Object3dの更新後に上書きし、光源所有者ではなくシーン全体へ同じライトを適用する。
 	ApplyScenePointLight();
 	UpdateEnemyAttacks();
-	UpdateEnemyProjectileHits();
+	UpdateEnemyAttackEntityHits();
 	UpdatePlayerAttacks();
-	UpdatePlayerProjectileHits();
+	UpdatePlayerAttackEntityHits();
 	UpdateBossUpgradeRewards();
 	UpdateItemDrops();
 	UpdateExperienceCompression();
 	UpdateEnemySpawning();
-	CleanupExpiredPlayerProjectiles();
+	CleanupExpiredPlayerAttackEntities();
 	UpdatePlayerHealthHud();
 	// G取得処理より後で更新し、このフレームに拾った金額を即座にHUDへ表示する。
 	UpdateChallengeMoneyHud();

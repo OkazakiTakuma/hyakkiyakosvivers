@@ -43,6 +43,8 @@ public:
 	}
 	/// ゲームプレイ画面の「Show Particles」設定を共通描画処理へ反映します。
 	bool IsParticleRenderingEnabled() const override { return isShowParticles_; }
+	/// <summary>自動デモからプレイヤーを敗北させ、通常と同じゲームオーバー演出を開始します。</summary>
+	bool BeginDemoDefeatPresentation();
 
 private:
 	bool isShowSkyBox_ = false;
@@ -133,8 +135,6 @@ private:
 	bool defeatTransitionRequested_ = false;
 	float defeatPresentationElapsed_ = 0.0f;
 	GameObject* defeatPresentationPlayer_ = nullptr;
-	EulerTransform defeatPresentationBaseTransform_{};
-	float defeatFallDirection_ = 1.0f;
 	std::unique_ptr<GameObject> defeatMessageTextObject_;
 	/// <summary>
 	/// ImGui によるデバッグ用 UI の表示と編集処理を行います。

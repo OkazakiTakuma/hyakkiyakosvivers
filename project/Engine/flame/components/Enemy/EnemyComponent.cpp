@@ -972,7 +972,7 @@ void EnemyComponent::EmitBossTornadoPattern(const EulerTransform& transform) {
 			request.attack = stats_.attack * stats_.bossTornadoAttackMultiplier;
 			request.size = stats_.bossTornadoSize;
 			request.lifeTime = stats_.bossTornadoLifeTime;
-			request.motionType = EnemyProjectileMotionType::ExpandingOrbit;
+			request.motionType = EnemyAttackEntityMotionType::ExpandingOrbit;
 			request.orbitCenter = transform.translate;
 			request.orbitAngle = angle;
 			request.orbitInitialRadius = stats_.bossTornadoInitialRadius;
@@ -1001,7 +1001,7 @@ void EnemyComponent::EmitBossConvergingTornadoPattern(const EulerTransform& tran
 			request.attack = stats_.attack * stats_.bossConvergingTornadoAttackMultiplier;
 			request.size = stats_.bossConvergingTornadoSize;
 			request.lifeTime = stats_.bossConvergingTornadoLifeTime;
-			request.motionType = EnemyProjectileMotionType::ContractingOrbit;
+			request.motionType = EnemyAttackEntityMotionType::ContractingOrbit;
 			request.orbitCenter = center;
 			request.orbitAngle = angle;
 			request.orbitInitialRadius = stats_.bossConvergingTornadoInitialRadius;
@@ -1026,7 +1026,7 @@ void EnemyComponent::EmitBossGiantTornadoPattern(const EulerTransform& transform
 		request.attack = stats_.attack * stats_.bossGiantTornadoAttackMultiplier;
 		request.size = stats_.bossGiantTornadoSize;
 		request.lifeTime = stats_.bossGiantTornadoLifeTime;
-		request.motionType = EnemyProjectileMotionType::Homing;
+		request.motionType = EnemyAttackEntityMotionType::Homing;
 		request.homingTarget = target_;
 		pendingShotRequests_.push_back(request);
 	}

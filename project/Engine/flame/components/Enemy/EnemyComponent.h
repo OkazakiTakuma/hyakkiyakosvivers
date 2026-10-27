@@ -3,7 +3,7 @@
 #include "MathConstants.h"
 #include "core/GameObject.h"
 #include "LineDrawer.h"
-#include "components/EnemyProjectile/EnemyProjectileComponent.h"
+#include "components/EnemyAttackEntity/EnemyAttackEntityComponent.h"
 #include "GameTime.h"
 #include <algorithm>
 #include <cmath>
@@ -30,7 +30,7 @@ struct EnemyShotRequest {
 	float size = 0.22f;
 	float lifeTime = 6.0f;
 	/// <summary>直進以外の特殊軌道をシーン側へ引き渡す設定です。</summary>
-	EnemyProjectileMotionType motionType = EnemyProjectileMotionType::Linear;
+	EnemyAttackEntityMotionType motionType = EnemyAttackEntityMotionType::Linear;
 	Vector3 orbitCenter{};
 	float orbitAngle = 0.0f;
 	float orbitInitialRadius = 0.0f;
