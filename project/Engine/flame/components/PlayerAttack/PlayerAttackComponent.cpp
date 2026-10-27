@@ -251,7 +251,7 @@ void PlayerAttackComponent::CreateMagatamaAttack(GameObject* owner, const Player
 			const float angle = index < static_cast<int>(levelStats.angles.size()) ? levelStats.angles[index] : 0.0f;
 			QueueShot(owner, player, attackStats, levelStats, currentLevel, angle, index, true);
 			PlayerAttackShotRequest& request = shotRequests_.back();
-			request.motionType = PlayerProjectileMotionType::Magatama;
+			request.motionType = PlayerAttackEntityMotionType::Magatama;
 		}
 	}
 
@@ -268,7 +268,7 @@ void PlayerAttackComponent::CreateOrbitAttack(GameObject* owner, const Player& p
 			const float localStartAngle = horizontalRadius > MathConstants::kDirectionEpsilon
 			    ? std::atan2(spawnOffset.z, spawnOffset.x)
 			    : MathConstants::kTwoPi * static_cast<float>(index) / static_cast<float>(shotCount);
-			request.motionType = PlayerProjectileMotionType::Orbit;
+			request.motionType = PlayerAttackEntityMotionType::Orbit;
 			request.motionAnchor = owner;
 			// プレイヤーの現在回転を除き、保存したローカル開始角度をワールド周回角へ変換する。
 			request.orbitAngleRadians = localStartAngle - owner->GetTransform().rotate.y;
@@ -285,7 +285,7 @@ void PlayerAttackComponent::CreateSkyLaserAttack(GameObject* owner, const Player
 		for (int index = 0; index < targetCount; ++index) {
 			QueueShot(owner, player, attackStats, levelStats, currentLevel, 0.0f, index);
 			PlayerAttackShotRequest& request = shotRequests_.back();
-			request.motionType = PlayerProjectileMotionType::SkyLaser;
+			request.motionType = PlayerAttackEntityMotionType::SkyLaser;
 			request.direction = {0.0f, -1.0f, 0.0f};
 			request.speed = 0.0f;
 		}
@@ -295,10 +295,12 @@ void PlayerAttackComponent::CreateBoomerangAttack(GameObject* owner, const Playe
 		// 発射時の進行方向はBaseSceneで最寄りの敵へ向けるが、飛行中は追尾しない。
 		QueueShot(owner, player, attackStats, levelStats, currentLevel, 0.0f, 0);
 		PlayerAttackShotRequest& request = shotRequests_.back();
-		request.motionType = PlayerProjectileMotionType::Boomerang;
+		request.motionType = PlayerAttackEntityMotionType::Boomerang;
 		request.motionAnchor = owner;
 		request.travelDistance = levelStats.travelDistance;
 		request.homing = false;
+		// データ側の汎用球モデルではなく、ブーメラン攻撃専用の大幣を飛ばす。
+		request.modelFilePath = "oonusa_handle.obj";
 	}
 
 void PlayerAttackComponent::CreateRicochetAttack(GameObject* owner, const Player& player, const PlayerAttackStats& attackStats, const PlayerAttackLevelStats& levelStats, const std::string& currentLevel) {
@@ -308,7 +310,7 @@ void PlayerAttackComponent::CreateRicochetAttack(GameObject* owner, const Player
 			const float angle = index < static_cast<int>(levelStats.angles.size()) ? levelStats.angles[index] : 0.0f;
 			QueueShot(owner, player, attackStats, levelStats, currentLevel, angle, index);
 			PlayerAttackShotRequest& request = shotRequests_.back();
-			request.motionType = PlayerProjectileMotionType::Ricochet;
+			request.motionType = PlayerAttackEntityMotionType::Ricochet;
 			request.homing = false;
 		}
 	}
@@ -319,7 +321,7 @@ void PlayerAttackComponent::CreateClawSlashAttack(GameObject* owner, const Playe
 		for (int index = 0; index < slashCount; ++index) {
 			QueueShot(owner, player, attackStats, levelStats, currentLevel, 0.0f, index);
 			PlayerAttackShotRequest& request = shotRequests_.back();
-			request.motionType = PlayerProjectileMotionType::ClawSlash;
+			request.motionType = PlayerAttackEntityMotionType::ClawSlash;
 			request.motionAnchor = owner;
 			request.speed = 0.0f;
 			request.homing = false;
@@ -342,12 +344,12 @@ void PlayerAttackComponent::CreateAttack(GameObject* owner, const Player& player
 	selectedPattern->CreateShots(*this, owner, player, slot.stats, levelStats, currentLevel);
 	// 継続ダメージ武器は同じ周回軌道でも、見た目を攻撃種別ごとに変える。
 	if (slot.stats.name == "五行結界" || slot.stats.name == "FlameField") {
-		const PlayerProjectileMotionType motionType = slot.stats.name == "五行結界"
-		    ? PlayerProjectileMotionType::PoisonCloud
-		    : PlayerProjectileMotionType::FlameField;
+		const PlayerAttackEntityMotionType motionType = slot.stats.name == "五行結界"
+		    ? PlayerAttackEntityMotionType::PoisonCloud
+		    : PlayerAttackEntityMotionType::FlameField;
 		for (size_t index = firstShotIndex; index < shotRequests_.size(); ++index) {
 			shotRequests_[index].motionType = motionType;
-			if (motionType == PlayerProjectileMotionType::FlameField) {
+			if (motionType == PlayerAttackEntityMotionType::FlameField) {
 				// プレイヤーを中心とした一定範囲内のランダム地点へフィールドを配置する。
 				static std::mt19937 randomEngine(std::random_device{}());
 				std::uniform_real_distribution<float> angleDistribution(0.0f, MathConstants::kTwoPi);

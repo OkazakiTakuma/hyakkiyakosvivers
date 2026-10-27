@@ -36,6 +36,9 @@ x86/
 *.obj
 !/project/Resources/enemy_drop.obj
 !/project/Resources/grass.obj
+!/project/Resources/oonusa_handle.obj
+!/project/Resources/oonusa_shide.obj
+!/project/Resources/oonusa_tie.obj
 *.idb
 *.ilk
 *.exp

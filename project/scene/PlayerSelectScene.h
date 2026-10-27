@@ -12,8 +12,8 @@ public:
 	void Finalize() override;
 	void SetSceneManager(SceneManager* manager) override { sceneManager_ = manager; }
 	bool IsParticleRenderingEnabled() const override { return false; }
-	/// <summary>巫女を選び、通常の決定操作と同じ確定演出をデモ進行から開始します。</summary>
-	bool BeginDemoMikoConfirmation();
+	/// <summary>指定キャラクターを選び、通常の決定操作と同じ確定演出をデモ進行から開始します。</summary>
+	bool BeginDemoPlayerConfirmation(const std::string& playerTypeName);
 
 private:
 	/// <summary>左右2カラムのパネル、見出し、操作案内を生成します。</summary>

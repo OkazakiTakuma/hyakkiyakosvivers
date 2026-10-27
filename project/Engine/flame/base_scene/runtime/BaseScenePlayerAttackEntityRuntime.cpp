@@ -63,14 +63,14 @@ GameObject* BaseScene::FindNearestEnemy(const Vector3& position) const {
 	return nearest;
 }
 
-GameObject* BaseScene::CreateRuntimePlayerProjectile(const PlayerAttackShotRequest& request) {
-	if (request.motionType == PlayerProjectileMotionType::PoisonCloud) {
+GameObject* BaseScene::CreateRuntimePlayerAttackEntity(const PlayerAttackShotRequest& request) {
+	if (request.motionType == PlayerAttackEntityMotionType::PoisonCloud) {
 		// 五行結界はプレイヤーへ追従する持続型フィールドなので、攻撃間隔ごとに新規生成すると
 		// 生存中の五芒星が同じ場所へ重なり続ける。既存の結界が消えるまでは1個だけ維持する。
 		for (const auto& sceneObject : sceneObjects_) {
-			PlayerProjectileComponent* existingProjectile = sceneObject->GetComponent<PlayerProjectileComponent>();
+			PlayerAttackEntityComponent* existingProjectile = sceneObject->GetComponent<PlayerAttackEntityComponent>();
 			if (existingProjectile && existingProjectile->IsEnabled() && !existingProjectile->IsExpired() &&
-			    existingProjectile->GetMotionType() == PlayerProjectileMotionType::PoisonCloud) {
+			    existingProjectile->GetMotionType() == PlayerAttackEntityMotionType::PoisonCloud) {
 				return sceneObject.get();
 			}
 		}
@@ -78,11 +78,11 @@ GameObject* BaseScene::CreateRuntimePlayerProjectile(const PlayerAttackShotReque
 
 	auto object = std::make_unique<GameObject>();
 	object->SetName(MakeUniqueObjectName(request.attackName.empty() ? "PlayerAttack" : request.attackName));
-	object->SetEditorType("PlayerProjectile");
+	object->SetEditorType("PlayerAttackEntity");
 	object->GetTransform().translate = request.position;
 	object->GetTransform().scale = {request.size, request.size, request.size};
 
-	PlayerProjectileComponent* projectile = object->AddComponent<PlayerProjectileComponent>();
+	PlayerAttackEntityComponent* projectile = object->AddComponent<PlayerAttackEntityComponent>();
 	projectile->SetAttackName(request.attackName);
 	projectile->SetLevel(request.level);
 	projectile->SetDirection(request.direction);
@@ -105,7 +105,7 @@ GameObject* BaseScene::CreateRuntimePlayerProjectile(const PlayerAttackShotReque
 	projectile->SetTravelOrigin(request.position);
 	projectile->SetClawSlashIndex(request.clawSlashIndex);
 	projectile->SetClawSlashCount(request.clawSlashCount);
-	const PlayerProjectilePresentation presentation = projectile->GetMotionPresentation();
+	const PlayerAttackEntityPresentation presentation = projectile->GetMotionPresentation();
 	if (request.repeatHitInterval <= 0.0f && presentation.repeatHitInterval > 0.0f) {
 		projectile->SetRepeatHitInterval(presentation.repeatHitInterval);
 	}
@@ -122,7 +122,7 @@ GameObject* BaseScene::CreateRuntimePlayerProjectile(const PlayerAttackShotReque
 		}
 	}
 
-	if (request.attackName == "Straight" && request.motionType == PlayerProjectileMotionType::Linear) {
+	if (request.attackName == "Straight" && request.motionType == PlayerAttackEntityMotionType::Linear) {
 		// 共通の弾パラメーター設定後に描画だけを差し替え、他の攻撃のモデル・軌跡には影響させない。
 		// 球モデルと直線のトレイルを使わず、初フレームから完成した斬撃を表示する。
 		object->AddComponent<StraightSlashVisualComponent>(request.lifeTime);
@@ -149,8 +149,28 @@ GameObject* BaseScene::CreateRuntimePlayerProjectile(const PlayerAttackShotReque
 		object3d->SetModel("sphere.obj");
 	}
 	object3d->SetEnabled(presentation.modelVisible);
-	if (request.motionType == PlayerProjectileMotionType::PoisonCloud ||
-	    request.motionType == PlayerProjectileMotionType::FlameField) {
+	if (request.motionType == PlayerAttackEntityMotionType::Boomerang) {
+		// 大幣は一枚のテクスチャで無理に色分けせず、柄・紙垂・結び目を同じTransformの
+		// 別モデルとして重ねる。これにより紙垂を白く保ったまま柄を木色にできる。
+		object3d->SetColor({0.43f, 0.18f, 0.055f, 1.0f});
+
+		constexpr const char* kShideModel = "oonusa_shide.obj";
+		constexpr const char* kTieModel = "oonusa_tie.obj";
+		for (const char* partModel : {kShideModel, kTieModel}) {
+			if (!ModelManager::GetInstance()->FindModel(partModel)) {
+				ModelManager::GetInstance()->LoadModel(partModel);
+			}
+		}
+
+		Object3dComponent* shide = object->AddComponent<Object3dComponent>();
+		shide->SetModel(kShideModel);
+		shide->SetColor({1.0f, 0.98f, 0.91f, 1.0f});
+		Object3dComponent* tie = object->AddComponent<Object3dComponent>();
+		tie->SetModel(kTieModel);
+		tie->SetColor({0.72f, 0.035f, 0.025f, 1.0f});
+	}
+	if (request.motionType == PlayerAttackEntityMotionType::PoisonCloud ||
+	    request.motionType == PlayerAttackEntityMotionType::FlameField) {
 		// 持続フィールドは球モデルではなく加算合成の専用演出だけを表示するため、
 		// 非表示モデルがシャドウマップへ描かれて円形の黒い影を残さないようにする。
 		object3d->SetShadowEnabled(false);
@@ -165,10 +185,10 @@ GameObject* BaseScene::CreateRuntimePlayerProjectile(const PlayerAttackShotReque
 		// 球を引き伸ばした旧表示は隠し、加算合成の専用エフェクトでレーザーを描画する。
 		object->AddComponent<SkyLaserVisualComponent>(request.lifeTime, request.size);
 	}
-	if (request.motionType == PlayerProjectileMotionType::PoisonCloud) {
+	if (request.motionType == PlayerAttackEntityMotionType::PoisonCloud) {
 		object->AddComponent<PoisonBarrierVisualComponent>(request.lifeTime, request.orbitHeight);
 	}
-	if (request.motionType == PlayerProjectileMotionType::FlameField) {
+	if (request.motionType == PlayerAttackEntityMotionType::FlameField) {
 		object->AddComponent<FlameFieldVisualComponent>(request.lifeTime, request.size, request.orbitHeight);
 	}
 	if (presentation.addTrail) {
@@ -245,7 +265,7 @@ GameObject* BaseScene::CreateRuntimePlayerProjectile(const PlayerAttackShotReque
 	return sceneObjects_.back().get();
 }
 
-void BaseScene::UpdatePlayerProjectileHits() {
+void BaseScene::UpdatePlayerAttackEntityHits() {
 	struct ExperienceDropRequest {
 		EnemyStats stats;
 		Vector3 position;
@@ -270,7 +290,7 @@ void BaseScene::UpdatePlayerProjectileHits() {
 	std::vector<ItemDropRequest> itemDropRequests;
 	Camera* camera = Object3dCommon::GetInstance() ? Object3dCommon::GetInstance()->GetDefaultCamera() : nullptr;
 	for (const auto& projectileObject : sceneObjects_) {
-		PlayerProjectileComponent* projectile = projectileObject->GetComponent<PlayerProjectileComponent>();
+		PlayerAttackEntityComponent* projectile = projectileObject->GetComponent<PlayerAttackEntityComponent>();
 		if (!projectile || projectile->IsExpired() ||
 		    !projectile->GetMotionPresentation().ricochets) {
 			continue;
@@ -315,7 +335,7 @@ void BaseScene::UpdatePlayerProjectileHits() {
 			if (obstacleObject.get() == projectileObject.get() ||
 			    obstacleObject->GetComponent<Player>() ||
 			    obstacleObject->GetComponent<EnemyComponent>() ||
-			    obstacleObject->GetComponent<PlayerProjectileComponent>()) {
+			    obstacleObject->GetComponent<PlayerAttackEntityComponent>()) {
 				continue;
 			}
 
@@ -370,12 +390,12 @@ void BaseScene::UpdatePlayerProjectileHits() {
 	}
 
 	for (const auto& projectileObject : sceneObjects_) {
-		PlayerProjectileComponent* projectile = projectileObject->GetComponent<PlayerProjectileComponent>();
+		PlayerAttackEntityComponent* projectile = projectileObject->GetComponent<PlayerAttackEntityComponent>();
 		if (!projectile || !projectile->IsEnabled() || projectile->IsExpired()) {
 			continue;
 		}
 
-		const PlayerProjectilePresentation presentation = projectile->GetMotionPresentation();
+		const PlayerAttackEntityPresentation presentation = projectile->GetMotionPresentation();
 		const float projectileQueryRadius = presentation.usesVerticalHitArea
 			? projectile->GetSize() * 0.35f
 			: projectile->GetSize();
@@ -470,10 +490,10 @@ void BaseScene::UpdatePlayerProjectileHits() {
 	}
 }
 
-void BaseScene::CleanupExpiredPlayerProjectiles() {
+void BaseScene::CleanupExpiredPlayerAttackEntities() {
 	sceneObjects_.erase(
 	    std::remove_if(sceneObjects_.begin(), sceneObjects_.end(), [](const std::unique_ptr<GameObject>& object) {
-		    PlayerProjectileComponent* projectile = object->GetComponent<PlayerProjectileComponent>();
+		    PlayerAttackEntityComponent* projectile = object->GetComponent<PlayerAttackEntityComponent>();
 		    if (projectile) {
 			    // 弾全体が画面端を抜けてから消えるよう、表示サイズを余白へ反映する。
 			    const float viewMargin = 0.05f + projectile->GetSize() * 0.02f;
@@ -484,7 +504,7 @@ void BaseScene::CleanupExpiredPlayerProjectiles() {
 				    return true;
 			    }
 		    }
-		    EnemyProjectileComponent* enemyProjectile = object->GetComponent<EnemyProjectileComponent>();
+		    EnemyAttackEntityComponent* enemyProjectile = object->GetComponent<EnemyAttackEntityComponent>();
 		    if (enemyProjectile && enemyProjectile->IsExpired()) {
 			    return true;
 		    }

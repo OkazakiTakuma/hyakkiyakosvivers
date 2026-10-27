@@ -5,7 +5,9 @@
 #include "base_scene/BaseScene.h"
 #include "helpers/SceneUiUtility.h"
 #include "Input.h"
+#include "GamePlayScene.h"
 #include "PlayerSelectScene.h"
+#include "repositories/PlayerStatusRepository.h"
 #include "Sprite.h"
 #include "SpriteCommon.h"
 #include "TextureManager.h"
@@ -13,7 +15,6 @@
 #include "GameTime.h"
 #include "PostEffect.h"
 #include "StringUtility.h"
-#include "TitleScene.h"
 
 #include <assert.h>
 #include <algorithm>
@@ -49,13 +50,11 @@ const char* kTransitionNames[] = {
 // 外部画像を必要としないよう、遷移色の下地には実行時生成する白1pxテクスチャを使用する。
 constexpr const char* kTransitionTextureKey = "__scene_transition_white";
 constexpr const char* kTransitionFogTexturePath = "Resources/Texture/fog_transition.png";
-constexpr const char* kDemoStageId = "default";
-constexpr const char* kDemoPlayerTypeName = "巫女";
-// 各選択内容を画面で確認でき、ゲーム開始演出後の戦闘も少し見られる長さにする。
-constexpr float kDemoTitleSeconds = 6.5f;
-constexpr float kDemoStageSelectSeconds = 2.5f;
+// 自動デモと動作検証だけで使用し、通常のステージ選択には表示しない予約IDです。
+constexpr const char* kDemoStageId = "demo";
 constexpr float kDemoPlayerSelectSeconds = 3.0f;
 constexpr float kDemoGameplaySeconds = 15.0f;
+constexpr float kDemoResultSeconds = 4.0f;
 
 float SmoothStep(float start, float end, float value) {
 	const float rate = std::clamp((value - start) / (end - start), 0.0f, 1.0f);
@@ -489,11 +488,18 @@ void SceneManager::UpdateDemoPlay() {
 		demoSceneElapsed_ = 0.0f;
 		demoObservedSceneName_.clear();
 		if (isDemoPlayActive_) {
-			// デモ開始時はエディターの停止状態を解除し、選択内容を必ずステージ1と巫女へ揃える。
+			// デモ開始時はエディターの停止状態を解除し、検証ステージと先頭キャラクターへ揃える。
 			isScenePlaying_ = true;
 			GameTime::SetPaused(false);
 			SetSelectedGameplayStageId(kDemoStageId);
-			SetSelectedPlayerTypeName(kDemoPlayerTypeName);
+			demoPlayerTypeNames_ = LoadPlayerTypeNames();
+			demoPlayerTypeNames_.erase(
+				std::remove(demoPlayerTypeNames_.begin(), demoPlayerTypeNames_.end(), "Default"),
+				demoPlayerTypeNames_.end());
+			demoPlayerTypeIndex_ = 0;
+			if (!demoPlayerTypeNames_.empty()) {
+				SetSelectedPlayerTypeName(demoPlayerTypeNames_.front());
+			}
 			isDemoRestartRequested_ = true;
 		} else {
 			isDemoRestartRequested_ = false;
@@ -515,47 +521,48 @@ void SceneManager::UpdateDemoPlay() {
 	}
 	if (isDemoRestartRequested_) {
 		isDemoRestartRequested_ = false;
-		if (currentSceneName_ != "TITLE") {
-			ChangeScene("TITLE", SceneTransitionType::FadeWhite);
+		if (currentSceneName_ != "PLAYER_SELECT") {
+			ChangeScene("PLAYER_SELECT", SceneTransitionType::FadeWhite);
 			return;
 		}
 	}
 
 	demoSceneElapsed_ += GameTime::GetUnscaledDeltaTime();
-	if (currentSceneName_ == "TITLE") {
-		if (!isDemoAdvancePresentationStarted_ && demoSceneElapsed_ >= kDemoTitleSeconds) {
-			SetSelectedGameplayStageId(kDemoStageId);
-			if (TitleScene* titleScene = dynamic_cast<TitleScene*>(scene_.get())) {
-				isDemoAdvancePresentationStarted_ = titleScene->BeginDemoStartTransition();
-			}
-		}
-		return;
-	}
-	if (currentSceneName_ == "STAGE_SELECT") {
-		if (demoSceneElapsed_ >= kDemoStageSelectSeconds) {
-			SetSelectedGameplayStageId(kDemoStageId);
-			ChangeScene("PLAYER_SELECT");
-		}
-		return;
-	}
 	if (currentSceneName_ == "PLAYER_SELECT") {
 		if (!isDemoAdvancePresentationStarted_ && demoSceneElapsed_ >= kDemoPlayerSelectSeconds) {
-			SetSelectedPlayerTypeName(kDemoPlayerTypeName);
+			const std::string& demoPlayerType = demoPlayerTypeNames_.empty()
+				? selectedPlayerTypeName_
+				: demoPlayerTypeNames_[demoPlayerTypeIndex_];
+			SetSelectedPlayerTypeName(demoPlayerType);
 			if (PlayerSelectScene* playerSelectScene = dynamic_cast<PlayerSelectScene*>(scene_.get())) {
-				isDemoAdvancePresentationStarted_ = playerSelectScene->BeginDemoMikoConfirmation();
+				isDemoAdvancePresentationStarted_ = playerSelectScene->BeginDemoPlayerConfirmation(demoPlayerType);
 			}
 		}
 		return;
 	}
 	if (currentSceneName_ == "GAMEPLAY") {
-		if (demoSceneElapsed_ >= kDemoGameplaySeconds) {
-			ChangeScene("TITLE", SceneTransitionType::FadeWhite);
+		if (!isDemoAdvancePresentationStarted_ && demoSceneElapsed_ >= kDemoGameplaySeconds) {
+			if (GamePlayScene* gamePlayScene = dynamic_cast<GamePlayScene*>(scene_.get())) {
+				// 時間切れで直接シーンを飛ばさず、通常と同じ専用アニメーション・霧・暗転を見せる。
+				isDemoAdvancePresentationStarted_ = gamePlayScene->BeginDemoDefeatPresentation();
+			}
+		}
+		return;
+	}
+	if (currentSceneName_ == "RESULT") {
+		if (demoSceneElapsed_ >= kDemoResultSeconds) {
+			SetSelectedGameplayStageId(kDemoStageId);
+			if (!demoPlayerTypeNames_.empty()) {
+				demoPlayerTypeIndex_ = (demoPlayerTypeIndex_ + 1) % demoPlayerTypeNames_.size();
+				SetSelectedPlayerTypeName(demoPlayerTypeNames_[demoPlayerTypeIndex_]);
+			}
+			ChangeScene("PLAYER_SELECT", SceneTransitionType::FadeWhite);
 		}
 		return;
 	}
 
-	// リザルトなどへ先に到達した場合も、次のループをタイトルから再開する。
-	ChangeScene("TITLE", SceneTransitionType::FadeWhite);
+	// 想定外のシーンへ移った場合も、次のループをキャラクター選択から再開する。
+	ChangeScene("PLAYER_SELECT", SceneTransitionType::FadeWhite);
 }
 
 /// <summary>
@@ -900,6 +907,17 @@ void SceneManager::SetSelectedGameplayStageId(const std::string& stageId) {
 std::string SceneManager::GetGameplayStageDisplayName(const std::string& stageId) const {
 	// 配置ファイルやセーブデータではdefault IDを維持し、画面表示だけを日本語名へ置き換える。
 	return stageId == "default" ? "平原" : stageId;
+}
+
+std::vector<std::string> SceneManager::GetSelectableGameplayStageIds() const {
+	std::vector<std::string> selectableStageIds;
+	selectableStageIds.reserve(gameplayStageIds_.size());
+	for (const std::string& stageId : gameplayStageIds_) {
+		if (stageId != kDemoStageId) {
+			selectableStageIds.push_back(stageId);
+		}
+	}
+	return selectableStageIds;
 }
 
 std::string SceneManager::GetGameplayStageJsonPath(const std::string& stageId) const {

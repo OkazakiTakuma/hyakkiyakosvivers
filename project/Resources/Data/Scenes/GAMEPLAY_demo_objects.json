@@ -1,0 +1,42 @@
+{
+    "extends": "GAMEPLAY_objects.json",
+    "objectOverrides": [
+        {
+            "name": "Player_5",
+            "player": {
+                "startingHealth": 1.0
+            }
+        },
+        {
+            "name": "EnemySpawnPoint_8",
+            "enemySpawnPoint": {
+                "bossEncounter": {
+                    "enabled": false
+                },
+                "enabled": false,
+                "spawnEnabled": false
+            }
+        }
+    ],
+    "objectAdditions": [
+        {
+            "children": [],
+            "enemy": {
+                "currentHealth": 95.0,
+                "enabled": true,
+                "targetName": "Player_5",
+                "typeName": "SelfDestruct"
+            },
+            "name": "DemoSelfDestruct_1",
+            "parent": "",
+            "transform": {
+                "translate": [
+                    1.2,
+                    0.0,
+                    0.0
+                ]
+            },
+            "type": "Enemy"
+        }
+    ]
+}

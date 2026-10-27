@@ -1197,7 +1197,7 @@
                     10.429917335510254
                 ]
             },
-            "type": "PlayerProjectile"
+            "type": "PlayerAttackEntity"
         }
     ],
     "scene": "GAMEPLAY",

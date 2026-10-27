@@ -1,8 +1,8 @@
-#include "components/EnemyProjectile/EnemyProjectileComponent.h"
+#include "components/EnemyAttackEntity/EnemyAttackEntityComponent.h"
 
-void EnemyProjectileComponent::Initialize() {}
+void EnemyAttackEntityComponent::Initialize() {}
 
-void EnemyProjectileComponent::Update() {
+void EnemyAttackEntityComponent::Update() {
 	if (!GetOwner()) {
 		return;
 	}
@@ -13,7 +13,7 @@ void EnemyProjectileComponent::Update() {
 
 	// 敵弾は大量生成される短命オブジェクトなので、個別のheap確保と仮想呼び出しを避ける。
 	switch (motionType_) {
-	case EnemyProjectileMotionType::Homing: {
+	case EnemyAttackEntityMotionType::Homing: {
 		if (homingTarget_) {
 			Vector3 toTarget = homingTarget_->GetTransform().translate - transform.translate;
 			toTarget.y = 0.0f;
@@ -25,9 +25,9 @@ void EnemyProjectileComponent::Update() {
 		transform.rotate.y = std::atan2(direction_.x, direction_.z);
 		break;
 	}
-	case EnemyProjectileMotionType::ExpandingOrbit:
-	case EnemyProjectileMotionType::ContractingOrbit: {
-		const float radialDirection = motionType_ == EnemyProjectileMotionType::ExpandingOrbit ? 1.0f : -1.0f;
+	case EnemyAttackEntityMotionType::ExpandingOrbit:
+	case EnemyAttackEntityMotionType::ContractingOrbit: {
+		const float radialDirection = motionType_ == EnemyAttackEntityMotionType::ExpandingOrbit ? 1.0f : -1.0f;
 		orbitRadius_ = (std::max)(0.15f, orbitRadius_ + radialDirection * orbitRadialSpeed_ * frameScale);
 		orbitAngle_ += orbitAngularSpeed_ * deltaTime;
 		transform.translate = orbitCenter_ + Vector3{
@@ -39,7 +39,7 @@ void EnemyProjectileComponent::Update() {
 		}
 		break;
 	}
-	case EnemyProjectileMotionType::Linear:
+	case EnemyAttackEntityMotionType::Linear:
 	default:
 		transform.translate = transform.translate + (speed_ * frameScale) * direction_;
 		break;
@@ -47,21 +47,21 @@ void EnemyProjectileComponent::Update() {
 	elapsedTime_ += deltaTime;
 }
 
-void EnemyProjectileComponent::SetDirection(const Vector3& direction) {
+void EnemyAttackEntityComponent::SetDirection(const Vector3& direction) {
 	direction_ = Length(direction) > MathConstants::kDirectionEpsilon ? Normalize(direction) : Vector3{0.0f, 0.0f, 1.0f};
 }
 
-const Vector3& EnemyProjectileComponent::GetDirection() const { return direction_; }
+const Vector3& EnemyAttackEntityComponent::GetDirection() const { return direction_; }
 
-const Vector3& EnemyProjectileComponent::GetPreviousPosition() const { return previousPosition_; }
+const Vector3& EnemyAttackEntityComponent::GetPreviousPosition() const { return previousPosition_; }
 
-void EnemyProjectileComponent::SetMotionType(EnemyProjectileMotionType motionType) {
+void EnemyAttackEntityComponent::SetMotionType(EnemyAttackEntityMotionType motionType) {
 	motionType_ = motionType;
 }
 
-EnemyProjectileMotionType EnemyProjectileComponent::GetMotionType() const { return motionType_; }
+EnemyAttackEntityMotionType EnemyAttackEntityComponent::GetMotionType() const { return motionType_; }
 
-void EnemyProjectileComponent::SetExpandingOrbit(
+void EnemyAttackEntityComponent::SetExpandingOrbit(
 	const Vector3& center, float angle, float initialRadius, float angularSpeed, float radialSpeed, float height) {
 	orbitCenter_ = center;
 	orbitAngle_ = angle;
@@ -69,10 +69,10 @@ void EnemyProjectileComponent::SetExpandingOrbit(
 	orbitAngularSpeed_ = angularSpeed;
 	orbitRadialSpeed_ = (std::max)(0.0f, radialSpeed);
 	orbitHeight_ = height;
-	SetMotionType(EnemyProjectileMotionType::ExpandingOrbit);
+	SetMotionType(EnemyAttackEntityMotionType::ExpandingOrbit);
 }
 
-void EnemyProjectileComponent::SetContractingOrbit(
+void EnemyAttackEntityComponent::SetContractingOrbit(
 	const Vector3& center, float angle, float initialRadius, float angularSpeed, float radialSpeed, float height) {
 	orbitCenter_ = center;
 	orbitAngle_ = angle;
@@ -80,27 +80,27 @@ void EnemyProjectileComponent::SetContractingOrbit(
 	orbitAngularSpeed_ = angularSpeed;
 	orbitRadialSpeed_ = (std::max)(0.0f, radialSpeed);
 	orbitHeight_ = height;
-	SetMotionType(EnemyProjectileMotionType::ContractingOrbit);
+	SetMotionType(EnemyAttackEntityMotionType::ContractingOrbit);
 }
 
-void EnemyProjectileComponent::SetHomingTarget(GameObject* target) {
+void EnemyAttackEntityComponent::SetHomingTarget(GameObject* target) {
 	homingTarget_ = target;
-	SetMotionType(EnemyProjectileMotionType::Homing);
+	SetMotionType(EnemyAttackEntityMotionType::Homing);
 }
 
-void EnemyProjectileComponent::SetSpeed(float speed) { speed_ = (std::max)(0.0f, speed); }
+void EnemyAttackEntityComponent::SetSpeed(float speed) { speed_ = (std::max)(0.0f, speed); }
 
-void EnemyProjectileComponent::SetAttack(float attack) { attack_ = (std::max)(0.0f, attack); }
+void EnemyAttackEntityComponent::SetAttack(float attack) { attack_ = (std::max)(0.0f, attack); }
 
-float EnemyProjectileComponent::GetAttack() const { return attack_; }
+float EnemyAttackEntityComponent::GetAttack() const { return attack_; }
 
-void EnemyProjectileComponent::SetSize(float size) { size_ = (std::max)(0.01f, size); }
+void EnemyAttackEntityComponent::SetSize(float size) { size_ = (std::max)(0.01f, size); }
 
-float EnemyProjectileComponent::GetSize() const { return size_; }
+float EnemyAttackEntityComponent::GetSize() const { return size_; }
 
-void EnemyProjectileComponent::SetLifeTime(float lifeTime) { lifeTime_ = (std::max)(0.0f, lifeTime); }
+void EnemyAttackEntityComponent::SetLifeTime(float lifeTime) { lifeTime_ = (std::max)(0.0f, lifeTime); }
 
-bool EnemyProjectileComponent::IsExpired() const { return hit_ || elapsedTime_ >= lifeTime_; }
+bool EnemyAttackEntityComponent::IsExpired() const { return hit_ || elapsedTime_ >= lifeTime_; }
 
-void EnemyProjectileComponent::MarkHit() { hit_ = true; }
+void EnemyAttackEntityComponent::MarkHit() { hit_ = true; }
 

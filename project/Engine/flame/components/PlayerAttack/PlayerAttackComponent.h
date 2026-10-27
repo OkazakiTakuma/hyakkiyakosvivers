@@ -58,7 +58,7 @@ struct PlayerAttackStats {
 };
 
 /// <summary>プレイヤー弾の移動パターンです。</summary>
-enum class PlayerProjectileMotionType {
+enum class PlayerAttackEntityMotionType {
 	Linear,
 	// 発射方向へ一度膨らんでから、時間経過で追尾力を強めて敵へ収束する勾玉。
 	Magatama,
@@ -91,7 +91,7 @@ struct PlayerAttackShotRequest {
 	std::string modelFilePath = "sphere.obj";
 	bool homing = false;
 	float homingAccuracy = 1.0f;
-	PlayerProjectileMotionType motionType = PlayerProjectileMotionType::Linear;
+	PlayerAttackEntityMotionType motionType = PlayerAttackEntityMotionType::Linear;
 	/// <summary>周回弾や爪攻撃の基準にするGameObjectです。所有権は持ちません。</summary>
 	GameObject* motionAnchor = nullptr;
 	/// <summary>周回弾の現在角度です。</summary>

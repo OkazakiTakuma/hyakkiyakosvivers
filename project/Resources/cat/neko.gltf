@@ -650,6 +650,244 @@
         "generatedBy": "generate_player_entrance_animations.js"
       }
     }
+,
+    {
+      "name": "力尽きる_猫",
+      "samplers": [
+        {
+          "input": 43,
+          "interpolation": "LINEAR",
+          "output": 44
+        },
+        {
+          "input": 43,
+          "interpolation": "LINEAR",
+          "output": 45
+        },
+        {
+          "input": 43,
+          "interpolation": "LINEAR",
+          "output": 46
+        },
+        {
+          "input": 43,
+          "interpolation": "LINEAR",
+          "output": 47
+        },
+        {
+          "input": 43,
+          "interpolation": "LINEAR",
+          "output": 48
+        },
+        {
+          "input": 43,
+          "interpolation": "LINEAR",
+          "output": 49
+        },
+        {
+          "input": 43,
+          "interpolation": "LINEAR",
+          "output": 50
+        },
+        {
+          "input": 43,
+          "interpolation": "LINEAR",
+          "output": 51
+        }
+      ],
+      "channels": [
+        {
+          "sampler": 0,
+          "target": {
+            "node": 7,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 1,
+          "target": {
+            "node": 3,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 2,
+          "target": {
+            "node": 0,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 3,
+          "target": {
+            "node": 1,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 4,
+          "target": {
+            "node": 2,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 5,
+          "target": {
+            "node": 4,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 6,
+          "target": {
+            "node": 5,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 7,
+          "target": {
+            "node": 6,
+            "path": "rotation"
+          }
+        }
+      ],
+      "extras": {
+        "generatedBy": "generate_player_entrance_animations.js"
+      }
+    }
+,
+    {
+      "name": "力尽きる完全_猫",
+      "samplers": [
+        {
+          "input": 52,
+          "interpolation": "LINEAR",
+          "output": 53
+        },
+        {
+          "input": 52,
+          "interpolation": "LINEAR",
+          "output": 54
+        },
+        {
+          "input": 52,
+          "interpolation": "LINEAR",
+          "output": 55
+        },
+        {
+          "input": 52,
+          "interpolation": "LINEAR",
+          "output": 56
+        },
+        {
+          "input": 52,
+          "interpolation": "LINEAR",
+          "output": 57
+        },
+        {
+          "input": 52,
+          "interpolation": "LINEAR",
+          "output": 58
+        },
+        {
+          "input": 52,
+          "interpolation": "LINEAR",
+          "output": 59
+        },
+        {
+          "input": 52,
+          "interpolation": "LINEAR",
+          "output": 60
+        },
+        {
+          "input": 52,
+          "interpolation": "LINEAR",
+          "output": 61
+        },
+        {
+          "input": 52,
+          "interpolation": "LINEAR",
+          "output": 62
+        }
+      ],
+      "channels": [
+        {
+          "sampler": 0,
+          "target": {
+            "node": 8,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 1,
+          "target": {
+            "node": 8,
+            "path": "translation"
+          }
+        },
+        {
+          "sampler": 2,
+          "target": {
+            "node": 7,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 3,
+          "target": {
+            "node": 3,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 4,
+          "target": {
+            "node": 0,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 5,
+          "target": {
+            "node": 1,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 6,
+          "target": {
+            "node": 2,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 7,
+          "target": {
+            "node": 4,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 8,
+          "target": {
+            "node": 5,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 9,
+          "target": {
+            "node": 6,
+            "path": "rotation"
+          }
+        }
+      ],
+      "extras": {
+        "generatedBy": "generate_player_entrance_animations.js"
+      }
+    }
   ],
   "materials": [
     {
@@ -1019,6 +1257,160 @@
       "count": 5,
       "type": "VEC4"
     }
+,
+    {
+      "name": "力尽きる_猫_時間",
+      "bufferView": 43,
+      "componentType": 5126,
+      "count": 6,
+      "type": "SCALAR",
+      "min": [
+        0
+      ],
+      "max": [
+        1.46
+      ]
+    },
+    {
+      "name": "力尽きる_猫_pelvis_回転",
+      "bufferView": 44,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる_猫_spine_回転",
+      "bufferView": 45,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる_猫_head_回転",
+      "bufferView": 46,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる_猫_arm.L_回転",
+      "bufferView": 47,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる_猫_arm.R_回転",
+      "bufferView": 48,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる_猫_leg.L_回転",
+      "bufferView": 49,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる_猫_leg.R_回転",
+      "bufferView": 50,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる_猫_tail_回転",
+      "bufferView": 51,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    }
+,
+    {
+      "name": "力尽きる完全_猫_時間",
+      "bufferView": 52,
+      "componentType": 5126,
+      "count": 6,
+      "type": "SCALAR",
+      "min": [
+        0
+      ],
+      "max": [
+        1.46
+      ]
+    },
+    {
+      "name": "力尽きる完全_猫_root_回転",
+      "bufferView": 53,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる完全_猫_root_移動",
+      "bufferView": 54,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC3"
+    },
+    {
+      "name": "力尽きる完全_猫_pelvis_回転",
+      "bufferView": 55,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる完全_猫_spine_回転",
+      "bufferView": 56,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる完全_猫_head_回転",
+      "bufferView": 57,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる完全_猫_arm.L_回転",
+      "bufferView": 58,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる完全_猫_arm.R_回転",
+      "bufferView": 59,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる完全_猫_leg.L_回転",
+      "bufferView": 60,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる完全_猫_leg.R_回転",
+      "bufferView": 61,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる完全_猫_tail_回転",
+      "bufferView": 62,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    }
   ],
   "bufferViews": [
     {
@@ -1244,6 +1636,108 @@
       "byteOffset": 340,
       "byteLength": 80
     }
+,
+    {
+      "buffer": 3,
+      "byteOffset": 0,
+      "byteLength": 24
+    },
+    {
+      "buffer": 3,
+      "byteOffset": 24,
+      "byteLength": 96
+    },
+    {
+      "buffer": 3,
+      "byteOffset": 120,
+      "byteLength": 96
+    },
+    {
+      "buffer": 3,
+      "byteOffset": 216,
+      "byteLength": 96
+    },
+    {
+      "buffer": 3,
+      "byteOffset": 312,
+      "byteLength": 96
+    },
+    {
+      "buffer": 3,
+      "byteOffset": 408,
+      "byteLength": 96
+    },
+    {
+      "buffer": 3,
+      "byteOffset": 504,
+      "byteLength": 96
+    },
+    {
+      "buffer": 3,
+      "byteOffset": 600,
+      "byteLength": 96
+    },
+    {
+      "buffer": 3,
+      "byteOffset": 696,
+      "byteLength": 96
+    }
+,
+    {
+      "buffer": 4,
+      "byteOffset": 0,
+      "byteLength": 24
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 24,
+      "byteLength": 96
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 120,
+      "byteLength": 72
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 192,
+      "byteLength": 96
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 288,
+      "byteLength": 96
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 384,
+      "byteLength": 96
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 480,
+      "byteLength": 96
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 576,
+      "byteLength": 96
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 672,
+      "byteLength": 96
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 768,
+      "byteLength": 96
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 864,
+      "byteLength": 96
+    }
   ],
   "samplers": [
     {
@@ -1265,6 +1759,16 @@
     {
       "byteLength": 420,
       "uri": "neko_game_start.bin"
+    }
+,
+    {
+      "byteLength": 792,
+      "uri": "neko_defeat.bin"
+    }
+,
+    {
+      "byteLength": 960,
+      "uri": "neko_defeat_baked.bin"
     }
   ]
 }

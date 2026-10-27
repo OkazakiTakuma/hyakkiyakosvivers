@@ -626,6 +626,220 @@
         "generatedBy": "generate_player_entrance_animations.js"
       }
     }
+,
+    {
+      "name": "力尽きる_巫女",
+      "samplers": [
+        {
+          "input": 53,
+          "interpolation": "LINEAR",
+          "output": 54
+        },
+        {
+          "input": 53,
+          "interpolation": "LINEAR",
+          "output": 55
+        },
+        {
+          "input": 53,
+          "interpolation": "LINEAR",
+          "output": 56
+        },
+        {
+          "input": 53,
+          "interpolation": "LINEAR",
+          "output": 57
+        },
+        {
+          "input": 53,
+          "interpolation": "LINEAR",
+          "output": 58
+        },
+        {
+          "input": 53,
+          "interpolation": "LINEAR",
+          "output": 59
+        },
+        {
+          "input": 53,
+          "interpolation": "LINEAR",
+          "output": 60
+        }
+      ],
+      "channels": [
+        {
+          "sampler": 0,
+          "target": {
+            "node": 3,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 1,
+          "target": {
+            "node": 0,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 2,
+          "target": {
+            "node": 1,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 3,
+          "target": {
+            "node": 2,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 4,
+          "target": {
+            "node": 4,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 5,
+          "target": {
+            "node": 5,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 6,
+          "target": {
+            "node": 6,
+            "path": "rotation"
+          }
+        }
+      ],
+      "extras": {
+        "generatedBy": "generate_player_entrance_animations.js"
+      }
+    }
+,
+    {
+      "name": "力尽きる完全_巫女",
+      "samplers": [
+        {
+          "input": 61,
+          "interpolation": "LINEAR",
+          "output": 62
+        },
+        {
+          "input": 61,
+          "interpolation": "LINEAR",
+          "output": 63
+        },
+        {
+          "input": 61,
+          "interpolation": "LINEAR",
+          "output": 64
+        },
+        {
+          "input": 61,
+          "interpolation": "LINEAR",
+          "output": 65
+        },
+        {
+          "input": 61,
+          "interpolation": "LINEAR",
+          "output": 66
+        },
+        {
+          "input": 61,
+          "interpolation": "LINEAR",
+          "output": 67
+        },
+        {
+          "input": 61,
+          "interpolation": "LINEAR",
+          "output": 68
+        },
+        {
+          "input": 61,
+          "interpolation": "LINEAR",
+          "output": 69
+        },
+        {
+          "input": 61,
+          "interpolation": "LINEAR",
+          "output": 70
+        }
+      ],
+      "channels": [
+        {
+          "sampler": 0,
+          "target": {
+            "node": 8,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 1,
+          "target": {
+            "node": 8,
+            "path": "translation"
+          }
+        },
+        {
+          "sampler": 2,
+          "target": {
+            "node": 3,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 3,
+          "target": {
+            "node": 0,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 4,
+          "target": {
+            "node": 1,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 5,
+          "target": {
+            "node": 2,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 6,
+          "target": {
+            "node": 4,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 7,
+          "target": {
+            "node": 5,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 8,
+          "target": {
+            "node": 6,
+            "path": "rotation"
+          }
+        }
+      ],
+      "extras": {
+        "generatedBy": "generate_player_entrance_animations.js"
+      }
+    }
   ],
   "materials": [
     {
@@ -1126,6 +1340,146 @@
       "count": 5,
       "type": "VEC4"
     }
+,
+    {
+      "name": "力尽きる_巫女_時間",
+      "bufferView": 53,
+      "componentType": 5126,
+      "count": 6,
+      "type": "SCALAR",
+      "min": [
+        0
+      ],
+      "max": [
+        1.52
+      ]
+    },
+    {
+      "name": "力尽きる_巫女_spine_回転",
+      "bufferView": 54,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる_巫女_head_回転",
+      "bufferView": 55,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる_巫女_arm.L_回転",
+      "bufferView": 56,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる_巫女_arm.R_回転",
+      "bufferView": 57,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる_巫女_leg.L_回転",
+      "bufferView": 58,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる_巫女_leg.R_回転",
+      "bufferView": 59,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる_巫女_tail_回転",
+      "bufferView": 60,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    }
+,
+    {
+      "name": "力尽きる完全_巫女_時間",
+      "bufferView": 61,
+      "componentType": 5126,
+      "count": 6,
+      "type": "SCALAR",
+      "min": [
+        0
+      ],
+      "max": [
+        1.52
+      ]
+    },
+    {
+      "name": "力尽きる完全_巫女_root_回転",
+      "bufferView": 62,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる完全_巫女_root_移動",
+      "bufferView": 63,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC3"
+    },
+    {
+      "name": "力尽きる完全_巫女_spine_回転",
+      "bufferView": 64,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる完全_巫女_head_回転",
+      "bufferView": 65,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる完全_巫女_arm.L_回転",
+      "bufferView": 66,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる完全_巫女_arm.R_回転",
+      "bufferView": 67,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる完全_巫女_leg.L_回転",
+      "bufferView": 68,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる完全_巫女_leg.R_回転",
+      "bufferView": 69,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    },
+    {
+      "name": "力尽きる完全_巫女_tail_回転",
+      "bufferView": 70,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    }
   ],
   "bufferViews": [
     {
@@ -1413,6 +1767,98 @@
       "byteOffset": 340,
       "byteLength": 80
     }
+,
+    {
+      "buffer": 3,
+      "byteOffset": 0,
+      "byteLength": 24
+    },
+    {
+      "buffer": 3,
+      "byteOffset": 24,
+      "byteLength": 96
+    },
+    {
+      "buffer": 3,
+      "byteOffset": 120,
+      "byteLength": 96
+    },
+    {
+      "buffer": 3,
+      "byteOffset": 216,
+      "byteLength": 96
+    },
+    {
+      "buffer": 3,
+      "byteOffset": 312,
+      "byteLength": 96
+    },
+    {
+      "buffer": 3,
+      "byteOffset": 408,
+      "byteLength": 96
+    },
+    {
+      "buffer": 3,
+      "byteOffset": 504,
+      "byteLength": 96
+    },
+    {
+      "buffer": 3,
+      "byteOffset": 600,
+      "byteLength": 96
+    }
+,
+    {
+      "buffer": 4,
+      "byteOffset": 0,
+      "byteLength": 24
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 24,
+      "byteLength": 96
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 120,
+      "byteLength": 72
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 192,
+      "byteLength": 96
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 288,
+      "byteLength": 96
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 384,
+      "byteLength": 96
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 480,
+      "byteLength": 96
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 576,
+      "byteLength": 96
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 672,
+      "byteLength": 96
+    },
+    {
+      "buffer": 4,
+      "byteOffset": 768,
+      "byteLength": 96
+    }
   ],
   "samplers": [
     {
@@ -1438,6 +1884,16 @@
     {
       "byteLength": 420,
       "uri": "miko_game_start.bin"
+    }
+,
+    {
+      "byteLength": 696,
+      "uri": "miko_defeat.bin"
+    }
+,
+    {
+      "byteLength": 864,
+      "uri": "miko_defeat_baked.bin"
     }
   ]
 }

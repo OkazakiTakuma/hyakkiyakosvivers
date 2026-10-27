@@ -6,7 +6,7 @@
 #include <vector>
 
 /// <summary>軌道Strategyが生成側へ公開する、弾の見た目と衝突上の特性です。</summary>
-struct PlayerProjectilePresentation {
+struct PlayerAttackEntityPresentation {
 	Vector3 scaleMultiplier{1.0f, 1.0f, 1.0f};
 	bool modelVisible = true;
 	bool addSkyLaserVisual = false;
@@ -31,7 +31,7 @@ struct PlayerProjectilePresentation {
 };
 
 /// <summary>プレイヤー弾の移動方式、追尾、寿命、貫通・再ヒット制御を管理します。</summary>
-class PlayerProjectileComponent : public Component {
+class PlayerAttackEntityComponent : public Component {
 public:
 	void Initialize() override;
 	void Update() override;
@@ -52,9 +52,9 @@ public:
 	bool IsHomingEnabled() const;
 	void SetHomingAccuracy(float homingAccuracy);
 	float GetHomingAccuracy() const;
-	void SetMotionType(PlayerProjectileMotionType motionType);
-	PlayerProjectileMotionType GetMotionType() const;
-	PlayerProjectilePresentation GetMotionPresentation() const;
+	void SetMotionType(PlayerAttackEntityMotionType motionType);
+	PlayerAttackEntityMotionType GetMotionType() const;
+	PlayerAttackEntityPresentation GetMotionPresentation() const;
 	void SetMotionAnchor(GameObject* motionAnchor);
 	void SetOrbitAngleRadians(float angle);
 	void SetOrbitRadius(float radius);
@@ -120,7 +120,7 @@ private:
 	/// <summary>勾玉の追尾力を時間で強めるための経過秒数です。</summary>
 	float magatamaElapsedSeconds_ = 0.0f;
 	/// <summary>直進、周回、ブーメランなどの移動方式です。</summary>
-	PlayerProjectileMotionType motionType_ = PlayerProjectileMotionType::Linear;
+	PlayerAttackEntityMotionType motionType_ = PlayerAttackEntityMotionType::Linear;
 	/// <summary>周回弾などの中心として使用する非所有参照です。</summary>
 	GameObject* motionAnchor_ = nullptr;
 	float orbitAngleRadians_ = 0.0f;

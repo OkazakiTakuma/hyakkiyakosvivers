@@ -22,7 +22,8 @@ void StageSelectScene::Initialize() {
 	selectedStageIndex_ = 0;
 	if (sceneManager_) {
 		sceneManager_->RefreshGameplayStagePatterns();
-		stageIds_ = sceneManager_->GetGameplayStageIds();
+		// demo はF1自動デモとエディター検証専用のため、通常の選択肢には含めない。
+		stageIds_ = sceneManager_->GetSelectableGameplayStageIds();
 		const auto found = std::find(stageIds_.begin(), stageIds_.end(), sceneManager_->GetSelectedGameplayStageId());
 		if (found != stageIds_.end()) {
 			selectedStageIndex_ = static_cast<int>(std::distance(stageIds_.begin(), found));
