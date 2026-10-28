@@ -226,6 +226,9 @@ void GamePlayScene::LoadSceneModels() {
 	ModelManager::GetInstance()->LoadModel("sphere.obj");
 	ModelManager::GetInstance()->LoadModel("terrain.obj", false, "/terrain");
 	ModelManager::GetInstance()->LoadModel("sand.obj", false, "/sand");
+	// ステージ2の和風街並みを構成する軽量な建築用プリミティブ。
+	ModelManager::GetInstance()->LoadModel("japanese_block.obj", false, "/stage2_japanese");
+	ModelManager::GetInstance()->LoadModel("japanese_roof.obj", false, "/stage2_japanese");
 	// 烏天狗の右手へ装備する刀を専用フォルダから事前読み込みする。
 	ModelManager::GetInstance()->LoadModel("brade.obj", false, "/brade");
 	ModelManager::GetInstance()->LoadModel("grass.obj");

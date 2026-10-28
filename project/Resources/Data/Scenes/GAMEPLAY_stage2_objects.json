@@ -4,10 +4,10 @@
         {
             "name": "terrain_7",
             "transform": {
-                "scale": [12.5, 1.0, 12.5]
+                "scale": [10.0, 1.0, 10.0]
             },
             "obbCollider": {
-                "halfSize": [24.0, 1.0, 12.5]
+                "halfSize": [10.0, 1.0, 10.0]
             }
         },
         {
@@ -92,12 +92,188 @@
             }
         }
     ],
+    "atmosphere": {
+        "enabled": true,
+        "atmosphereDensity": 0.82,
+        "distanceFogDensity": 0.008,
+        "heightFogDensity": 0.10,
+        "horizonColor": [0.72, 0.32, 0.25],
+        "mieColor": [1.0, 0.62, 0.38],
+        "mieStrength": 0.055,
+        "rayleighColor": [0.28, 0.36, 0.72],
+        "rayleighStrength": 0.55,
+        "sunDirection": [-0.20, 0.18, 0.96],
+        "sunIntensity": 2.2
+    },
     "objectAdditions": [
+        {
+            "name": "stage2_stone_avenue_east_west", "type": "LoadedModel", "model": "sand.obj", "children": [], "parent": "",
+            "object3d": {"enabled": false, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.48, 0.46, 0.42, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [24.0, 1.0, 3.2], "translate": [0.0, -1.17, 0.0]}
+        },
+        {
+            "name": "stage2_stone_avenue_north_south", "type": "LoadedModel", "model": "sand.obj", "children": [], "parent": "",
+            "object3d": {"enabled": false, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.56, 0.53, 0.47, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [3.2, 1.0, 12.0], "translate": [0.0, -1.16, 0.0]}
+        },
+
+        {
+            "name": "stage2_machiya_west_south", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.76, 0.69, 0.55, 1.0], "receiveLighting": true}},
+            "obbCollider": {"enabled": false, "drawDebug": false, "centerOffset": [0.0, 2.0, 0.0], "halfSize": [3.0, 2.0, 3.2], "pushBack": false},
+            "transform": {"rotate": [0.0, 3.14159265, 0.0], "scale": [6.0, 4.0, 6.4], "translate": [-8.5, -1.15, -15.0]}
+        },
+        {
+            "name": "stage2_machiya_west_south_roof", "type": "LoadedModel", "model": "japanese_roof.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.12, 0.14, 0.16, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 3.14159265, 0.0], "scale": [7.2, 2.6, 7.2], "translate": [-8.5, 2.75, -15.0]}
+        },
+        {
+            "name": "stage2_machiya_west_south_lattice", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.20, 0.10, 0.055, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [5.0, 2.8, 0.18], "translate": [-8.5, -1.10, -12.20]}
+        },
+        {
+            "name": "stage2_machiya_west_north", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.84, 0.80, 0.68, 1.0], "receiveLighting": true}},
+            "obbCollider": {"enabled": false, "drawDebug": false, "centerOffset": [0.0, 2.25, 0.0], "halfSize": [3.25, 2.25, 3.0], "pushBack": false},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [6.5, 4.5, 6.0], "translate": [-8.5, -1.15, 15.0]}
+        },
+        {
+            "name": "stage2_machiya_west_north_roof", "type": "LoadedModel", "model": "japanese_roof.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.18, 0.16, 0.15, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [7.7, 2.7, 6.8], "translate": [-8.5, 3.25, 15.0]}
+        },
+        {
+            "name": "stage2_machiya_west_north_lattice", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.24, 0.12, 0.06, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [4.7, 3.1, 0.18], "translate": [-8.5, -1.10, 12.20]}
+        },
+
+        {
+            "name": "stage2_machiya_east_south", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.82, 0.75, 0.60, 1.0], "receiveLighting": true}},
+            "obbCollider": {"enabled": false, "drawDebug": false, "centerOffset": [0.0, 2.1, 0.0], "halfSize": [3.1, 2.1, 3.0], "pushBack": false},
+            "transform": {"rotate": [0.0, 3.14159265, 0.0], "scale": [6.2, 4.2, 6.0], "translate": [8.5, -1.15, -15.0]}
+        },
+        {
+            "name": "stage2_machiya_east_south_roof", "type": "LoadedModel", "model": "japanese_roof.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.14, 0.15, 0.17, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 3.14159265, 0.0], "scale": [7.4, 2.6, 6.8], "translate": [8.5, 2.95, -15.0]}
+        },
+        {
+            "name": "stage2_machiya_east_south_lattice", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.20, 0.09, 0.045, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [4.8, 2.9, 0.18], "translate": [8.5, -1.10, -12.20]}
+        },
+        {
+            "name": "stage2_machiya_east_north", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.72, 0.62, 0.47, 1.0], "receiveLighting": true}},
+            "obbCollider": {"enabled": false, "drawDebug": false, "centerOffset": [0.0, 2.0, 0.0], "halfSize": [3.0, 2.0, 3.25], "pushBack": false},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [6.0, 4.0, 6.5], "translate": [8.5, -1.15, 15.0]}
+        },
+        {
+            "name": "stage2_machiya_east_north_roof", "type": "LoadedModel", "model": "japanese_roof.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.20, 0.17, 0.16, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [7.2, 2.5, 7.3], "translate": [8.5, 2.75, 15.0]}
+        },
+        {
+            "name": "stage2_machiya_east_north_lattice", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.23, 0.11, 0.05, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [5.1, 2.8, 0.18], "translate": [8.5, -1.10, 12.20]}
+        },
+
+        {
+            "name": "stage2_torii_north_left", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.72, 0.055, 0.035, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [0.55, 4.8, 0.55], "translate": [-2.8, -1.15, 10.7]}
+        },
+        {
+            "name": "stage2_torii_north_right", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.72, 0.055, 0.035, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [0.55, 4.8, 0.55], "translate": [2.8, -1.15, 10.7]}
+        },
+        {
+            "name": "stage2_torii_north_beam", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.76, 0.06, 0.035, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [7.6, 0.45, 0.65], "translate": [0.0, 3.25, 10.7]}
+        },
+        {
+            "name": "stage2_torii_north_lintel", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.14, 0.055, 0.035, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [6.3, 0.28, 0.5], "translate": [0.0, 2.55, 10.7]}
+        },
+
+        {
+            "name": "stage2_wall_north_west", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": false, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.78, 0.75, 0.66, 1.0], "receiveLighting": true}},
+            "obbCollider": {"enabled": false, "drawDebug": false, "centerOffset": [0.0, 1.0, 0.0], "halfSize": [6.5, 1.0, 0.35], "pushBack": false},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [13.0, 2.0, 0.7], "translate": [-10.5, -1.15, 11.8]}
+        },
+        {
+            "name": "stage2_wall_north_east", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": false, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.78, 0.75, 0.66, 1.0], "receiveLighting": true}},
+            "obbCollider": {"enabled": false, "drawDebug": false, "centerOffset": [0.0, 1.0, 0.0], "halfSize": [6.5, 1.0, 0.35], "pushBack": false},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [13.0, 2.0, 0.7], "translate": [10.5, -1.15, 11.8]}
+        },
+        {
+            "name": "stage2_wall_south_west", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": false, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.72, 0.69, 0.61, 1.0], "receiveLighting": true}},
+            "obbCollider": {"enabled": false, "drawDebug": false, "centerOffset": [0.0, 1.0, 0.0], "halfSize": [8.5, 1.0, 0.35], "pushBack": false},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [17.0, 2.0, 0.7], "translate": [-12.0, -1.15, -11.8]}
+        },
+        {
+            "name": "stage2_wall_south_east", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": false, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.72, 0.69, 0.61, 1.0], "receiveLighting": true}},
+            "obbCollider": {"enabled": false, "drawDebug": false, "centerOffset": [0.0, 1.0, 0.0], "halfSize": [8.5, 1.0, 0.35], "pushBack": false},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [17.0, 2.0, 0.7], "translate": [12.0, -1.15, -11.8]}
+        },
+
+        {
+            "name": "stage2_lantern_north_west_post", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.32, 0.31, 0.29, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [0.42, 1.6, 0.42], "translate": [-7.0, -1.15, 7.8]}
+        },
+        {
+            "name": "stage2_lantern_north_west_light", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "isPointLight": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [1.0, 0.55, 0.18, 1.0], "emissionColor": [1.0, 0.22, 0.035], "emissionIntensity": 1.1, "receiveLighting": true}, "pointLight": {"color": [1.0, 0.36, 0.12, 1.0], "intensity": 1.5, "radius": 6.0, "decay": 1.5, "position": [-7.0, 1.0, 7.8]}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [0.85, 0.75, 0.85], "translate": [-7.0, 0.45, 7.8]}
+        },
+        {
+            "name": "stage2_lantern_north_east_post", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.32, 0.31, 0.29, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [0.42, 1.6, 0.42], "translate": [7.0, -1.15, 7.8]}
+        },
+        {
+            "name": "stage2_lantern_north_east_light", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "isPointLight": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [1.0, 0.55, 0.18, 1.0], "emissionColor": [1.0, 0.22, 0.035], "emissionIntensity": 1.1, "receiveLighting": true}, "pointLight": {"color": [1.0, 0.36, 0.12, 1.0], "intensity": 1.5, "radius": 6.0, "decay": 1.5, "position": [7.0, 1.0, 7.8]}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [0.85, 0.75, 0.85], "translate": [7.0, 0.45, 7.8]}
+        },
+        {
+            "name": "stage2_lantern_south_west_post", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.32, 0.31, 0.29, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [0.42, 1.6, 0.42], "translate": [-7.0, -1.15, -7.8]}
+        },
+        {
+            "name": "stage2_lantern_south_west_light", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "isPointLight": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [1.0, 0.55, 0.18, 1.0], "emissionColor": [1.0, 0.22, 0.035], "emissionIntensity": 1.1, "receiveLighting": true}, "pointLight": {"color": [1.0, 0.36, 0.12, 1.0], "intensity": 1.5, "radius": 6.0, "decay": 1.5, "position": [-7.0, 1.0, -7.8]}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [0.85, 0.75, 0.85], "translate": [-7.0, 0.45, -7.8]}
+        },
+        {
+            "name": "stage2_lantern_south_east_post", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.32, 0.31, 0.29, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [0.42, 1.6, 0.42], "translate": [7.0, -1.15, -7.8]}
+        },
+        {
+            "name": "stage2_lantern_south_east_light", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "isPointLight": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [1.0, 0.55, 0.18, 1.0], "emissionColor": [1.0, 0.22, 0.035], "emissionIntensity": 1.1, "receiveLighting": true}, "pointLight": {"color": [1.0, 0.36, 0.12, 1.0], "intensity": 1.5, "radius": 6.0, "decay": 1.5, "position": [7.0, 1.0, -7.8]}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [0.85, 0.75, 0.85], "translate": [7.0, 0.45, -7.8]}
+        },
         {
             "children": [],
             "model": "terrain.obj",
             "name": "stage2_wall_north",
-            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/terrain/grass_replacement.png"},
+            "object3d": {"enabled": false, "modelTextureFilePath": "Resources/terrain/grass_replacement.png"},
             "obbCollider": {"centerOffset": [0.0, 0.0, 0.0], "drawDebug": false, "enabled": true, "halfSize": [10.0, 0.5, 10.0], "pushBack": false},
             "parent": "",
             "transform": {"rotate": [1.57079632679, 0.0, 0.0], "scale": [3.0, 1.0, 0.2], "translate": [0.0, 1.0, 10.0]},
@@ -107,11 +283,71 @@
             "children": [],
             "model": "terrain.obj",
             "name": "stage2_wall_south",
-            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/terrain/grass_replacement.png"},
+            "object3d": {"enabled": false, "modelTextureFilePath": "Resources/terrain/grass_replacement.png"},
             "obbCollider": {"centerOffset": [0.0, 0.0, 0.0], "drawDebug": false, "enabled": true, "halfSize": [10.0, 0.5, 10.0], "pushBack": false},
             "parent": "",
             "transform": {"rotate": [-1.57079632679, 0.0, 0.0], "scale": [3.0, 1.0, 0.2], "translate": [0.0, 1.0, -10.0]},
             "type": "LoadedModel"
+        },
+        {
+            "name": "stage2_machiya_north_far_west", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.70, 0.61, 0.47, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [6.8, 4.2, 5.8], "translate": [-18.0, -1.15, 15.0]}
+        },
+        {
+            "name": "stage2_machiya_north_far_west_roof", "type": "LoadedModel", "model": "japanese_roof.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.15, 0.13, 0.13, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [8.0, 2.7, 6.6], "translate": [-18.0, 2.95, 15.0]}
+        },
+        {
+            "name": "stage2_machiya_north_center", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.87, 0.82, 0.70, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [6.2, 4.8, 5.6], "translate": [0.0, -1.15, 15.3]}
+        },
+        {
+            "name": "stage2_machiya_north_center_roof", "type": "LoadedModel", "model": "japanese_roof.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.10, 0.12, 0.15, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [7.5, 3.0, 6.4], "translate": [0.0, 3.55, 15.3]}
+        },
+        {
+            "name": "stage2_machiya_north_far_east", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.76, 0.68, 0.53, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [6.8, 4.3, 5.8], "translate": [18.0, -1.15, 15.0]}
+        },
+        {
+            "name": "stage2_machiya_north_far_east_roof", "type": "LoadedModel", "model": "japanese_roof.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.19, 0.16, 0.14, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 0.0, 0.0], "scale": [8.0, 2.7, 6.6], "translate": [18.0, 3.05, 15.0]}
+        },
+        {
+            "name": "stage2_machiya_south_far_west", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.80, 0.72, 0.57, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 3.14159265, 0.0], "scale": [6.8, 4.3, 5.8], "translate": [-18.0, -1.15, -15.0]}
+        },
+        {
+            "name": "stage2_machiya_south_far_west_roof", "type": "LoadedModel", "model": "japanese_roof.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.16, 0.15, 0.16, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 3.14159265, 0.0], "scale": [8.0, 2.7, 6.6], "translate": [-18.0, 3.05, -15.0]}
+        },
+        {
+            "name": "stage2_machiya_south_center", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.73, 0.64, 0.49, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 3.14159265, 0.0], "scale": [6.2, 4.6, 5.6], "translate": [0.0, -1.15, -15.3]}
+        },
+        {
+            "name": "stage2_machiya_south_center_roof", "type": "LoadedModel", "model": "japanese_roof.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.11, 0.13, 0.15, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 3.14159265, 0.0], "scale": [7.5, 2.9, 6.4], "translate": [0.0, 3.35, -15.3]}
+        },
+        {
+            "name": "stage2_machiya_south_far_east", "type": "LoadedModel", "model": "japanese_block.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.85, 0.79, 0.66, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 3.14159265, 0.0], "scale": [6.8, 4.1, 5.8], "translate": [18.0, -1.15, -15.0]}
+        },
+        {
+            "name": "stage2_machiya_south_far_east_roof", "type": "LoadedModel", "model": "japanese_roof.obj", "children": [], "parent": "",
+            "object3d": {"enabled": true, "modelTextureFilePath": "Resources/human/white.png", "material": {"color": [0.20, 0.17, 0.15, 1.0], "receiveLighting": true}},
+            "transform": {"rotate": [0.0, 3.14159265, 0.0], "scale": [8.0, 2.6, 6.6], "translate": [18.0, 2.85, -15.0]}
         }
     ]
 }
