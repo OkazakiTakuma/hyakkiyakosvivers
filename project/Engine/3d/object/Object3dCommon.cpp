@@ -66,18 +66,18 @@ void Object3dCommon::BindShadowMap() {
 }
 
 void Object3dCommon::SetShadowLightDirection(const Vector3& direction) {
-	const Vector3 normalized = NormalizeReturnVector(direction);
+	const Vector3 normalized = Normalize(direction);
 	if (Length(normalized) > 0.0f) shadowLightDirection_ = normalized;
 }
 
 void Object3dCommon::UpdateLightViewProjectionMatrix() {
 	// 床の高さではなくカメラ周辺の空間全体を覆うので、坂や段差も同じ方法で扱えます。
 	const Vector3 focus = defaultCamera ? defaultCamera->GetTranslate() : Vector3{};
-	Vector3 forward = NormalizeReturnVector(shadowLightDirection_);
+	Vector3 forward = Normalize(shadowLightDirection_);
 	if (Length(forward) <= 0.0f) forward = {0.0f, -1.0f, 0.0f};
 	Vector3 up = std::fabs(forward.y) > 0.98f ? Vector3{0.0f, 0.0f, 1.0f} : Vector3{0.0f, 1.0f, 0.0f};
-	const Vector3 right = NormalizeReturnVector(Cross(up, forward));
-	up = NormalizeReturnVector(Cross(forward, right));
+	const Vector3 right = Normalize(Cross(up, forward));
+	up = Normalize(Cross(forward, right));
 	// ライトは方向だけを持つため、カメラ中心から十分離れた仮想位置を作ります。
 	const Vector3 lightPosition = focus - 70.0f * forward;
 	Matrix4x4 view = MakeIdentity4x4();

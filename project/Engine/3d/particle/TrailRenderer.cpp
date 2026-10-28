@@ -113,7 +113,7 @@ void TrailRenderer::AppendRequestVertices(const Request& request, const Vector3&
 		if (Length(tangent) <= kEpsilon) {
 			continue;
 		}
-		tangent = NormalizeReturnVector(tangent);
+		tangent = Normalize(tangent);
 		Vector3 viewDirection = cameraPosition - request.points[i].position;
 		// 進行方向と視線方向の両方に直交する向きを帯の横方向として使う。
 		Vector3 side = Cross(tangent, viewDirection);
@@ -124,7 +124,7 @@ void TrailRenderer::AppendRequestVertices(const Request& request, const Vector3&
 		if (Length(side) <= kEpsilon) {
 			side = Cross(tangent, {1.0f, 0.0f, 0.0f});
 		}
-		sides[i] = NormalizeReturnVector(side);
+		sides[i] = Normalize(side);
 	}
 
 	for (size_t i = 0; i < pointCount; ++i) {

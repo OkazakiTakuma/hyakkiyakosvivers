@@ -133,7 +133,7 @@ void Object3d::CreateCombinedBufferResource() {
 	cameraData->paddingAtmosphere = 0.0f;
 
 	directionallightData->color = {1.0f, 1.0f, 1.0f, 1.0f};
-	directionallightData->direction = NormalizeReturnVector(Vector3(0.0f, -1.0f, 0.0f));
+	directionallightData->direction = Normalize(Vector3(0.0f, -1.0f, 0.0f));
 	directionallightData->intensity = 1.0f;
 
 	pointLightData->color = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -665,7 +665,7 @@ Object3d::~Object3d() {
 void Object3d::SetDirectionalLight(const Vector4& color, const Vector3& direction, float intensity) {
 	if (directionallightData) {
 		directionallightData->color = color;
-		directionallightData->direction = NormalizeReturnVector(direction);
+		directionallightData->direction = Normalize(direction);
 		directionallightData->intensity = intensity;
 		// シーン内で共有する影パスも、通常描画と同じ太陽方向へ揃えます。
 		Object3dCommon::GetInstance()->SetShadowLightDirection(directionallightData->direction);

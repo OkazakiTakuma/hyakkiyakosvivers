@@ -62,10 +62,6 @@ struct PlayerStats {
 	std::string modelFilePath;
 	/// <summary>モデルをアニメーションモデルとして扱うかどうかです。</summary>
 	bool isAnimationModel = false;
-	/// <summary>旧データ互換用の初期攻撃タイプ名です。現在は attackSlots[0] と同期します。</summary>
-	std::string initialAttackName = "Straight";
-	/// <summary>旧データ互換用の初期攻撃レベルです。現在は attackSlots[0] と同期します。</summary>
-	std::string initialAttackLevel = "1";
 	/// <summary>プレイヤーが同時に装備できる攻撃スロットです。</summary>
 	std::array<PlayerAttackSlot, 5> attackSlots{};
 	/// <summary>一時的または恒久的に能力へ加算するステータスアップアイテムスロットです。</summary>

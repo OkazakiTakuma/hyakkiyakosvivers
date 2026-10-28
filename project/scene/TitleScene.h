@@ -30,9 +30,6 @@ public:
 	void Finalize() override;
 	/// <summary>シーン遷移と共有所持金の参照に使うSceneManagerを設定します。</summary>
 	void SetSceneManager(SceneManager* manager) override { sceneManager = manager; }
-	/// <summary>通常のゲーム開始と同じタイトル退出演出を、デモ進行から開始します。</summary>
-	bool BeginDemoStartTransition();
-
 private:
 	enum class TitlePhase {
 		FadeIn,

@@ -2,7 +2,6 @@
 #include "../../base/struct.h"
 #include "../camera/Camera.h"
 #include "Matrix.h"
-#include "Screen.h"
 #include "Vector.h"
 #include "struct.h"
 #include <Windows.h>

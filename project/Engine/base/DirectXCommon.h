@@ -2,7 +2,6 @@
 #include <d3d12.h>
 #include "DirectXTex.h"
 #include "Matrix.h"
-#include "Screen.h"
 #include "ScreenCapture.h"
 #include "Vector.h"
 #include "Logger.h"

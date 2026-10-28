@@ -24,14 +24,8 @@ float Length(const Vector3& v);
 /// 値を正規化して扱いやすい状態にします。
 /// </summary>
 Vector3 Normalize(const Vector3& v);
-/// <summary>
-/// 値を正規化して扱いやすい状態にします。
-/// </summary>
-Vector3 NormalizeReturnVector(const Vector3& v);
-
 Vector3 Leap(const Vector3& v1, const Vector3& v2, const float t);
 
-void VectorScreenPrintf(int x, int y, const Vector3& vector, const char* label);
 Vector3 Cross(const Vector3& v1, const Vector3& v2);
 struct Vector4 {
 	float x, y, z, w;

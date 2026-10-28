@@ -83,7 +83,7 @@ void PlayerAttackEntityComponent::SetLevel(const std::string& level) { level_ = 
 
 const std::string& PlayerAttackEntityComponent::GetLevel() const { return level_; }
 
-void PlayerAttackEntityComponent::SetDirection(const Vector3& direction) { direction_ = Length(direction) > MathConstants::kDirectionEpsilon ? NormalizeReturnVector(direction) : Vector3{0.0f, 0.0f, 1.0f}; }
+void PlayerAttackEntityComponent::SetDirection(const Vector3& direction) { direction_ = Length(direction) > MathConstants::kDirectionEpsilon ? Normalize(direction) : Vector3{0.0f, 0.0f, 1.0f}; }
 
 const Vector3& PlayerAttackEntityComponent::GetDirection() const { return direction_; }
 
@@ -287,7 +287,7 @@ void PlayerAttackEntityComponent::UpdateLinearMotion(GameObject* owner, float de
 		Vector3 toTarget = homingTarget_->GetTransform().translate - owner->GetTransform().translate;
 		toTarget.y = 0.0f;
 		if (Length(toTarget) > MathConstants::kDirectionEpsilon) {
-			const Vector3 targetDirection = NormalizeReturnVector(toTarget);
+			const Vector3 targetDirection = Normalize(toTarget);
 			float homingRate = (std::clamp)(homingAccuracy_, 0.0f, 1.0f);
 			if (rampHoming) {
 				magatamaElapsedSeconds_ += deltaTime;
@@ -296,7 +296,7 @@ void PlayerAttackEntityComponent::UpdateLinearMotion(GameObject* owner, float de
 				homingRate *= turnRamp;
 			}
 			const float accuracy = 1.0f - std::pow(1.0f - homingRate, frameScale);
-			direction_ = NormalizeReturnVector(Leap(direction_, targetDirection, accuracy));
+			direction_ = Normalize(Leap(direction_, targetDirection, accuracy));
 		}
 	}
 
@@ -324,7 +324,7 @@ void PlayerAttackEntityComponent::UpdateBoomerang(GameObject* owner, float delta
 					lifeTime_ = 0.0f;
 					return;
 				}
-				direction_ = NormalizeReturnVector(toPlayer);
+				direction_ = Normalize(toPlayer);
 				returning_ = true;
 			}
 		}

@@ -13,7 +13,6 @@
         "projectileSize": 0.34,
         "projectileSpeed": 0.14,
         "shootingInterval": 1.35,
-        "shoots": false,
         "sizeScale": 1.85,
         "spawnsPerMinute": 0.0,
         "speed": 0.045
@@ -24,7 +23,6 @@
         "experience": 6,
         "experienceModel": "enemy_drop.obj",
         "health": 140.0,
-        "shoots": false,
         "spawnsPerMinute": 16.0,
         "speed": 0.052
     },
@@ -40,7 +38,6 @@
         "projectileSize": 0.26,
         "projectileSpeed": 0.145,
         "shootingInterval": 1.2,
-        "shoots": true,
         "spawnsPerMinute": 10.0,
         "speed": 0.043
     },
@@ -55,7 +52,6 @@
         "experience": 10,
         "experienceModel": "enemy_drop.obj",
         "health": 210.0,
-        "shoots": false,
         "spawnsPerMinute": 7.0,
         "speed": 0.043
     },
@@ -68,7 +64,6 @@
         "selfDestructFuseDuration": 0.8,
         "selfDestructRadius": 3.0,
         "selfDestructTriggerDistance": 2.2,
-        "shoots": false,
         "sizeScale": 0.9,
         "spawnsPerMinute": 8.0,
         "speed": 0.065
@@ -101,7 +96,6 @@
         "experience": 45,
         "experienceModel": "enemy_drop.obj",
         "health": 4200.0,
-        "shoots": false,
         "sizeScale": 0.9,
         "spawnsPerMinute": 0.0,
         "speed": 0.032
@@ -118,7 +112,6 @@
         "experienceModel": "enemy_drop.obj",
         "health": 150.0,
         "shootingInterval": 2.0,
-        "shoots": false,
         "spawnsPerMinute": 5.0,
         "speed": 0.03500000014901161
     },
@@ -128,7 +121,6 @@
         "experienceModel": "enemy_drop.obj",
         "health": 100.0,
         "shootingInterval": 2.0,
-        "shoots": false,
         "spawnsPerMinute": 12.0,
         "speed": 0.03999999910593033
     },
@@ -139,7 +131,6 @@
         "experienceModel": "enemy_drop.obj",
         "health": 800.0,
         "shootingInterval": 2.0,
-        "shoots": false,
         "sizeScale": 1.6,
         "spawnsPerMinute": 0.0,
         "speed": 0.055
@@ -156,7 +147,6 @@
         "projectileSize": 0.32,
         "projectileSpeed": 0.14,
         "shootingInterval": 0.9,
-        "shoots": true,
         "sizeScale": 1.55,
         "spawnsPerMinute": 0.0,
         "speed": 0.045
@@ -173,7 +163,6 @@
         "experienceModel": "enemy_drop.obj",
         "health": 900.0,
         "shootingInterval": 2.0,
-        "shoots": false,
         "sizeScale": 1.7,
         "spawnsPerMinute": 0.0,
         "speed": 0.045
@@ -204,7 +193,6 @@
         "projectileSize": 0.30,
         "projectileLifeTime": 8.0,
         "shootingInterval": 2.0,
-        "shoots": false,
         "sizeScale": 2.4000000953674316,
         "spawnsPerMinute": 1.0,
         "speed": 0.02500000037252903
@@ -221,7 +209,6 @@
         "projectileSize": 0.2199999988079071,
         "projectileSpeed": 0.11999999731779099,
         "shootingInterval": 1.6,
-        "shoots": true,
         "spawnsPerMinute": 7.0,
         "speed": 0.03500000014901161
     }

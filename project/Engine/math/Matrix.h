@@ -65,8 +65,6 @@ Matrix4x4 Transpose(const Matrix4x4& m);
 /// Identity4x4 を生成して返します。
 /// </summary>
 Matrix4x4 MakeIdentity4x4();
-/// <param name="matrix">計算に使用する行列を指定します。</param>
-void MatrixScreenPrintf(int posX, int posY, const Matrix4x4& matrix, const char* label);
 /// <summary>
 /// TranslateMatrix を生成して返します。
 /// </summary>

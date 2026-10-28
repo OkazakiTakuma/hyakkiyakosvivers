@@ -186,11 +186,7 @@ void EnemyComponent::Update() {
 	const Vector3 normalized = distance > MathConstants::kDirectionEpsilon ? Normalize(direction) : Vector3{0.0f, 0.0f, 1.0f};
 	transform.rotate.y = std::atan2(normalized.x, normalized.z);
 
-	const EnemyBehaviorType behavior =
-		stats_.behavior == EnemyBehaviorType::Chase && stats_.shoots
-			? EnemyBehaviorType::Shooter
-			: stats_.behavior;
-	switch (behavior) {
+	switch (stats_.behavior) {
 	case EnemyBehaviorType::Shooter:
 		UpdateShooter(transform, normalized, distance);
 		break;
@@ -322,8 +318,7 @@ void EnemyComponent::Draw3D() {
 
 void EnemyComponent::ApplyStats(const EnemyStats& stats) {
 		const bool isFirstStatsApplication = !hasAppliedStats_;
-		const bool behaviorChanged = hasAppliedStats_ &&
-			(stats_.behavior != stats.behavior || stats_.shoots != stats.shoots);
+		const bool behaviorChanged = hasAppliedStats_ && stats_.behavior != stats.behavior;
 		stats_ = stats;
 		hasAppliedStats_ = true;
 		if (behaviorChanged) {
@@ -532,11 +527,7 @@ float EnemyComponent::GetContactAttackDamage() const {
 }
 
 EnemyBehaviorPresentation EnemyComponent::GetBehaviorPresentation() {
-	const EnemyBehaviorType behavior =
-		stats_.behavior == EnemyBehaviorType::Chase && stats_.shoots
-			? EnemyBehaviorType::Shooter
-			: stats_.behavior;
-	switch (behavior) {
+	switch (stats_.behavior) {
 	case EnemyBehaviorType::Shooter:
 		return MakeColoredPresentation("enemy_shooter.gltf", {0.25f, 0.55f, 1.0f, 1.0f});
 	case EnemyBehaviorType::Charger: {

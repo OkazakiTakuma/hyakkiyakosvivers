@@ -44,35 +44,6 @@ const char* GetDefeatAnimationName(const std::string& playerType) {
 }
 
 #ifdef USE_IMGUI
-ImVec2 GetPrimaryWorkPos() {
-	const ImGuiPlatformIO& platformIO = ImGui::GetPlatformIO();
-	if (platformIO.Monitors.Size > 0) {
-		return platformIO.Monitors[0].WorkPos;
-	}
-	return ImVec2(0.0f, 0.0f);
-}
-
-ImVec2 GetPrimaryWorkSize() {
-	const ImGuiPlatformIO& platformIO = ImGui::GetPlatformIO();
-	if (platformIO.Monitors.Size > 0) {
-		return platformIO.Monitors[0].WorkSize;
-	}
-	return ImVec2(1280.0f, 720.0f);
-}
-
-float ClampFloat(float value, float minValue, float maxValue) {
-	if (maxValue < minValue) {
-		return minValue;
-	}
-	if (value < minValue) {
-		return minValue;
-	}
-	if (value > maxValue) {
-		return maxValue;
-	}
-	return value;
-}
-
 float ClampLayoutValue(float value, float minValue, float maxValue) {
 	if (maxValue < minValue) {
 		return maxValue;
@@ -84,17 +55,6 @@ float ClampLayoutValue(float value, float minValue, float maxValue) {
 		return maxValue;
 	}
 	return value;
-}
-
-ImVec2 ClampWindowPosToWorkArea(const ImVec2& pos, const ImVec2& size) {
-	const ImVec2 workPos = GetPrimaryWorkPos();
-	const ImVec2 workSize = GetPrimaryWorkSize();
-	const float maxX = workPos.x + workSize.x - size.x;
-	const float maxY = workPos.y + workSize.y - size.y;
-	return ImVec2(
-	    ClampFloat(pos.x, workPos.x, maxX),
-	    ClampFloat(pos.y, workPos.y, maxY)
-	);
 }
 
 struct EditorLayout {
@@ -456,7 +416,7 @@ void GamePlayScene::ApplyStageOneEveningLight() {
 	}
 
 	const AtmosphereSettings& atmosphere = AtmosphereSystem::GetInstance()->GetSettings();
-	const Vector3 sunDirection = NormalizeReturnVector(atmosphere.sunDirection);
+	const Vector3 sunDirection = Normalize(atmosphere.sunDirection);
 	const Vector3 lightDirection = {-sunDirection.x, -sunDirection.y, -sunDirection.z};
 	// 低い夕陽の暖色を残しながら、戦闘中の輪郭と地形の起伏が潰れない明るさにします。
 	const Vector4 sunlightColor = {1.0f, 0.48f, 0.20f, 1.0f};
