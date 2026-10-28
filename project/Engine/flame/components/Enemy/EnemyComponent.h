@@ -56,7 +56,6 @@ struct EnemyStats {
 	float collectExperienceItemDropChance = 0.05f;
 	/// <summary>この敵が落とす回復アイテムのHP回復量です。</summary>
 	float healthItemHealAmount = 25.0f;
-	bool shoots = false;
 	EnemyBehaviorType behavior = EnemyBehaviorType::Chase;
 	// Shooter専用: preferredDistanceを中心とした許容帯の中で停止し、近すぎる場合は後退する。
 	float preferredDistance = 7.0f;

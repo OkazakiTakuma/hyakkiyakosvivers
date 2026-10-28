@@ -362,7 +362,7 @@ void BaseScene::UpdatePlayerAttackEntityHits() {
 			if (Length(surfaceNormal) <= MathConstants::kDirectionEpsilon) {
 				continue;
 			}
-			surfaceNormal = NormalizeReturnVector(surfaceNormal);
+			surfaceNormal = Normalize(surfaceNormal);
 			const float incomingAmount = Dot(projectile->GetDirection(), surfaceNormal);
 			if (incomingAmount >= 0.0f) {
 				continue;

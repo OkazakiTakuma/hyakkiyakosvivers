@@ -44,7 +44,7 @@ public:
 	void SetDirectionalLight(const Vector4& color, const Vector3& direction, float intensity) {
 		if (!lightData_) return;
 		lightData_->color = color;
-		lightData_->direction = NormalizeReturnVector(direction);
+		lightData_->direction = Normalize(direction);
 		lightData_->intensity = intensity;
 	}
 protected:

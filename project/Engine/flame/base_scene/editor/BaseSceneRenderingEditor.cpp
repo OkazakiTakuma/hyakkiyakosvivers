@@ -587,7 +587,7 @@ void BaseScene::DrawEditorSkyBoxControls() {
 	}
 	// 方向は常に単位ベクトルへ戻し、円盤位置と平行光源の強度計算を安定させます。
 	if (ImGui::DragFloat3("Sun Direction", &atmosphere.sunDirection.x, 0.005f, -1.0f, 1.0f)) {
-		atmosphere.sunDirection = NormalizeReturnVector(atmosphere.sunDirection);
+		atmosphere.sunDirection = Normalize(atmosphere.sunDirection);
 	}
 	ImGui::SliderFloat("Sun Angular Radius", &atmosphere.sunAngularRadius, 0.002f, 0.06f, "%.3f");
 	ImGui::SliderFloat("Sun HDR Intensity", &atmosphere.sunIntensity, 0.0f, 30.0f);

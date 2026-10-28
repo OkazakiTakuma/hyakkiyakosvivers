@@ -285,9 +285,6 @@
     <ClCompile Include="Engine\math\Quaternion.cpp">
       <Filter>Engine\math</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\math\Screen.cpp">
-      <Filter>Engine\math</Filter>
-    </ClCompile>
     <ClCompile Include="Engine\math\Vector.cpp">
       <Filter>Engine\math</Filter>
     </ClCompile>
@@ -561,9 +558,6 @@
       <Filter>Engine\math</Filter>
     </ClInclude>
     <ClInclude Include="Engine\math\Quaternion.h">
-      <Filter>Engine\math</Filter>
-    </ClInclude>
-    <ClInclude Include="Engine\math\Screen.h">
       <Filter>Engine\math</Filter>
     </ClInclude>
     <ClInclude Include="Engine\math\Vector.h">

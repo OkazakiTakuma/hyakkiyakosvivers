@@ -147,7 +147,7 @@ void PlayerSelectScene::RefreshSelectionPresentation() {
 	if (unlocked) {
 		characterStateTextObject_->GetComponent<TextComponent>()->SetText("◀  SELECTED  ▶");
 		characterStateTextObject_->GetComponent<TextComponent>()->SetColor({0.42f, 0.82f, 1.0f, 1.0f});
-		weaponNameTextObject_->GetComponent<TextComponent>()->SetText(stats.initialAttackName);
+		weaponNameTextObject_->GetComponent<TextComponent>()->SetText(stats.attackSlots[0].attackName);
 		weaponTextObject_->GetComponent<TextComponent>()->SetText(MakeWeaponDescription(stats));
 	} else {
 		// 未開放キャラクターは数値を伏せ、解除条件だけをプレイヤーへ案内する。
@@ -165,8 +165,8 @@ void PlayerSelectScene::RefreshSelectionPresentation() {
 	pageTextObject_->GetComponent<TextComponent>()->SetText(std::to_string(selectedPlayerIndex_ + 1) + "  /  " + std::to_string(playerTypeNames_.size()));
 
 	// 攻撃共通画像、レベル別画像の順に探し、どちらもなければ仮アイコンへ戻す。
-	const PlayerAttackStats attack = LoadPlayerAttackStats(stats.initialAttackName);
-	const PlayerAttackLevelStats* level = FindAttackLevel(attack, stats.initialAttackLevel);
+	const PlayerAttackStats attack = LoadPlayerAttackStats(stats.attackSlots[0].attackName);
+	const PlayerAttackLevelStats* level = FindAttackLevel(attack, stats.attackSlots[0].attackLevel);
 	std::string iconPath = attack.choiceTextureFilePath;
 	if (iconPath.empty() && level) iconPath = level->choiceTextureFilePath;
 	if (iconPath.empty() || !std::filesystem::exists(iconPath)) iconPath = "Resources/circle.png";
@@ -282,8 +282,8 @@ std::string PlayerSelectScene::MakeStatusDescription(const PlayerStats& stats) c
 }
 
 std::string PlayerSelectScene::MakeWeaponDescription(const PlayerStats& stats) const {
-	const PlayerAttackStats attack = LoadPlayerAttackStats(stats.initialAttackName);
-	const PlayerAttackLevelStats* level = FindAttackLevel(attack, stats.initialAttackLevel);
+	const PlayerAttackStats attack = LoadPlayerAttackStats(stats.attackSlots[0].attackName);
+	const PlayerAttackLevelStats* level = FindAttackLevel(attack, stats.attackSlots[0].attackLevel);
 	if (!level) return "武器データがありません";
 	std::ostringstream stream;
 	stream << (level->choiceDescription.empty() ? "初期装備として使用する攻撃です" : level->choiceDescription)

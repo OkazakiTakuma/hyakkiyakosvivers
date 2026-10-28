@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include "Matrix.h"
-#include "Screen.h"
 #include "Vector.h"
 #include "DirectXTex.h"
 #include <Windows.h>

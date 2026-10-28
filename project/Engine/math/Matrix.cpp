@@ -180,8 +180,6 @@ Matrix4x4 MakeIdentity4x4() {
 	return identiy;
 }
 
-void MatrixScreenPrintf(int posX, int posY, const Matrix4x4& matrix, const char* label) {}
-
 /// <summary>
 /// TranslateMatrix を生成して返します。
 /// </summary>

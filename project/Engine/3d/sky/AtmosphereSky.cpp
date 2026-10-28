@@ -121,7 +121,7 @@ void AtmosphereSky::Update(const Camera* camera) {
 	    Multiply(view, camera->GetProjectionMatrix()));
 
 	const AtmosphereSettings& settings = AtmosphereSystem::GetInstance()->GetSettings();
-	atmosphereData_->sunDirection = NormalizeReturnVector(settings.sunDirection);
+	atmosphereData_->sunDirection = Normalize(settings.sunDirection);
 	atmosphereData_->sunAngularRadius = settings.sunAngularRadius;
 	atmosphereData_->rayleighColor = settings.rayleighColor;
 	atmosphereData_->rayleighStrength = settings.rayleighStrength;

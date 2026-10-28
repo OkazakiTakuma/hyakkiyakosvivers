@@ -167,7 +167,7 @@ Vector3 PlayerAttackComponent::RotateYaw(const Vector3& direction, float degrees
 		const float c = std::cos(radians);
 		const float s = std::sin(radians);
 		const Vector3 rotated = {direction.x * c + direction.z * s, 0.0f, -direction.x * s + direction.z * c};
-		return NormalizeReturnVector(rotated);
+		return Normalize(rotated);
 	}
 
 Vector3 PlayerAttackComponent::GetShotSpawnOffset(const PlayerAttackLevelStats& levelStats, int shotIndex) {
@@ -191,7 +191,7 @@ void PlayerAttackComponent::QueueShot(GameObject* owner, const Player& player, c
 		    0.0f,
 		    std::cos(owner->GetTransform().rotate.y)
 		};
-		forward = NormalizeReturnVector(forward);
+		forward = Normalize(forward);
 		const Vector3 right = {
 		    std::cos(owner->GetTransform().rotate.y),
 		    0.0f,

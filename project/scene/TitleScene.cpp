@@ -62,7 +62,7 @@ void TitleScene::Initialize() {
 	// 太陽方向を空・平行光源・距離霞で共有し、別々に位置を調整する必要をなくします。
 	AtmosphereSettings& atmosphere = AtmosphereSystem::GetInstance()->GetSettings();
 	atmosphere.enabled = true;
-	atmosphere.sunDirection = NormalizeReturnVector({-0.18f, 0.03f, 0.98f});
+	atmosphere.sunDirection = Normalize(Vector3{-0.18f, 0.03f, 0.98f});
 	atmosphere.sunAngularRadius = 0.022f;
 	atmosphere.sunIntensity = 3.5f;
 	atmosphere.rayleighStrength = 0.72f;
@@ -271,14 +271,6 @@ void TitleScene::BeginExitTransition(const std::string& sceneName) {
 	titlePhase_ = TitlePhase::Exit;
 }
 
-bool TitleScene::BeginDemoStartTransition() {
-	if (titlePhase_ == TitlePhase::Exit) {
-		return false;
-	}
-	BeginExitTransition("STAGE_SELECT");
-	return true;
-}
-
 void TitleScene::UpdateExitPresentation() {
 	if (exitMagatamas_.empty() || exitEnemies_.empty()) {
 		if (!exitSceneChangeRequested_ && sceneManager && !exitSceneName_.empty()) {
@@ -356,7 +348,7 @@ void TitleScene::UpdateExitPresentation() {
 
 void TitleScene::UpdateTitlePresentation() {
 	const AtmosphereSettings& atmosphere = AtmosphereSystem::GetInstance()->GetSettings();
-	const Vector3 sunDirection = NormalizeReturnVector(atmosphere.sunDirection);
+	const Vector3 sunDirection = Normalize(atmosphere.sunDirection);
 	const Vector3 lightDirection = {-sunDirection.x, -sunDirection.y, -sunDirection.z};
 	// 太陽が地平線へ近いほど、直接光を白から橙へ変化させます。
 	const float sunsetAmount = std::clamp((0.25f - sunDirection.y) / 0.33f, 0.0f, 1.0f);

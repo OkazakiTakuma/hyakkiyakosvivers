@@ -57,7 +57,6 @@ inline nlohmann::json ToJson(const EnemyStats& stats) {
 	json["health"] = stats.health;
 	json["attack"] = stats.attack;
 	json["speed"] = stats.speed;
-	json["shoots"] = stats.shoots;
 	json["shootingInterval"] = stats.shootingInterval;
 	json["spawnsPerMinute"] = stats.spawnsPerMinute;
 	json["experience"] = stats.experience;
@@ -135,7 +134,6 @@ inline EnemyStats FromJson(const nlohmann::json& json, const EnemyStats& fallbac
 	stats.health = (std::max)(0.0f, json.value("health", stats.health));
 	stats.attack = (std::max)(0.0f, json.value("attack", stats.attack));
 	stats.speed = (std::max)(0.0f, json.value("speed", stats.speed));
-	stats.shoots = json.value("shoots", stats.shoots);
 	stats.shootingInterval = (std::max)(0.0f, json.value("shootingInterval", stats.shootingInterval));
 	stats.spawnsPerMinute = (std::max)(0.0f, json.value("spawnsPerMinute", stats.spawnsPerMinute));
 	stats.experience = (std::max)(0, json.value("experience", stats.experience));
@@ -145,8 +143,6 @@ inline EnemyStats FromJson(const nlohmann::json& json, const EnemyStats& fallbac
 	stats.collectExperienceItemDropChance = (std::clamp)(json.value("collectExperienceItemDropChance", stats.collectExperienceItemDropChance), 0.0f, 1.0f);
 	stats.healthItemHealAmount = (std::max)(0.0f, json.value("healthItemHealAmount", stats.healthItemHealAmount));
 	stats.behavior = BehaviorFromString(json.value("behavior", std::string(BehaviorToString(stats.behavior))));
-	// behavior導入前のデータではshootsだけが保存されていたため、旧データをShooterとして引き継ぐ。
-	if (stats.shoots && !json.contains("behavior")) stats.behavior = EnemyBehaviorType::Shooter;
 	stats.preferredDistance = (std::max)(0.0f, json.value("preferredDistance", stats.preferredDistance));
 	stats.distanceTolerance = (std::max)(0.0f, json.value("distanceTolerance", stats.distanceTolerance));
 	stats.projectileSpeed = (std::max)(0.0f, json.value("projectileSpeed", stats.projectileSpeed));

@@ -229,18 +229,6 @@ std::string SceneManager::GetPlayerUnlockPrerequisiteStage(const std::string& pl
 	return found == playerUnlockStagePrerequisites_.end() ? std::string{} : found->second;
 }
 
-void SceneManager::UnlockPlayerType(const std::string& playerTypeName) {
-	// ステージクリア・ショップ購入など、呼び出し元を限定しない共通の開放入口として使用する。
-	if (playerTypeName.empty()) {
-		return;
-	}
-	// 初回開放時だけ保存し、同じ条件が複数回成立しても不要なファイル書き込みを行わない。
-	if (unlockedPlayerTypeNames_.insert(playerTypeName).second) {
-		// 開放した瞬間に永続化し、キャラクター選択画面へ移る前に終了しても進行を保持する。
-		SaveGameProgress();
-	}
-}
-
 void SceneManager::LoadStageUnlockConditions() {
 	std::ifstream input(StringUtility::Utf8ToPath(kStageUnlockConditionsFilePath));
 	if (!input) {
@@ -371,23 +359,9 @@ bool SceneManager::SpendMoney(int amount) {
 	return true;
 }
 
-std::string SceneManager::MakeShopUpgradeKey(const std::string& upgradeId) const {
-	// 同じ商品でも使用キャラクターごとに独立した購入レベルを持たせる。
-	return MakeShopUpgradeKey(selectedPlayerTypeName_, upgradeId);
-}
-
 std::string SceneManager::MakeShopUpgradeKey(
 	const std::string& playerTypeName, const std::string& upgradeId) const {
 	return playerTypeName + ":" + upgradeId;
-}
-
-int SceneManager::GetShopUpgradeLevel(const std::string& upgradeId) const {
-	const auto found = shopUpgradeLevels_.find(MakeShopUpgradeKey(upgradeId));
-	return found == shopUpgradeLevels_.end() ? 0 : found->second;
-}
-
-void SceneManager::SetShopUpgradeLevel(const std::string& upgradeId, int level) {
-	SetShopUpgradeLevelForPlayer(selectedPlayerTypeName_, upgradeId, level);
 }
 
 int SceneManager::GetShopUpgradeLevelForPlayer(

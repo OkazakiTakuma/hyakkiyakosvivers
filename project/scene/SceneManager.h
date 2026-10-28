@@ -79,9 +79,6 @@ public:
 	bool IsPlayerTypeUnlocked(const std::string& playerTypeName) const;
 	/// <summary>指定プレイヤーの開放に必要なクリア済みステージIDを返します。条件なしなら空文字です。</summary>
 	std::string GetPlayerUnlockPrerequisiteStage(const std::string& playerTypeName) const;
-	/// <summary>指定したプレイヤータイプを開放し、進行データへ即時保存します。</summary>
-	void UnlockPlayerType(const std::string& playerTypeName);
-
 	/// <summary>
 	/// 毎フレームの状態更新を行います。
 	/// </summary>
@@ -139,10 +136,6 @@ public:
 	void AddMoney(int amount);
 	/// <summary>残高が足りる場合だけ所持金を消費し、進行データへ保存します。</summary>
 	bool SpendMoney(int amount);
-	/// <summary>選択中プレイヤーの商品購入レベルを取得します。</summary>
-	int GetShopUpgradeLevel(const std::string& upgradeId) const;
-	/// <summary>選択中プレイヤーの商品購入レベルを更新して保存します。</summary>
-	void SetShopUpgradeLevel(const std::string& upgradeId, int level);
 	/// <summary>指定プレイヤーの商品購入レベルを取得します。ショップ内の対象切り替えで使用します。</summary>
 	int GetShopUpgradeLevelForPlayer(const std::string& playerTypeName, const std::string& upgradeId) const;
 	/// <summary>指定プレイヤーの商品購入レベルを更新し、進行データへ保存します。</summary>
@@ -187,8 +180,6 @@ private:
 	void SaveStageUnlockConditions() const;
 	/// <summary>開放条件の変更によって循環参照が発生するかを判定します。</summary>
 	bool WouldCreateStageUnlockCycle(const std::string& stageId, const std::string& prerequisiteStageId) const;
-	/// <summary>プレイヤーごとに商品レベルを分けるための保存キーを生成します。</summary>
-	std::string MakeShopUpgradeKey(const std::string& upgradeId) const;
 	/// <summary>ショップ対象を明示して商品レベルの保存キーを生成します。</summary>
 	std::string MakeShopUpgradeKey(const std::string& playerTypeName, const std::string& upgradeId) const;
 	/// <summary>全キャラクター共通商品の保存キーを生成します。</summary>

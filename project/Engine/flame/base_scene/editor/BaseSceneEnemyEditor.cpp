@@ -369,7 +369,6 @@ void BaseScene::DrawEnemyInspector() {
 	int behaviorIndex = static_cast<int>(stats.behavior);
 	if (ImGui::Combo("Behavior", &behaviorIndex, behaviorLabels, 7)) {
 		stats.behavior = static_cast<EnemyBehaviorType>(behaviorIndex);
-		stats.shoots = stats.behavior == EnemyBehaviorType::Shooter;
 		statsChanged = true;
 	}
 	if (stats.behavior == EnemyBehaviorType::Shooter || stats.behavior == EnemyBehaviorType::BurstShooter) {

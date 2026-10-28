@@ -61,8 +61,6 @@ PlayerStats MakeDefaultPlayerStats();
 
 std::vector<std::string> GetPlayerAttackLevels();
 
-std::string NormalizePlayerAttackName(const std::string& attackName);
-
 PlayerAttackLevelStats MakeDefaultPlayerAttackLevelStats(const std::string& level);
 
 PlayerAttackStats MakeDefaultPlayerAttackStats();

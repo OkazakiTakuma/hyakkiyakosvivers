@@ -23,13 +23,6 @@ constexpr float kBladeScale = 12.0f;
 constexpr float kBladeGripCenter = 0.007f * kBladeScale;
 constexpr int kLeftMouseButton = 0;
 
-// セーブデータや選択画面で使われる日本語名と、旧来の英語名の両方を烏天狗として扱う。
-bool IsKarasuTenguPlayerType(const std::string& playerTypeName) {
-	return playerTypeName == "烏天狗" ||
-	       playerTypeName == "KarasuTengu" ||
-	       playerTypeName == "karasuTengu";
-}
-
 Vector3 MoveTowards(const Vector3& current, const Vector3& target, float maxDelta) {
 	// 現在速度を目標速度へ一定量だけ近づけ、入力の急停止・急加速を抑える。
 	const Vector3 difference = target - current;
@@ -232,7 +225,7 @@ void Player::UpdateHealthRegeneration(float deltaTime) {
 
 void Player::Draw3D() {
 	// 刀は烏天狗専用装備。読み込みに失敗した場合も安全に描画を中止する。
-	if (!IsKarasuTenguPlayerType(playerTypeName_) || !bladeObject_) {
+	if (playerTypeName_ != "烏天狗" || !bladeObject_) {
 		return;
 	}
 
@@ -288,7 +281,7 @@ void Player::Finalize() {
 
 void Player::EnsureBladeEquipment() {
 	// 生成済みなら再利用し、毎フレームのモデル読み込みとObject3d生成を避ける。
-	if (!IsKarasuTenguPlayerType(playerTypeName_) || bladeObject_) {
+	if (playerTypeName_ != "烏天狗" || bladeObject_) {
 		return;
 	}
 

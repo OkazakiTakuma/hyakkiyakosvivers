@@ -721,7 +721,7 @@ void Model::ApplySkinning(const Skeleton& skeleton) {
 		}
 
 		skinnedVertices_[vertexIndex].position.w = 1.0f;
-		skinnedVertices_[vertexIndex].normal = NormalizeReturnVector(skinnedVertices_[vertexIndex].normal);
+		skinnedVertices_[vertexIndex].normal = Normalize(skinnedVertices_[vertexIndex].normal);
 	}
 
 	std::memcpy(vertexData, skinnedVertices_.data(), sizeof(VertexData) * skinnedVertices_.size());

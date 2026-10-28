@@ -768,7 +768,7 @@ void BaseScene::LoadEditorObjects() {
 		const nlohmann::json& atmosphereJson = root["atmosphere"];
 		AtmosphereSettings& atmosphere = AtmosphereSystem::GetInstance()->GetSettings();
 		atmosphere.enabled = atmosphereJson.value("enabled", atmosphere.enabled);
-		atmosphere.sunDirection = NormalizeReturnVector(JsonToVector3(
+		atmosphere.sunDirection = Normalize(JsonToVector3(
 		    atmosphereJson.value("sunDirection", nlohmann::json::array()), atmosphere.sunDirection));
 		atmosphere.sunAngularRadius = atmosphereJson.value("sunAngularRadius", atmosphere.sunAngularRadius);
 		atmosphere.sunIntensity = atmosphereJson.value("sunIntensity", atmosphere.sunIntensity);

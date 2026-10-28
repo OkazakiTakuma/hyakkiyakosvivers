@@ -360,8 +360,6 @@ void BaseScene::DrawPlayerPersistenceInspector(GameObject* selectedObject, Playe
 	}
 
 	if (statsChanged) {
-		stats.initialAttackName = stats.attackSlots[0].attackName;
-		stats.initialAttackLevel = stats.attackSlots[0].attackLevel;
 		// ステータススロットはJSONへ即時保存せず、現在シーン上のプレイヤーにだけ反映する。
 		player->ApplyStats(stats, ApplyPlayerStatusItems(stats));
 		if (PlayerAttackComponent* attack = selectedObject->GetComponent<PlayerAttackComponent>()) {
