@@ -806,6 +806,53 @@ void BaseScene::LoadEditorObjects() {
 		collectObjects(objectJson, objectJson.value("parent", ""));
 	}
 
+	// ステージ2の街並みは中央タイルだけをJSONで管理し、実行時に左右2タイルの
+	// 描画専用コピーを作る。ステージ2はX方向だけをループするため、Z方向へ複製すると
+	// 壁の後ろに置いた建物が中央の戦闘エリアへ現れてしまう。
+	if (sceneManager && sceneManager->GetSelectedGameplayStageId() == "stage2" && !playerTypeOverride_.empty()) {
+		constexpr float kStage2TileSize = 20.0f;
+		const std::vector<nlohmann::json> centerTileObjects = flatObjects;
+		for (const nlohmann::json& centerObject : centerTileObjects) {
+			const std::string centerName = centerObject.value("name", std::string());
+			const bool isTownScenery =
+			    centerName.rfind("stage2_machiya_", 0) == 0 ||
+			    centerName.rfind("stage2_torii_", 0) == 0 ||
+			    centerName.rfind("stage2_lantern_", 0) == 0;
+			if (!isTownScenery) {
+				continue;
+			}
+			const nlohmann::json centerObject3d = centerObject.value("object3d", nlohmann::json::object());
+			if (!centerObject3d.value("enabled", true)) {
+				continue;
+			}
+
+			for (int tileX = -1; tileX <= 1; ++tileX) {
+				if (tileX == 0) {
+					continue;
+				}
+					nlohmann::json tileObject = centerObject;
+					tileObject["name"] = centerName + "_tile_x_" + std::to_string(tileX + 1);
+					tileObject["parent"] = "";
+					tileObject["children"] = nlohmann::json::array();
+					tileObject.erase("obbCollider");
+					tileObject.erase("sphereCollider");
+					if (tileObject.contains("object3d")) {
+						tileObject["object3d"]["isPointLight"] = false;
+						tileObject["object3d"].erase("pointLight");
+					}
+
+					nlohmann::json& transform = tileObject["transform"];
+					nlohmann::json translate = transform.value(
+					    "translate", nlohmann::json::array({0.0f, 0.0f, 0.0f}));
+					if (translate.is_array() && translate.size() >= 3) {
+						translate[0] = translate[0].get<float>() + tileX * kStage2TileSize;
+						transform["translate"] = std::move(translate);
+					}
+					flatObjects.push_back(std::move(tileObject));
+			}
+		}
+	}
+
 	for (const auto& objectJson : flatObjects) {
 		const std::string typeName = objectJson.value("type", "Empty");
 		std::string modelFilePath = objectJson.value("model", "");

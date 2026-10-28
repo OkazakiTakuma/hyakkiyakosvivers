@@ -271,9 +271,10 @@ void BaseScene::UpdateLoopingTerrain() {
 	}
 
 	const std::string& stageId = sceneManager->GetSelectedGameplayStageId();
-	// 平原はX/Zの両方向、ステージ2は壁と平行なX方向だけをループ対象にする。
+	// ステージ1はX/Z両方向、ステージ2は壁に沿ったX方向だけを20単位で循環させる。
 	const bool wrapsBothAxes = stageId == "default";
 	const bool wrapsHorizontally = stageId == "stage2";
+	const bool isStage2 = stageId == "stage2";
 	if (!wrapsBothAxes && !wrapsHorizontally) {
 		return;
 	}
@@ -294,7 +295,7 @@ void BaseScene::UpdateLoopingTerrain() {
 
 	// プレイヤーが中央タイルの端を越えた分だけ、地形側をタイル1枚分ずつ送る。
 	// プレイヤー・敵・弾・ドロップなどのワールド座標は一切変更しない。
-	const float halfWidth = wrapsBothAxes ? 10.0f : 20.0f;
+	constexpr float halfWidth = 10.0f;
 	const float width = halfWidth * 2.0f;
 	const Vector3 playerPosition = playerObject->GetTransform().translate;
 	const Vector3 terrainPosition = centerTerrain->GetTransform().translate;
@@ -313,13 +314,14 @@ void BaseScene::UpdateLoopingTerrain() {
 		return;
 	}
 
-	// 床の9タイルに加え、ステージ2の上下壁もX方向へ同期させて回廊を途切れさせない。
-	auto isLoopingTerrain = [wrapsHorizontally](const GameObject* target) {
+	// 床の9タイルに加え、ステージ2では壁と和風背景も同じ量だけ送り、
+	// ループ境界を越えても街並みの相対配置が崩れないようにする。
+	auto isLoopingTerrain = [isStage2](const GameObject* target) {
 		if (!target) return false;
 		const std::string& name = target->GetName();
 		return name == "terrain_7" ||
 		    name.rfind("terrain_loop_", 0) == 0 ||
-		    (wrapsHorizontally && name.rfind("stage2_wall_", 0) == 0);
+		    (isStage2 && name.rfind("stage2_", 0) == 0);
 	};
 
 	for (const auto& object : sceneObjects_) {
