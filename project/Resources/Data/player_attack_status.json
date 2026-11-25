@@ -1,5 +1,1798 @@
 {
-    "勾玉": {
+    "Boomerang": {
+        "levels": {
+            "1": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 38.0,
+                "attackInterval": 1.2000000476837158,
+                "description": "一定距離進むと戻ってくる",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 1,
+                "level": "1",
+                "lifeTime": 2.5,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "shotCount": 1,
+                "size": 63.75,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.3199999928474426,
+                "travelDistance": 5.5
+            },
+            "2": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 43.0,
+                "attackInterval": 1.149999976158142,
+                "description": "威力・速度・大きさが上昇する",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 1,
+                "level": "2",
+                "lifeTime": 2.5,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "shotCount": 1,
+                "size": 67.5,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.3400000035762787,
+                "travelDistance": 6.0
+            },
+            "3": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 49.0,
+                "attackInterval": 1.100000023841858,
+                "description": "さらに威力が上がり、より遠くの敵を切り裂く",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 1,
+                "level": "3",
+                "lifeTime": 2.5,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "shotCount": 1,
+                "size": 71.25,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.36000001430511475,
+                "travelDistance": 6.5
+            },
+            "4": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 56.0,
+                "attackInterval": 1.0499999523162842,
+                "description": "攻撃範囲と戻ってくる速度が上昇し、ノックバックが強化される",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 2,
+                "level": "4",
+                "lifeTime": 2.5,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "shotCount": 1,
+                "size": 78.75,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.3799999952316284,
+                "travelDistance": 7.0
+            },
+            "5": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 64.0,
+                "attackInterval": 1.0,
+                "description": "巨大な大幣が素早く往復し、敵を強く押し返す",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 2,
+                "level": "5",
+                "lifeTime": 2.5,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "shotCount": 1,
+                "size": 86.25,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.4000000059604645,
+                "travelDistance": 7.5
+            },
+            "super": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 79.0,
+                "attackInterval": 0.800000011920929,
+                "description": "超巨大な大幣が高速で敵を祓い、最大のノックバックを与える",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 3,
+                "level": "super",
+                "lifeTime": 3.0,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "shotCount": 1,
+                "size": 97.5,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.44999998807907104,
+                "texture": "Resources/UI/WeaponIcons/boomerang_super.png",
+                "travelDistance": 8.0
+            }
+        },
+        "name": "Boomerang",
+        "displayName": "廻祓の大幣",
+        "superDisplayName": "神逐・廻天大幣",
+        "patternId": "boomerang",
+        "superCondition": {
+            "level": "1",
+            "status": "AttackUp"
+        },
+        "texture": "Resources/UI/WeaponIcons/boomerang.png"
+    },
+    "ClawSlash": {
+        "levels": {
+            "1": {
+                "angles": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "attack": 27.5,
+                "attackInterval": 0.800000011920929,
+                "description": "正面を3本の爪で切り裂き、敵をわずかに押し返す",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 1,
+                "level": "1",
+                "lifeTime": 0.41999998688697815,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 3,
+                "size": 105.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.0,
+                "travelDistance": 1.7999999523162842
+            },
+            "2": {
+                "angles": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "attack": 35.0,
+                "attackInterval": 0.75,
+                "description": "爪の威力と攻撃範囲が上昇する",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 1,
+                "level": "2",
+                "lifeTime": 0.41999998688697815,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 3,
+                "size": 115.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.0,
+                "travelDistance": 1.7999999523162842
+            },
+            "3": {
+                "angles": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "attack": 45.0,
+                "attackInterval": 0.699999988079071,
+                "description": "より大きな爪で正面の敵を切り裂き、ノックバックが強化される",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 2,
+                "level": "3",
+                "lifeTime": 0.44999998807907104,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 3,
+                "size": 125.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.0,
+                "travelDistance": 1.7999999523162842
+            },
+            "4": {
+                "angles": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "attack": 57.5,
+                "attackInterval": 0.6499999761581421,
+                "description": "爪の威力と攻撃速度が上昇する",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 2,
+                "level": "4",
+                "lifeTime": 0.44999998807907104,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 3,
+                "size": 135.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.0,
+                "travelDistance": 1.7999999523162842
+            },
+            "5": {
+                "angles": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "attack": 72.5,
+                "attackInterval": 0.6000000238418579,
+                "description": "巨大な爪で広範囲を切り裂き、敵を大きく吹き飛ばす",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 3,
+                "level": "5",
+                "lifeTime": 0.47999998927116394,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 3,
+                "size": 145.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.0,
+                "travelDistance": 1.7999999523162842
+            },
+            "super": {
+                "angles": [
+                    -30.0,
+                    -15.0,
+                    0.0,
+                    15.0,
+                    30.0
+                ],
+                "attack": 100.0,
+                "attackInterval": 0.44999998807907104,
+                "description": "5本の巨大な爪で正面を連続して切り裂き、最大のノックバックを与える",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 3,
+                "level": "super",
+                "lifeTime": 0.550000011920929,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 5,
+                "size": 165.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.0,
+                "texture": "Resources/UI/WeaponIcons/claw_slash_super.png",
+                "travelDistance": 2.0
+            }
+        },
+        "name": "ClawSlash",
+        "displayName": "妖爪・三日月",
+        "superDisplayName": "猫又奥義・五爪裂界",
+        "patternId": "claw_slash",
+        "superCondition": {
+            "level": "1",
+            "status": "HasteUp"
+        },
+        "texture": "Resources/UI/WeaponIcons/claw_slash.png",
+        "visualId": "model"
+    },
+    "FlameField": {
+        "levels": {
+            "1": {
+                "attack": 12.0,
+                "attackInterval": 1.25,
+                "description": "ランダム地点に発生する円形の炎が敵を焼き続ける",
+                "infinitePierce": true,
+                "level": "1",
+                "lifeTime": 3.5,
+                "model": "sphere.obj",
+                "repeatHitInterval": 0.4,
+                "shotCount": 1,
+                "size": 180.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        0.0
+                    ]
+                ],
+                "speed": 2.5
+            },
+            "2": {
+                "attack": 15.0,
+                "attackInterval": 1.15,
+                "description": "炎の威力と範囲が増加する",
+                "infinitePierce": true,
+                "level": "2",
+                "lifeTime": 3.8,
+                "model": "sphere.obj",
+                "repeatHitInterval": 0.36,
+                "shotCount": 1,
+                "size": 108.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        2.2
+                    ]
+                ],
+                "speed": 2.7
+            },
+            "3": {
+                "attack": 18.0,
+                "attackInterval": 1.05,
+                "description": "炎が2つになり、攻撃範囲が広がる",
+                "infinitePierce": true,
+                "level": "3",
+                "lifeTime": 4.0,
+                "model": "sphere.obj",
+                "repeatHitInterval": 0.33,
+                "shotCount": 2,
+                "size": 112.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        2.3
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        -2.3
+                    ]
+                ],
+                "speed": 2.9
+            },
+            "4": {
+                "attack": 21.0,
+                "attackInterval": 0.95,
+                "description": "炎の燃焼間隔が短くなり、より激しく焼く",
+                "infinitePierce": true,
+                "level": "4",
+                "lifeTime": 4.2,
+                "model": "sphere.obj",
+                "repeatHitInterval": 0.29,
+                "shotCount": 2,
+                "size": 118.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        2.5
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        -2.5
+                    ]
+                ],
+                "speed": 3.1
+            },
+            "5": {
+                "attack": 25.0,
+                "attackInterval": 0.85,
+                "description": "3つの炎が高速周回し、広範囲を焼き尽くす",
+                "infinitePierce": true,
+                "level": "5",
+                "lifeTime": 4.5,
+                "model": "sphere.obj",
+                "repeatHitInterval": 0.25,
+                "shotCount": 3,
+                "size": 125.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        2.6
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        -2.6
+                    ],
+                    [
+                        2.6,
+                        0.5,
+                        0.0
+                    ]
+                ],
+                "speed": 3.3
+            },
+            "super": {
+                "attack": 32.0,
+                "attackInterval": 0.7,
+                "description": "6つの巨大な炎が敵を包囲し、猛烈な継続ダメージを与える",
+                "infinitePierce": true,
+                "level": "super",
+                "lifeTime": 5.0,
+                "model": "sphere.obj",
+                "repeatHitInterval": 0.18,
+                "shotCount": 6,
+                "size": 135.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        2.9
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        -2.9
+                    ],
+                    [
+                        2.9,
+                        0.5,
+                        0.0
+                    ],
+                    [
+                        -2.9,
+                        0.5,
+                        0.0
+                    ],
+                    [
+                        2.0,
+                        0.5,
+                        2.0
+                    ],
+                    [
+                        -2.0,
+                        0.5,
+                        -2.0
+                    ]
+                ],
+                "speed": 3.7,
+                "texture": "Resources/UI/WeaponIcons/flame_field_super.png"
+            }
+        },
+        "name": "FlameField",
+        "displayName": "狐火炎陣",
+        "superDisplayName": "六華・焦熱狐火陣",
+        "patternId": "flame_field",
+        "superCondition": {
+            "level": "1",
+            "status": "AttackUp"
+        },
+        "texture": "Resources/UI/WeaponIcons/flame_field.png"
+    },
+    "Orbit": {
+        "levels": {
+            "1": {
+                "angles": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "attack": 18.0,
+                "attackInterval": 4.0,
+                "description": "周囲を回り、弱いノックバックで敵を近づけさせない",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 1,
+                "level": "1",
+                "lifeTime": 4.0,
+                "model": "orbit_yinyang_base.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 3,
+                "size": 41.25,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.6499999761581421,
+                        2.200000047683716
+                    ],
+                    [
+                        1.905255913734436,
+                        0.6499999761581421,
+                        -1.1000001430511475
+                    ],
+                    [
+                        -1.9052560329437256,
+                        0.6499999761581421,
+                        -1.0999997854232788
+                    ]
+                ],
+                "speed": 2.200000047683716,
+                "travelDistance": 6.0
+            },
+            "2": {
+                "angles": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "attack": 21.0,
+                "attackInterval": 4.0,
+                "description": "周回弾の威力・速度・大きさが上昇する",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 1,
+                "level": "2",
+                "lifeTime": 4.0,
+                "model": "orbit_yinyang_base.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 3,
+                "size": 45.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.6499999761581421,
+                        2.200000047683716
+                    ],
+                    [
+                        1.905255913734436,
+                        0.6499999761581421,
+                        -1.1000001430511475
+                    ],
+                    [
+                        -1.9052560329437256,
+                        0.6499999761581421,
+                        -1.0999997854232788
+                    ]
+                ],
+                "speed": 2.299999952316284,
+                "travelDistance": 6.0
+            },
+            "3": {
+                "angles": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "attack": 22.0,
+                "attackInterval": 4.5,
+                "description": "周回弾が4個に増え、ノックバックと持続時間が強化される",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 2,
+                "level": "3",
+                "lifeTime": 4.5,
+                "model": "orbit_yinyang_base.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 4,
+                "size": 48.75,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.6499999761581421,
+                        2.200000047683716
+                    ],
+                    [
+                        2.200000047683716,
+                        0.6499999761581421,
+                        -9.616505280973797e-08
+                    ],
+                    [
+                        -1.9233010561947594e-07,
+                        0.6499999761581421,
+                        -2.200000047683716
+                    ],
+                    [
+                        -2.200000047683716,
+                        0.6499999761581421,
+                        2.6234738825792192e-08
+                    ]
+                ],
+                "speed": 2.4000000953674316,
+                "travelDistance": 6.0
+            },
+            "4": {
+                "angles": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "attack": 25.0,
+                "attackInterval": 4.5,
+                "description": "4個の周回弾がさらに強力になる",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 2,
+                "level": "4",
+                "lifeTime": 4.5,
+                "model": "orbit_yinyang_base.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 4,
+                "size": 52.5,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.6499999761581421,
+                        2.200000047683716
+                    ],
+                    [
+                        2.200000047683716,
+                        0.6499999761581421,
+                        -9.616505280973797e-08
+                    ],
+                    [
+                        -1.9233010561947594e-07,
+                        0.6499999761581421,
+                        -2.200000047683716
+                    ],
+                    [
+                        -2.200000047683716,
+                        0.6499999761581421,
+                        2.6234738825792192e-08
+                    ]
+                ],
+                "speed": 2.5,
+                "travelDistance": 6.0
+            },
+            "5": {
+                "angles": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "attack": 27.0,
+                "attackInterval": 5.0,
+                "description": "5個の周回弾が強力なノックバックで長時間プレイヤーを守る",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 3,
+                "level": "5",
+                "lifeTime": 5.0,
+                "model": "orbit_yinyang_base.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 5,
+                "size": 56.25,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.6499999761581421,
+                        2.200000047683716
+                    ],
+                    [
+                        2.0923244953155518,
+                        0.6499999761581421,
+                        0.6798373460769653
+                    ],
+                    [
+                        1.293127417564392,
+                        0.6499999761581421,
+                        -1.7798376083374023
+                    ],
+                    [
+                        -1.2931277751922607,
+                        0.6499999761581421,
+                        -1.7798373699188232
+                    ],
+                    [
+                        -2.0923242568969727,
+                        0.6499999761581421,
+                        0.679837703704834
+                    ]
+                ],
+                "speed": 2.5999999046325684,
+                "travelDistance": 6.0
+            },
+            "super": {
+                "angles": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "attack": 32.0,
+                "attackInterval": 5.5,
+                "description": "6個の巨大な周回弾が最大のノックバックで敵を阻む",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 3,
+                "level": "super",
+                "lifeTime": 5.5,
+                "model": "orbit_yinyang_base.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 6,
+                "size": 63.75,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.6499999761581421,
+                        2.200000047683716
+                    ],
+                    [
+                        1.9052560329437256,
+                        0.6499999761581421,
+                        1.0999999046325684
+                    ],
+                    [
+                        1.905255913734436,
+                        0.6499999761581421,
+                        -1.1000001430511475
+                    ],
+                    [
+                        -1.9233010561947594e-07,
+                        0.6499999761581421,
+                        -2.200000047683716
+                    ],
+                    [
+                        -1.9052560329437256,
+                        0.6499999761581421,
+                        -1.0999997854232788
+                    ],
+                    [
+                        -1.9052555561065674,
+                        0.6499999761581421,
+                        1.1000008583068848
+                    ]
+                ],
+                "speed": 3.0,
+                "texture": "Resources/UI/WeaponIcons/orbit_super.png",
+                "travelDistance": 6.0
+            }
+        },
+        "name": "Orbit",
+        "displayName": "神楽鈴・守ノ輪",
+        "superDisplayName": "六響・天護神楽",
+        "patternId": "orbit",
+        "superCondition": {
+            "level": "1",
+            "status": "SpeedUp"
+        },
+        "texture": "Resources/UI/WeaponIcons/orbit.png",
+        "visualId": "model"
+    },
+    "Ricochet": {
+        "levels": {
+            "1": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 24.0,
+                "attackInterval": 1.399999976158142,
+                "description": "画面内で反射する",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 0,
+                "level": "1",
+                "lifeTime": 5.0,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 1,
+                "size": 48.75,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.30000001192092896,
+                "travelDistance": 6.0
+            },
+            "2": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 27.0,
+                "attackInterval": 1.2999999523162842,
+                "description": "反射弾の威力・速度・持続時間が上昇する",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 0,
+                "level": "2",
+                "lifeTime": 5.5,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 1,
+                "size": 52.5,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.3199999928474426,
+                "travelDistance": 6.0
+            },
+            "3": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 31.0,
+                "attackInterval": 1.2000000476837158,
+                "description": "反射弾が敵を押し返しながら長時間跳ね回る",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 1,
+                "level": "3",
+                "lifeTime": 6.0,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 1,
+                "size": 56.25,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.3400000035762787,
+                "travelDistance": 6.0
+            },
+            "4": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 36.0,
+                "attackInterval": 1.100000023841858,
+                "description": "攻撃範囲が広がり、発射間隔が短くなる",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 1,
+                "level": "4",
+                "lifeTime": 6.5,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 1,
+                "size": 60.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.36000001430511475,
+                "travelDistance": 6.0
+            },
+            "5": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 42.0,
+                "attackInterval": 1.0,
+                "description": "強力な反射弾がノックバックを強めて長時間跳ね回る",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 2,
+                "level": "5",
+                "lifeTime": 7.0,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 1,
+                "size": 67.5,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.3799999952316284,
+                "travelDistance": 6.0
+            },
+            "super": {
+                "angles": [
+                    -18.0,
+                    0.0,
+                    18.0
+                ],
+                "attack": 50.0,
+                "attackInterval": 0.800000011920929,
+                "description": "強いノックバックを持つ3発の巨大な反射弾を同時に撃ち出す",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 2,
+                "level": "super",
+                "lifeTime": 8.0,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 3,
+                "size": 75.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.41999998688697815,
+                "texture": "Resources/UI/WeaponIcons/ricochet_super.png",
+                "travelDistance": 6.0
+            }
+        },
+        "name": "Ricochet",
+        "displayName": "跳光護符",
+        "superDisplayName": "三耀・八方跳魔符",
+        "patternId": "ricochet",
+        "superCondition": {
+            "level": "1",
+            "status": "ExperienceBoost"
+        },
+        "texture": "Resources/UI/WeaponIcons/ricochet.png",
+        "visualId": "model"
+    },
+    "SkyLaser": {
+        "levels": {
+            "1": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 55.0,
+                "attackInterval": 2.799999952316284,
+                "description": "天からレーザーを落とす",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 0,
+                "level": "1",
+                "lifeTime": 0.44999998807907104,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 1,
+                "size": 63.75,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.0,
+                "travelDistance": 6.0
+            },
+            "2": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 63.0,
+                "attackInterval": 2.5999999046325684,
+                "description": "レーザーの威力と攻撃範囲が上昇する",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 0,
+                "level": "2",
+                "lifeTime": 0.44999998807907104,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 1,
+                "size": 67.5,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.0,
+                "travelDistance": 6.0
+            },
+            "3": {
+                "angles": [
+                    0.0,
+                    0.0
+                ],
+                "attack": 70.0,
+                "attackInterval": 2.4000000953674316,
+                "description": "画面内の敵2体へ、弱いノックバックを持つレーザーを落とす",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 1,
+                "level": "3",
+                "lifeTime": 0.5,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 2,
+                "size": 71.25,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.0,
+                "travelDistance": 6.0
+            },
+            "4": {
+                "angles": [
+                    0.0,
+                    0.0
+                ],
+                "attack": 80.0,
+                "attackInterval": 2.200000047683716,
+                "description": "2本のレーザーがさらに強力になる",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 1,
+                "level": "4",
+                "lifeTime": 0.5,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 2,
+                "size": 75.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.0,
+                "travelDistance": 6.0
+            },
+            "5": {
+                "angles": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "attack": 90.0,
+                "attackInterval": 2.0,
+                "description": "画面内の敵3体へ、強いノックバックを持つ巨大なレーザーを落とす",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 2,
+                "level": "5",
+                "lifeTime": 0.550000011920929,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 3,
+                "size": 82.5,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.0,
+                "travelDistance": 6.0
+            },
+            "super": {
+                "angles": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "attack": 110.0,
+                "attackInterval": 1.600000023841858,
+                "description": "画面内の敵5体へ、最大のノックバックを持つ超強力なレーザーを落とす",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 3,
+                "level": "super",
+                "lifeTime": 0.6499999761581421,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 5,
+                "size": 93.75,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.0,
+                "texture": "Resources/UI/WeaponIcons/sky_laser_super.png",
+                "travelDistance": 6.0
+            }
+        },
+        "name": "SkyLaser",
+        "displayName": "天穿つ神光",
+        "superDisplayName": "天罰・五柱神光",
+        "patternId": "sky_laser",
+        "superCondition": {
+            "level": "1",
+            "status": "SizeUp"
+        },
+        "texture": "Resources/UI/WeaponIcons/sky_laser.png",
+        "visualId": "model"
+    },
+    "Straight": {
+        "levels": {
+            "1": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 28.0,
+                "attackInterval": 0.550000011920929,
+                "description": "正面へまっすぐ弾を撃ち出す",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": false,
+                "knockback": 0,
+                "level": "1",
+                "lifeTime": 3.0,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 1,
+                "size": 60.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.3400000035762787,
+                "travelDistance": 6.0
+            },
+            "2": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 32.0,
+                "attackInterval": 0.5199999809265137,
+                "description": "弾の威力・速度・大きさが上昇する",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": false,
+                "knockback": 0,
+                "level": "2",
+                "lifeTime": 3.0,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 1,
+                "size": 67.5,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.3499999940395355,
+                "travelDistance": 6.0
+            },
+            "3": {
+                "angles": [
+                    -12.0,
+                    0.0,
+                    12.0
+                ],
+                "attack": 30.0,
+                "attackInterval": 0.5,
+                "description": "弱いノックバックを持つ貫通弾を前方3方向へ撃ち出す",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": false,
+                "knockback": 1,
+                "level": "3",
+                "lifeTime": 3.0,
+                "model": "sphere.obj",
+                "pierceCount": 1,
+                "repeatHitInterval": 0.0,
+                "shotCount": 3,
+                "size": 71.25,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.36000001430511475,
+                "travelDistance": 6.0
+            },
+            "4": {
+                "angles": [
+                    -18.0,
+                    0.0,
+                    18.0
+                ],
+                "attack": 35.0,
+                "attackInterval": 0.44999998807907104,
+                "description": "3方向弾の威力と貫通回数が上昇する",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": false,
+                "knockback": 1,
+                "level": "4",
+                "lifeTime": 3.0,
+                "model": "sphere.obj",
+                "pierceCount": 2,
+                "repeatHitInterval": 0.0,
+                "shotCount": 3,
+                "size": 78.75,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.3799999952316284,
+                "travelDistance": 6.0
+            },
+            "5": {
+                "angles": [
+                    -24.0,
+                    -12.0,
+                    0.0,
+                    12.0,
+                    24.0
+                ],
+                "attack": 38.0,
+                "attackInterval": 0.41999998688697815,
+                "description": "ノックバックを強化した貫通弾を前方5方向へ撃ち出す",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": false,
+                "knockback": 2,
+                "level": "5",
+                "lifeTime": 3.0,
+                "model": "sphere.obj",
+                "pierceCount": 3,
+                "repeatHitInterval": 0.0,
+                "shotCount": 5,
+                "size": 86.25,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.4000000059604645,
+                "travelDistance": 6.0
+            },
+            "super": {
+                "angles": [
+                    0.0,
+                    60.0,
+                    120.0,
+                    180.0,
+                    -60.0,
+                    -120.0
+                ],
+                "attack": 42.0,
+                "attackInterval": 0.3499999940395355,
+                "description": "強いノックバックを持つ追尾弾6発を全方向へ撃ち出す",
+                "homing": true,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 2,
+                "level": "super",
+                "lifeTime": 5.0,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.0,
+                "shotCount": 6,
+                "size": 75.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ],
+                    [
+                        0.0,
+                        0.5,
+                        1.2000000476837158
+                    ]
+                ],
+                "speed": 0.44999998807907104,
+                "texture": "Resources/UI/WeaponIcons/straight_super.png",
+                "travelDistance": 6.0
+            }
+        },
+        "name": "Straight",
+        "displayName": "天狗風刃",
+        "superDisplayName": "六道・追命風刃",
+        "patternId": "default",
+        "superCondition": {
+            "level": "1",
+            "status": "SpeedUp"
+        },
+        "texture": "Resources/UI/WeaponIcons/straight.png",
+        "visualId": "straight_slash"
+    },
+    "PoisonCloud": {
+        "levels": {
+            "1": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 7.0,
+                "attackInterval": 1.0,
+                "description": "五行の力を巡らせ、周囲の敵へ継続ダメージを与える結界を展開する",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 0,
+                "level": "1",
+                "lifeTime": 5.0,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.699999988079071,
+                "shotCount": 1,
+                "size": 220.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.6000000238418579,
+                        0.0
+                    ]
+                ],
+                "speed": 1.2000000476837158,
+                "travelDistance": 6.0
+            },
+            "2": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 9.0,
+                "attackInterval": 0.8999999761581421,
+                "description": "五行結界の範囲と持続時間が増加する",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 0,
+                "level": "2",
+                "lifeTime": 5.5,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.6499999761581421,
+                "shotCount": 1,
+                "size": 240.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.6000000238418579,
+                        0.0
+                    ]
+                ],
+                "speed": 1.2999999523162842,
+                "travelDistance": 6.0
+            },
+            "3": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 10.0,
+                "attackInterval": 0.800000011920929,
+                "description": "五行の巡りが強まり、結界の攻撃範囲がさらに広がる",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 0,
+                "level": "3",
+                "lifeTime": 6.0,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.6000000238418579,
+                "shotCount": 1,
+                "size": 260.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.6000000238418579,
+                        0.0
+                    ]
+                ],
+                "speed": 1.399999976158142,
+                "travelDistance": 6.0
+            },
+            "4": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 12.0,
+                "attackInterval": 0.7200000286102295,
+                "description": "結界の攻撃間隔が短くなり、効果範囲も広がる",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 0,
+                "level": "4",
+                "lifeTime": 6.0,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.5199999809265137,
+                "shotCount": 1,
+                "size": 280.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.6000000238418579,
+                        0.0
+                    ]
+                ],
+                "speed": 1.5,
+                "travelDistance": 6.0
+            },
+            "5": {
+                "angles": [
+                    0.0
+                ],
+                "attack": 14.0,
+                "attackInterval": 0.6499999761581421,
+                "description": "強固な五行結界が広範囲の敵へ強い継続ダメージを与える",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 0,
+                "level": "5",
+                "lifeTime": 6.5,
+                "model": "sphere.obj",
+                "pierceCount": 0,
+                "repeatHitInterval": 0.44999998807907104,
+                "shotCount": 1,
+                "size": 300.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.6000000238418579,
+                        0.0
+                    ]
+                ],
+                "speed": 1.600000023841858,
+                "travelDistance": 6.0
+            },
+            "super": {
+                "angles": [
+                    -30.0,
+                    -15.0,
+                    0.0,
+                    15.0,
+                    30.0
+                ],
+                "attack": 18.0,
+                "attackInterval": 0.5,
+                "description": "五行の力を極限まで解放し、巨大な結界で敵を長時間封じ蝕む",
+                "homing": false,
+                "homingAccuracy": 1.0,
+                "infinitePierce": true,
+                "knockback": 0,
+                "level": "super",
+                "lifeTime": 8.0,
+                "model": "sphere.obj",
+                "pierceCount": 3,
+                "repeatHitInterval": 0.3199999928474426,
+                "shotCount": 1,
+                "size": 330.0,
+                "spawnOffsets": [
+                    [
+                        0.0,
+                        0.6000000238418579,
+                        0.0
+                    ]
+                ],
+                "speed": 1.7999999523162842,
+                "texture": "Resources/UI/WeaponIcons/five_element_barrier_super.png",
+                "travelDistance": 6.0
+            }
+        },
+        "name": "PoisonCloud",
+        "displayName": "五行封魔陣",
+        "superDisplayName": "極式・五行封滅陣",
+        "patternId": "poison_cloud",
+        "superCondition": {
+            "level": "1",
+            "status": "SizeUp"
+        },
+        "texture": "Resources/UI/WeaponIcons/five_element_barrier.png",
+        "visualId": "model"
+    },
+    "ArcHoming": {
         "levels": {
             "1": {
                 "angles": [
@@ -11,10 +1804,12 @@
                 "homing": true,
                 "homingAccuracy": 0.11999999731779099,
                 "infinitePierce": false,
+                "knockback": 0,
                 "level": "1",
                 "lifeTime": 5.0,
                 "model": "magatama.gltf",
                 "pierceCount": 0,
+                "repeatHitInterval": 0.0,
                 "shotCount": 1,
                 "size": 60.0,
                 "spawnOffsets": [
@@ -37,10 +1832,12 @@
                 "homing": true,
                 "homingAccuracy": 0.125,
                 "infinitePierce": false,
+                "knockback": 0,
                 "level": "2",
                 "lifeTime": 5.0,
                 "model": "magatama.gltf",
                 "pierceCount": 0,
+                "repeatHitInterval": 0.0,
                 "shotCount": 1,
                 "size": 60.0,
                 "spawnOffsets": [
@@ -61,14 +1858,16 @@
                 ],
                 "attack": 35.0,
                 "attackInterval": 0.7200000286102295,
-                "description": "赤・青・緑の勾玉が別々の弧を描く",
+                "description": "赤・青・緑の勾玉が別々の弧を描き、敵をわずかに押し返す",
                 "homing": true,
                 "homingAccuracy": 0.125,
                 "infinitePierce": false,
+                "knockback": 1,
                 "level": "3",
                 "lifeTime": 5.0,
                 "model": "magatama.gltf",
                 "pierceCount": 0,
+                "repeatHitInterval": 0.0,
                 "shotCount": 3,
                 "size": 60.0,
                 "spawnOffsets": [
@@ -103,10 +1902,12 @@
                 "homing": true,
                 "homingAccuracy": 0.12999999523162842,
                 "infinitePierce": false,
+                "knockback": 1,
                 "level": "4",
                 "lifeTime": 5.0,
                 "model": "magatama.gltf",
                 "pierceCount": 0,
+                "repeatHitInterval": 0.0,
                 "shotCount": 3,
                 "size": 82.0,
                 "spawnOffsets": [
@@ -142,10 +1943,12 @@
                 "homing": true,
                 "homingAccuracy": 0.12999999523162842,
                 "infinitePierce": false,
+                "knockback": 1,
                 "level": "5",
                 "lifeTime": 5.0,
                 "model": "magatama.gltf",
                 "pierceCount": 0,
+                "repeatHitInterval": 0.0,
                 "shotCount": 4,
                 "size": 82.0,
                 "spawnOffsets": [
@@ -184,14 +1987,16 @@
                 ],
                 "attack": 54.0,
                 "attackInterval": 0.6200000047683716,
-                "description": "6色の巨大な勾玉が敵へ向かって弧を描く",
+                "description": "強いノックバックを持つ6色の巨大な勾玉が敵へ向かって弧を描く",
                 "homing": true,
                 "homingAccuracy": 0.14499999582767487,
                 "infinitePierce": false,
+                "knockback": 2,
                 "level": "super",
                 "lifeTime": 5.5,
                 "model": "magatama.gltf",
                 "pierceCount": 1,
+                "repeatHitInterval": 0.0,
                 "shotCount": 6,
                 "size": 105.0,
                 "spawnOffsets": [
@@ -227,1393 +2032,19 @@
                     ]
                 ],
                 "speed": 0.4000000059604645,
-                "texture": "",
+                "texture": "Resources/UI/WeaponIcons/magatama_super.png",
                 "travelDistance": 6.0
             }
         },
-        "name": "勾玉",
+        "name": "ArcHoming",
+        "displayName": "彩巡の勾玉",
+        "superDisplayName": "六彩・天環勾玉",
+        "patternId": "magatama",
         "superCondition": {
-            "level": "5",
+            "level": "1",
             "status": "DefenceUp"
         },
-        "texture": "Resources//uvChecker.png"
-    },
-    "Boomerang": {
-        "levels": {
-            "1": {
-                "angles": [
-                    0.0
-                ],
-                "attack": 38.0,
-                "attackInterval": 1.2000000476837158,
-                "description": "一定距離進むと戻ってくる",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "1",
-                "lifeTime": 2.5,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 1,
-                "size": 63.75,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.3199999928474426,
-                "travelDistance": 5.5
-            },
-            "2": {
-                "angles": [
-                    0.0
-                ],
-                "attack": 43.0,
-                "attackInterval": 1.149999976158142,
-                "description": "威力・速度・大きさが上昇する",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "2",
-                "lifeTime": 2.5,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 1,
-                "size": 67.5,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.3400000035762787,
-                "travelDistance": 6.0
-            },
-            "3": {
-                "angles": [
-                    0.0
-                ],
-                "attack": 49.0,
-                "attackInterval": 1.100000023841858,
-                "description": "さらに威力が上がり、より遠くの敵を切り裂く",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "3",
-                "lifeTime": 2.5,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 1,
-                "size": 71.25,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.36000001430511475,
-                "travelDistance": 6.5
-            },
-            "4": {
-                "angles": [
-                    0.0
-                ],
-                "attack": 56.0,
-                "attackInterval": 1.0499999523162842,
-                "description": "攻撃範囲と戻ってくる速度が上昇する",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "4",
-                "lifeTime": 2.5,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 1,
-                "size": 78.75,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.3799999952316284,
-                "travelDistance": 7.0
-            },
-            "5": {
-                "angles": [
-                    0.0
-                ],
-                "attack": 64.0,
-                "attackInterval": 1.0,
-                "description": "巨大な大幣が素早く往復する",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "5",
-                "lifeTime": 2.5,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 1,
-                "size": 86.25,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.4000000059604645,
-                "travelDistance": 7.5
-            },
-            "super": {
-                "angles": [
-                    0.0
-                ],
-                "attack": 79.0,
-                "attackInterval": 0.800000011920929,
-                "description": "超巨大な大幣が高速で敵を祓う",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "super",
-                "lifeTime": 3.0,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 1,
-                "size": 97.5,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.44999998807907104,
-                "texture": "",
-                "travelDistance": 8.0
-            }
-        },
-        "name": "Boomerang",
-        "superCondition": {
-            "level": "1",
-            "status": "AttackUp"
-        },
-        "texture": "Resources//uvChecker.png"
-    },
-    "ClawSlash": {
-        "levels": {
-            "1": {
-                "angles": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "attack": 55.0,
-                "attackInterval": 0.800000011920929,
-                "description": "正面を3本の爪で切り裂く",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "1",
-                "lifeTime": 0.42,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 3,
-                "size": 105.0,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.0,
-                "travelDistance": 1.8
-            },
-            "2": {
-                "angles": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "attack": 70.0,
-                "attackInterval": 0.75,
-                "description": "爪の威力と攻撃範囲が上昇する",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "2",
-                "lifeTime": 0.42,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 3,
-                "size": 115.0,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.0,
-                "travelDistance": 1.8
-            },
-            "3": {
-                "angles": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "attack": 90.0,
-                "attackInterval": 0.699999988079071,
-                "description": "より大きな爪で正面の敵を切り裂く",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "3",
-                "lifeTime": 0.45,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 3,
-                "size": 125.0,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.0,
-                "travelDistance": 1.8
-            },
-            "4": {
-                "angles": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "attack": 115.0,
-                "attackInterval": 0.6499999761581421,
-                "description": "爪の威力と攻撃速度が上昇する",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "4",
-                "lifeTime": 0.45,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 3,
-                "size": 135.0,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.0,
-                "travelDistance": 1.8
-            },
-            "5": {
-                "angles": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "attack": 145.0,
-                "attackInterval": 0.6000000238418579,
-                "description": "巨大な爪で広範囲を切り裂く",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "5",
-                "lifeTime": 0.48,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 3,
-                "size": 145.0,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.0,
-                "travelDistance": 1.8
-            },
-            "super": {
-                "angles": [
-                    -30.0,
-                    -15.0,
-                    0.0,
-                    15.0,
-                    30.0
-                ],
-                "attack": 200.0,
-                "attackInterval": 0.44999998807907104,
-                "description": "5本の巨大な爪で正面を連続して切り裂く",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "super",
-                "lifeTime": 0.55,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 5,
-                "size": 165.0,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.0,
-                "texture": "",
-                "travelDistance": 2.0
-            }
-        },
-        "name": "ClawSlash",
-        "superCondition": {
-            "level": "5",
-            "status": "AttackUp"
-        },
-        "texture": ""
-    },
-    "Orbit": {
-        "levels": {
-            "1": {
-                "angles": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "attack": 18.0,
-                "attackInterval": 4.0,
-                "description": "周囲を回り近づけさせない",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "1",
-                "lifeTime": 4.0,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 3,
-                "size": 41.25,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.6499999761581421,
-                        2.200000047683716
-                    ],
-                    [
-                        1.905255913734436,
-                        0.6499999761581421,
-                        -1.1000001430511475
-                    ],
-                    [
-                        -1.9052560329437256,
-                        0.6499999761581421,
-                        -1.0999997854232788
-                    ]
-                ],
-                "speed": 2.200000047683716,
-                "texture": "Resources//uvChecker.png",
-                "travelDistance": 6.0
-            },
-            "2": {
-                "angles": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "attack": 21.0,
-                "attackInterval": 4.0,
-                "description": "周回弾の威力・速度・大きさが上昇する",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "2",
-                "lifeTime": 4.0,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 3,
-                "size": 45.0,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.6499999761581421,
-                        2.200000047683716
-                    ],
-                    [
-                        1.905255913734436,
-                        0.6499999761581421,
-                        -1.1000001430511475
-                    ],
-                    [
-                        -1.9052560329437256,
-                        0.6499999761581421,
-                        -1.0999997854232788
-                    ]
-                ],
-                "speed": 2.299999952316284,
-                "texture": "",
-                "travelDistance": 6.0
-            },
-            "3": {
-                "angles": [
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "attack": 22.0,
-                "attackInterval": 4.5,
-                "description": "周回弾が4個に増え、持続時間が延びる",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "3",
-                "lifeTime": 4.5,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 4,
-                "size": 48.75,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.6499999761581421,
-                        2.200000047683716
-                    ],
-                    [
-                        2.200000047683716,
-                        0.6499999761581421,
-                        -9.616505280973797e-08
-                    ],
-                    [
-                        -1.9233010561947594e-07,
-                        0.6499999761581421,
-                        -2.200000047683716
-                    ],
-                    [
-                        -2.200000047683716,
-                        0.6499999761581421,
-                        2.6234738825792192e-08
-                    ]
-                ],
-                "speed": 2.4000000953674316,
-                "texture": "",
-                "travelDistance": 6.0
-            },
-            "4": {
-                "angles": [
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "attack": 25.0,
-                "attackInterval": 4.5,
-                "description": "4個の周回弾がさらに強力になる",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "4",
-                "lifeTime": 4.5,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 4,
-                "size": 52.5,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.6499999761581421,
-                        2.200000047683716
-                    ],
-                    [
-                        2.200000047683716,
-                        0.6499999761581421,
-                        -9.616505280973797e-08
-                    ],
-                    [
-                        -1.9233010561947594e-07,
-                        0.6499999761581421,
-                        -2.200000047683716
-                    ],
-                    [
-                        -2.200000047683716,
-                        0.6499999761581421,
-                        2.6234738825792192e-08
-                    ]
-                ],
-                "speed": 2.5,
-                "texture": "",
-                "travelDistance": 6.0
-            },
-            "5": {
-                "angles": [
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "attack": 27.0,
-                "attackInterval": 5.0,
-                "description": "5個の周回弾が長時間プレイヤーを守る",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "5",
-                "lifeTime": 5.0,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 5,
-                "size": 56.25,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.6499999761581421,
-                        2.200000047683716
-                    ],
-                    [
-                        2.0923244953155518,
-                        0.6499999761581421,
-                        0.6798373460769653
-                    ],
-                    [
-                        1.293127417564392,
-                        0.6499999761581421,
-                        -1.7798376083374023
-                    ],
-                    [
-                        -1.2931277751922607,
-                        0.6499999761581421,
-                        -1.7798373699188232
-                    ],
-                    [
-                        -2.0923242568969727,
-                        0.6499999761581421,
-                        0.679837703704834
-                    ]
-                ],
-                "speed": 2.5999999046325684,
-                "texture": "",
-                "travelDistance": 6.0
-            },
-            "super": {
-                "angles": [
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "attack": 32.0,
-                "attackInterval": 5.5,
-                "description": "6個の巨大な周回弾が高速で敵を阻む",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "super",
-                "lifeTime": 5.5,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 6,
-                "size": 63.75,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.6499999761581421,
-                        2.200000047683716
-                    ],
-                    [
-                        1.9052560329437256,
-                        0.6499999761581421,
-                        1.0999999046325684
-                    ],
-                    [
-                        1.905255913734436,
-                        0.6499999761581421,
-                        -1.1000001430511475
-                    ],
-                    [
-                        -1.9233010561947594e-07,
-                        0.6499999761581421,
-                        -2.200000047683716
-                    ],
-                    [
-                        -1.9052560329437256,
-                        0.6499999761581421,
-                        -1.0999997854232788
-                    ],
-                    [
-                        -1.9052555561065674,
-                        0.6499999761581421,
-                        1.1000008583068848
-                    ]
-                ],
-                "speed": 3.0,
-                "texture": "",
-                "travelDistance": 6.0
-            }
-        },
-        "name": "Orbit",
-        "superCondition": {
-            "level": "1",
-            "status": "SizeUp"
-        }
-    },
-    "Ricochet": {
-        "levels": {
-            "1": {
-                "angles": [
-                    0.0
-                ],
-                "attack": 24.0,
-                "attackInterval": 1.399999976158142,
-                "description": "画面内で反射する",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "1",
-                "lifeTime": 5.0,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 1,
-                "size": 48.75,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.30000001192092896,
-                "texture": "Resources//uvChecker.png",
-                "travelDistance": 6.0
-            },
-            "2": {
-                "angles": [
-                    0.0
-                ],
-                "attack": 27.0,
-                "attackInterval": 1.2999999523162842,
-                "description": "反射弾の威力・速度・持続時間が上昇する",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "2",
-                "lifeTime": 5.5,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 1,
-                "size": 52.5,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.3199999928474426,
-                "texture": "",
-                "travelDistance": 6.0
-            },
-            "3": {
-                "angles": [
-                    0.0
-                ],
-                "attack": 31.0,
-                "attackInterval": 1.2000000476837158,
-                "description": "反射弾がさらに強くなり、長時間跳ね回る",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "3",
-                "lifeTime": 6.0,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 1,
-                "size": 56.25,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.3400000035762787,
-                "texture": "",
-                "travelDistance": 6.0
-            },
-            "4": {
-                "angles": [
-                    0.0
-                ],
-                "attack": 36.0,
-                "attackInterval": 1.100000023841858,
-                "description": "攻撃範囲が広がり、発射間隔が短くなる",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "4",
-                "lifeTime": 6.5,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 1,
-                "size": 60.0,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.36000001430511475,
-                "texture": "",
-                "travelDistance": 6.0
-            },
-            "5": {
-                "angles": [
-                    0.0
-                ],
-                "attack": 42.0,
-                "attackInterval": 1.0,
-                "description": "強力な反射弾が長時間画面内を跳ね回る",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "5",
-                "lifeTime": 7.0,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 1,
-                "size": 67.5,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.3799999952316284,
-                "texture": "",
-                "travelDistance": 6.0
-            },
-            "super": {
-                "angles": [
-                    -18.0,
-                    0.0,
-                    18.0
-                ],
-                "attack": 50.0,
-                "attackInterval": 0.800000011920929,
-                "description": "3発の巨大な反射弾を同時に撃ち出す",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "super",
-                "lifeTime": 8.0,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 3,
-                "size": 75.0,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.41999998688697815,
-                "texture": "",
-                "travelDistance": 6.0
-            }
-        },
-        "name": "Ricochet",
-        "superCondition": {
-            "level": "1",
-            "status": "SpeedUp"
-        }
-    },
-    "SkyLaser": {
-        "levels": {
-            "1": {
-                "angles": [
-                    0.0
-                ],
-                "attack": 55.0,
-                "attackInterval": 2.799999952316284,
-                "description": "天からレーザーを落とす",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "1",
-                "lifeTime": 0.44999998807907104,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 1,
-                "size": 63.75,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.0,
-                "texture": "Resources//uvChecker.png",
-                "travelDistance": 6.0
-            },
-            "2": {
-                "angles": [
-                    0.0
-                ],
-                "attack": 63.0,
-                "attackInterval": 2.5999999046325684,
-                "description": "レーザーの威力と攻撃範囲が上昇する",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "2",
-                "lifeTime": 0.44999998807907104,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 1,
-                "size": 67.5,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.0,
-                "texture": "",
-                "travelDistance": 6.0
-            },
-            "3": {
-                "angles": [
-                    0.0,
-                    0.0
-                ],
-                "attack": 70.0,
-                "attackInterval": 2.4000000953674316,
-                "description": "画面内の敵2体へ同時にレーザーを落とす",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "3",
-                "lifeTime": 0.5,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 2,
-                "size": 71.25,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.0,
-                "texture": "",
-                "travelDistance": 6.0
-            },
-            "4": {
-                "angles": [
-                    0.0,
-                    0.0
-                ],
-                "attack": 80.0,
-                "attackInterval": 2.200000047683716,
-                "description": "2本のレーザーがさらに強力になる",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "4",
-                "lifeTime": 0.5,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 2,
-                "size": 75.0,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.0,
-                "texture": "",
-                "travelDistance": 6.0
-            },
-            "5": {
-                "angles": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "attack": 90.0,
-                "attackInterval": 2.0,
-                "description": "画面内の敵3体へ巨大なレーザーを落とす",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "5",
-                "lifeTime": 0.550000011920929,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 3,
-                "size": 82.5,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.0,
-                "texture": "",
-                "travelDistance": 6.0
-            },
-            "super": {
-                "angles": [
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "attack": 110.0,
-                "attackInterval": 1.600000023841858,
-                "description": "画面内の敵5体へ超強力なレーザーを落とす",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "super",
-                "lifeTime": 0.6499999761581421,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 5,
-                "size": 93.75,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.0,
-                "texture": "",
-                "travelDistance": 6.0
-            }
-        },
-        "name": "SkyLaser",
-        "superCondition": {
-            "level": "1",
-            "status": "AttackUp"
-        }
-    },
-    "Straight": {
-        "levels": {
-            "1": {
-                "angles": [
-                    0.0
-                ],
-                "attack": 28.0,
-                "attackInterval": 0.550000011920929,
-                "description": "正面へまっすぐ弾を撃ち出す",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": false,
-                "level": "1",
-                "lifeTime": 3.0,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 1,
-                "size": 60.0,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.3400000035762787,
-                "texture": "Resources//uvChecker.png",
-                "travelDistance": 6.0
-            },
-            "2": {
-                "angles": [
-                    0.0
-                ],
-                "attack": 32.0,
-                "attackInterval": 0.5199999809265137,
-                "description": "弾の威力・速度・大きさが上昇する",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": false,
-                "level": "2",
-                "lifeTime": 3.0,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 1,
-                "size": 67.5,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.3499999940395355,
-                "texture": "",
-                "travelDistance": 6.0
-            },
-            "3": {
-                "angles": [
-                    -12.0,
-                    0.0,
-                    12.0
-                ],
-                "attack": 30.0,
-                "attackInterval": 0.5,
-                "description": "貫通する弾を前方3方向へ撃ち出す",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": false,
-                "level": "3",
-                "lifeTime": 3.0,
-                "model": "sphere.obj",
-                "pierceCount": 1,
-                "shotCount": 3,
-                "size": 71.25,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.36000001430511475,
-                "texture": "",
-                "travelDistance": 6.0
-            },
-            "4": {
-                "angles": [
-                    -18.0,
-                    0.0,
-                    18.0
-                ],
-                "attack": 35.0,
-                "attackInterval": 0.44999998807907104,
-                "description": "3方向弾の威力と貫通回数が上昇する",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": false,
-                "level": "4",
-                "lifeTime": 3.0,
-                "model": "sphere.obj",
-                "pierceCount": 2,
-                "shotCount": 3,
-                "size": 78.75,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.3799999952316284,
-                "texture": "",
-                "travelDistance": 6.0
-            },
-            "5": {
-                "angles": [
-                    -24.0,
-                    -12.0,
-                    0.0,
-                    12.0,
-                    24.0
-                ],
-                "attack": 38.0,
-                "attackInterval": 0.41999998688697815,
-                "description": "強力な貫通弾を前方5方向へ撃ち出す",
-                "homing": false,
-                "homingAccuracy": 1.0,
-                "infinitePierce": false,
-                "level": "5",
-                "lifeTime": 3.0,
-                "model": "sphere.obj",
-                "pierceCount": 3,
-                "shotCount": 5,
-                "size": 86.25,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.4000000059604645,
-                "texture": "",
-                "travelDistance": 6.0
-            },
-            "super": {
-                "angles": [
-                    0.0,
-                    60.0,
-                    120.0,
-                    180.0,
-                    -60.0,
-                    -120.0
-                ],
-                "attack": 42.0,
-                "attackInterval": 0.3499999940395355,
-                "description": "敵を追尾する6発の弾を全方向へ撃ち出す",
-                "homing": true,
-                "homingAccuracy": 1.0,
-                "infinitePierce": true,
-                "level": "super",
-                "lifeTime": 5.0,
-                "model": "sphere.obj",
-                "pierceCount": 0,
-                "shotCount": 6,
-                "size": 75.0,
-                "spawnOffsets": [
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ],
-                    [
-                        0.0,
-                        0.5,
-                        1.2000000476837158
-                    ]
-                ],
-                "speed": 0.44999998807907104,
-                "texture": "",
-                "travelDistance": 6.0
-            }
-        },
-        "name": "Straight",
-        "superCondition": {
-            "level": "1",
-            "status": "SizeUp"
-        }
-    },
-    "五行結界": {
-        "name": "五行結界",
-        "levels": {
-            "1": {"level":"1","description":"五行の力を巡らせ、周囲の敵へ継続ダメージを与える結界を展開する","attack":7.0,"attackInterval":1.0,"repeatHitInterval":0.70,"lifeTime":5.0,"model":"sphere.obj","size":220.0,"shotCount":1,"speed":1.2,"infinitePierce":true,"spawnOffsets":[[0.0,0.6,0.0]]},
-            "2": {"level":"2","description":"五行結界の範囲と持続時間が増加する","attack":9.0,"attackInterval":0.9,"repeatHitInterval":0.65,"lifeTime":5.5,"model":"sphere.obj","size":240.0,"shotCount":1,"speed":1.3,"infinitePierce":true,"spawnOffsets":[[0.0,0.6,0.0]]},
-            "3": {"level":"3","description":"五行の巡りが強まり、結界の攻撃範囲がさらに広がる","attack":10.0,"attackInterval":0.8,"repeatHitInterval":0.60,"lifeTime":6.0,"model":"sphere.obj","size":260.0,"shotCount":1,"speed":1.4,"infinitePierce":true,"spawnOffsets":[[0.0,0.6,0.0]]},
-            "4": {"level":"4","description":"結界の攻撃間隔が短くなり、効果範囲も広がる","attack":12.0,"attackInterval":0.72,"repeatHitInterval":0.52,"lifeTime":6.0,"model":"sphere.obj","size":280.0,"shotCount":1,"speed":1.5,"infinitePierce":true,"spawnOffsets":[[0.0,0.6,0.0]]},
-            "5": {"level":"5","description":"強固な五行結界が広範囲の敵へ強い継続ダメージを与える","attack":14.0,"attackInterval":0.65,"repeatHitInterval":0.45,"lifeTime":6.5,"model":"sphere.obj","size":300.0,"shotCount":1,"speed":1.6,"infinitePierce":true,"spawnOffsets":[[0.0,0.6,0.0]]},
-            "super": {"level":"super","description":"五行の力を極限まで解放し、巨大な結界で敵を長時間封じ蝕む","attack":18.0,"attackInterval":0.5,"repeatHitInterval":0.32,"lifeTime":8.0,"model":"sphere.obj","size":330.0,"shotCount":1,"speed":1.8,"infinitePierce":true,"spawnOffsets":[[0.0,0.6,0.0]]}
-        },
-        "superCondition": {"status":"AttackUp","level":"1"}
-    },
-    "FlameField": {
-        "name": "FlameField",
-        "levels": {
-            "1": {"level":"1","description":"ランダム地点に発生する円形の炎が敵を焼き続ける","attack":12.0,"attackInterval":1.25,"repeatHitInterval":0.40,"lifeTime":3.5,"model":"sphere.obj","size":180.0,"shotCount":1,"speed":2.5,"infinitePierce":true,"spawnOffsets":[[0.0,0.5,0.0]]},
-            "2": {"level":"2","description":"炎の威力と範囲が増加する","attack":15.0,"attackInterval":1.15,"repeatHitInterval":0.36,"lifeTime":3.8,"model":"sphere.obj","size":108.0,"shotCount":1,"speed":2.7,"infinitePierce":true,"spawnOffsets":[[0.0,0.5,2.2]]},
-            "3": {"level":"3","description":"炎が2つになり、攻撃範囲が広がる","attack":18.0,"attackInterval":1.05,"repeatHitInterval":0.33,"lifeTime":4.0,"model":"sphere.obj","size":112.0,"shotCount":2,"speed":2.9,"infinitePierce":true,"spawnOffsets":[[0.0,0.5,2.3],[0.0,0.5,-2.3]]},
-            "4": {"level":"4","description":"炎の燃焼間隔が短くなり、より激しく焼く","attack":21.0,"attackInterval":0.95,"repeatHitInterval":0.29,"lifeTime":4.2,"model":"sphere.obj","size":118.0,"shotCount":2,"speed":3.1,"infinitePierce":true,"spawnOffsets":[[0.0,0.5,2.5],[0.0,0.5,-2.5]]},
-            "5": {"level":"5","description":"3つの炎が高速周回し、広範囲を焼き尽くす","attack":25.0,"attackInterval":0.85,"repeatHitInterval":0.25,"lifeTime":4.5,"model":"sphere.obj","size":125.0,"shotCount":3,"speed":3.3,"infinitePierce":true,"spawnOffsets":[[0.0,0.5,2.6],[0.0,0.5,-2.6],[2.6,0.5,0.0]]},
-            "super": {"level":"super","description":"6つの巨大な炎が敵を包囲し、猛烈な継続ダメージを与える","attack":32.0,"attackInterval":0.7,"repeatHitInterval":0.18,"lifeTime":5.0,"model":"sphere.obj","size":135.0,"shotCount":6,"speed":3.7,"infinitePierce":true,"spawnOffsets":[[0.0,0.5,2.9],[0.0,0.5,-2.9],[2.9,0.5,0.0],[-2.9,0.5,0.0],[2.0,0.5,2.0],[-2.0,0.5,-2.0]]}
-        },
-        "superCondition": {"status":"AttackUp","level":"1"}
+        "texture": "Resources/UI/WeaponIcons/magatama.png",
+        "visualId": "model"
     }
 }

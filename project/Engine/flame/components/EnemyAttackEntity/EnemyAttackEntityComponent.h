@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/Component.h"
-#include "core/GameObject.h"
+#include "core/EntityComponent.h"
+#include "core/Entity.h"
 #include "MathConstants.h"
 #include "GameTime.h"
 #include <algorithm>
@@ -20,7 +20,7 @@ enum class EnemyAttackEntityMotionType {
 };
 
 /// <summary>敵弾の移動、攻撃力、寿命、命中状態を管理します。</summary>
-class EnemyAttackEntityComponent : public Component {
+class EnemyAttackEntityComponent : public EntityComponent {
 public:
 	void Initialize() override;
 	void Update() override;
@@ -37,7 +37,8 @@ public:
 	void SetContractingOrbit(
 		const Vector3& center, float angle, float initialRadius, float angularSpeed, float radialSpeed, float height);
 	/// <summary>巨大竜巻が追跡する対象を設定します。対象の所有権は保持しません。</summary>
-	void SetHomingTarget(GameObject* target);
+	void SetHomingTarget(Entity* target);
+	Entity* GetHomingTarget() const { return homingTarget_; }
 	void SetSpeed(float speed);
 	void SetAttack(float attack);
 	float GetAttack() const;
@@ -62,7 +63,7 @@ private:
 	float orbitRadialSpeed_ = 0.0f;
 	float orbitHeight_ = 0.0f;
 	/// <summary>追尾対象への非所有参照です。</summary>
-	GameObject* homingTarget_ = nullptr;
+	Entity* homingTarget_ = nullptr;
 	/// <summary>60FPS時の1フレームあたりの移動量です。</summary>
 	float speed_ = 0.12f;
 	/// <summary>プレイヤーへ与えるダメージ量です。</summary>

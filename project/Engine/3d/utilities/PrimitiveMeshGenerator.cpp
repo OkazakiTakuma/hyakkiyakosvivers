@@ -76,4 +76,19 @@ MeshData GenerateCylinder(float radius, float height, uint32_t subdivision, bool
 	return mesh;
 }
 
+MeshData GeneratePlane(float width, float height) {
+	const float halfWidth = width * 0.5f;
+	const float halfHeight = height * 0.5f;
+	MeshData mesh;
+	mesh.vertices = {
+		{{-halfWidth, halfHeight, 0.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}},
+		{{halfWidth, halfHeight, 0.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, -1.0f}},
+		{{-halfWidth, -halfHeight, 0.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, -1.0f}},
+		{{halfWidth, -halfHeight, 0.0f, 1.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, -1.0f}}
+	};
+	// 同じ面を逆巻きでも登録し、アリーナの内外どちらから見ても表示されるようにする。
+	mesh.indices = {0, 1, 2, 2, 1, 3, 2, 1, 0, 3, 1, 2};
+	return mesh;
+}
+
 } // 名前空間 PrimitiveMeshGenerator

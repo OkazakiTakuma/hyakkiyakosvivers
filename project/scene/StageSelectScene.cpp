@@ -13,6 +13,7 @@ constexpr int kCardsPerRow = 3;
 constexpr int kRowsPerPage = 2;
 constexpr int kCardsPerPage = kCardsPerRow * kRowsPerPage;
 constexpr float kReturnToTitleTransitionSeconds = 1.65f;
+constexpr const char* kStageCardTexturePath = "Resources/UI/World/stage_ema_card.png";
 using SceneUiUtility::CreateColorSprite;
 using SceneUiUtility::CreateTextObject;
 using SceneUiUtility::DrawColorSprite;
@@ -38,18 +39,23 @@ void StageSelectScene::Initialize() {
 
 void StageSelectScene::CreateUi() {
 	backgroundSprite_ = CreateColorSprite();
+	for (auto& sprite : frameAccentSprites_) sprite = CreateColorSprite();
 	cardBorderSprites_.clear();
 	cardSprites_.clear();
+	cardAccentSprites_.clear();
 	stageTextObjects_.clear();
-	titleTextObject_ = CreateTextObject("ステージを選択", 48.0f);
+	titleTextObject_ = SceneUiUtility::CreateHeadingText("御境選び", 46.0f, {0.98f, 0.84f, 0.53f, 1.0f}, DWRITE_FONT_WEIGHT_EXTRA_BOLD);
 	selectedStageTextObject_ = CreateTextObject("", 22.0f);
 	instructionTextObject_ = CreateTextObject(
-	    "A / D・左右キー・Pad左右: 選択    Space / Enter・Pad A: 決定    Q・Pad B: タイトルへ戻る", 19.0f);
+	    "A / D・左右キー: 境を巡る    Space / Enter・Pad A: 出立    Q・Pad B: 戻る", 18.0f);
 	pageTextObject_ = CreateTextObject("", 18.0f);
 	for (const std::string& stageId : stageIds_) {
 		cardBorderSprites_.push_back(CreateColorSprite());
-		cardSprites_.push_back(CreateColorSprite());
-		stageTextObjects_.push_back(CreateTextObject(MakeStageDescription(stageId), 25.0f));
+		auto cardSprite = std::make_unique<Sprite>();
+		cardSprite->Initialize(kStageCardTexturePath);
+		cardSprites_.push_back(std::move(cardSprite));
+		cardAccentSprites_.push_back(CreateColorSprite());
+		stageTextObjects_.push_back(CreateTextObject(MakeStageDescription(stageId), 22.0f));
 	}
 	// 末尾の1枚は草原プレビューを暗くする専用オーバーレイ。カード用の添字には含めない。
 	cardBorderSprites_.push_back(CreateColorSprite());
@@ -57,7 +63,7 @@ void StageSelectScene::CreateUi() {
 
 std::string StageSelectScene::MakeStageDescription(const std::string& stageId) const {
 	std::string displayName = sceneManager_ ? sceneManager_->GetGameplayStageDisplayName(stageId) : stageId;
-	if (stageId != "default") {
+	if (stageId != "default" && stageId != "stage2") {
 		std::transform(displayName.begin(), displayName.end(), displayName.begin(), [](unsigned char character) {
 			return static_cast<char>(std::toupper(character));
 		});
@@ -67,7 +73,7 @@ std::string StageSelectScene::MakeStageDescription(const std::string& stageId) c
 		std::string prerequisite = sceneManager_->GetGameplayStageUnlockPrerequisite(stageId);
 		const std::string prerequisiteId = prerequisite;
 		prerequisite = sceneManager_->GetGameplayStageDisplayName(prerequisite);
-		if (prerequisiteId != "default") {
+		if (prerequisiteId != "default" && prerequisiteId != "stage2") {
 			std::transform(prerequisite.begin(), prerequisite.end(), prerequisite.begin(), [](unsigned char character) {
 				return static_cast<char>(std::toupper(character));
 			});
@@ -75,10 +81,10 @@ std::string StageSelectScene::MakeStageDescription(const std::string& stageId) c
 		return displayName + "\n\nLOCKED\n" + prerequisite + "クリアで開放";
 	}
 	if (stageId == "default") {
-		return displayName + "\n\n夕暮れの無限平原\n全方向へループする広いフィールド";
+		return displayName + "\n\n逢魔が時の草原\n夕陽の下、四方へ続く妖の原";
 	}
 	if (stageId == "stage2") {
-		return displayName + "\n\n横長回廊\n上下は壁、左右は無限にループ";
+		return displayName + "\n\n妖の古道\n塀に囲まれ、東西へ巡る夜道";
 	}
 	return displayName + "\n\nカスタムステージ\n配置パターン: " + stageId;
 }
@@ -128,7 +134,8 @@ void StageSelectScene::Draw2D() {
 	const float verticalGap = 18.0f;
 	const float availableWidth = screenWidth - sideMargin * 2.0f;
 	const float cardWidth = (std::min)(300.0f, (availableWidth - horizontalGap * 2.0f) / 3.0f);
-	const float cardHeight = (std::min)(190.0f, (screenHeight - 245.0f - verticalGap) / 2.0f);
+	// 横長の絵馬テクスチャが縦へ間延びしない高さを上限にする。
+	const float cardHeight = (std::min)(168.0f, (screenHeight - 245.0f - verticalGap) / 2.0f);
 	const float firstRowY = 145.0f;
 
 	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
@@ -147,6 +154,11 @@ void StageSelectScene::Draw2D() {
 		}
 		DrawColorSprite(backgroundSprite_.get(), 0.0f, 0.0f, screenWidth, screenHeight, {0.02f, 0.04f, 0.075f, 1.0f});
 	}
+	// 上下の朱線と金の細線で画面全体を神社の扁額のように縁取る。
+	DrawColorSprite(frameAccentSprites_[0].get(), 0.0f, 0.0f, screenWidth, 5.0f, {0.68f, 0.07f, 0.035f, 1.0f});
+	DrawColorSprite(frameAccentSprites_[1].get(), 0.0f, screenHeight - 5.0f, screenWidth, 5.0f, {0.68f, 0.07f, 0.035f, 1.0f});
+	DrawColorSprite(frameAccentSprites_[2].get(), screenWidth * 0.5f - 150.0f, 91.0f, 300.0f, 2.0f,
+		{0.92f, 0.68f, 0.24f, 0.9f});
 	for (int row = 0; row < kRowsPerPage; ++row) {
 		const int rowStart = pageStart + row * kCardsPerRow;
 		const int rowEnd = (std::min)(rowStart + kCardsPerRow, pageEnd);
@@ -164,16 +176,23 @@ void StageSelectScene::Draw2D() {
 			const bool unlocked = !sceneManager_ || sceneManager_->IsGameplayStageUnlocked(stageIds_[index]);
 			// ロック中は選択色より暗色を優先し、操作不能であることをカード全体で表現する。
 			DrawColorSprite(cardBorderSprites_[index].get(), cardX - 5.0f, cardY - 5.0f, cardWidth + 10.0f, cardHeight + 10.0f,
-			    !unlocked ? Vector4{0.20f, 0.21f, 0.24f, 1.0f} :
-			    selected ? Vector4{0.24f, 0.92f, 1.0f, 1.0f} : Vector4{0.20f, 0.25f, 0.34f, 1.0f});
+			    !unlocked ? Vector4{0.20f, 0.19f, 0.19f, 1.0f} :
+			    selected ? Vector4{0.96f, 0.70f, 0.22f, 1.0f} : Vector4{0.34f, 0.19f, 0.13f, 1.0f});
 			DrawColorSprite(cardSprites_[index].get(), cardX, cardY, cardWidth, cardHeight,
-			    !unlocked ? Vector4{0.055f, 0.06f, 0.075f, 0.98f} :
-			    selected ? Vector4{0.08f, 0.36f, 0.50f, 0.98f} : Vector4{0.06f, 0.12f, 0.22f, 0.98f});
-			GameObject* textObject = stageTextObjects_[index].get();
+			    !unlocked ? Vector4{0.30f, 0.30f, 0.30f, 0.94f} :
+			    selected ? Vector4{1.0f, 1.0f, 1.0f, 1.0f} : Vector4{0.82f, 0.82f, 0.80f, 0.98f});
+			// 選択中だけ絵馬の下端に金の光を添え、生成素材の朱線と競合させない。
+			DrawColorSprite(cardAccentSprites_[index].get(), cardX + 20.0f, cardY + cardHeight - 5.0f,
+				cardWidth - 40.0f, 3.0f, selected && unlocked
+					? Vector4{1.0f, 0.72f, 0.20f, 0.95f} : Vector4{0.0f, 0.0f, 0.0f, 0.0f});
+			Entity* textObject = stageTextObjects_[index].get();
 			textObject->GetTransform().translate = {cardX + cardWidth * 0.5f, cardY + cardHeight * 0.5f, 0.0f};
-			textObject->GetComponent<TextComponent>()->SetColor(
-			    !unlocked ? Vector4{0.48f, 0.50f, 0.56f, 1.0f} :
-			    selected ? Vector4{0.72f, 0.97f, 1.0f, 1.0f} : Vector4{0.90f, 0.93f, 1.0f, 1.0f});
+			TextComponent* cardText = textObject->GetComponent<TextComponent>();
+			// 絵馬の漆枠と金具を避けた内側だけを本文領域にする。
+			cardText->SetLayoutBounds((std::max)(1.0f, cardWidth - 58.0f), (std::max)(1.0f, cardHeight - 42.0f));
+			cardText->SetColor(
+			    !unlocked ? Vector4{0.46f, 0.44f, 0.42f, 1.0f} :
+			    selected ? Vector4{0.29f, 0.055f, 0.035f, 1.0f} : Vector4{0.14f, 0.12f, 0.10f, 1.0f});
 			textObject->Draw2D();
 		}
 	}
@@ -182,7 +201,8 @@ void StageSelectScene::Draw2D() {
 	const std::string selectedStageName = stageCount > 0
 		? (sceneManager_ ? sceneManager_->GetGameplayStageDisplayName(stageIds_[selectedStageIndex_]) : stageIds_[selectedStageIndex_])
 		: "---";
-	selectedStageTextObject_->GetComponent<TextComponent>()->SetText("選択中のステージ: " + selectedStageName);
+	selectedStageTextObject_->GetComponent<TextComponent>()->SetText("次に踏み入る境　「" + selectedStageName + "」");
+	selectedStageTextObject_->GetComponent<TextComponent>()->SetColor({0.91f, 0.82f, 0.68f, 1.0f});
 	selectedStageTextObject_->GetTransform().translate = {screenWidth * 0.5f, 100.0f, 0.0f};
 	instructionTextObject_->GetTransform().translate = {screenWidth * 0.5f, screenHeight - 32.0f, 0.0f};
 	std::ostringstream pageStream;
@@ -197,8 +217,10 @@ void StageSelectScene::Draw2D() {
 
 void StageSelectScene::Finalize() {
 	backgroundSprite_.reset();
+	for (auto& sprite : frameAccentSprites_) sprite.reset();
 	cardBorderSprites_.clear();
 	cardSprites_.clear();
+	cardAccentSprites_.clear();
 	titleTextObject_.reset();
 	selectedStageTextObject_.reset();
 	instructionTextObject_.reset();

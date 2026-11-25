@@ -1,13 +1,13 @@
 #pragma once
 
-#include "core/Component.h"
+#include "core/EntityComponent.h"
 #include "Vector.h"
 
 /// <summary>
 /// GameObjectをシーン光源として扱うための設定です。
 /// 表面の発光表現はObject3dのMaterialに残し、周囲を照らす責務だけを保持します。
 /// </summary>
-class PointLightComponent final : public Component {
+class PointLightComponent final : public EntityComponent {
 public:
 	void SetColor(const Vector4& color) { color_ = color; }
 	const Vector4& GetColor() const { return color_; }

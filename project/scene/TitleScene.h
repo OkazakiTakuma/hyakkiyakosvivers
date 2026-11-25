@@ -28,8 +28,6 @@ public:
 	/// 確保したリソースを解放し、終了処理を行います。
 	/// </summary>
 	void Finalize() override;
-	/// <summary>シーン遷移と共有所持金の参照に使うSceneManagerを設定します。</summary>
-	void SetSceneManager(SceneManager* manager) override { sceneManager = manager; }
 private:
 	enum class TitlePhase {
 		FadeIn,
@@ -55,8 +53,6 @@ private:
 	/// ImGui によるデバッグ用 UI の表示と編集処理を行います。
 	/// </summary>
 	void ImGuiUpdate();
-	/// <summary>SceneManagerが所有するインスタンスへの非所有参照です。</summary>
-	SceneManager* sceneManager = nullptr;
 	/// <summary>球体モデルを使わず、空の散乱計算から太陽を描くタイトル専用Skyです。</summary>
 	std::unique_ptr<AtmosphereSky> atmosphereSky_;
 	/// <summary>タイトル背景の地面へ配置する草のインスタンシング描画です。</summary>
@@ -84,21 +80,21 @@ private:
 	/// <summary>画像化したゲームタイトルロゴです。</summary>
 	std::unique_ptr<Sprite> titleLogoSprite_;
 	/// <summary>ゲーム開始メニューの文字です。</summary>
-	std::unique_ptr<GameObject> startTextObject_;
+	std::unique_ptr<Entity> startTextObject_;
 	/// <summary>進行をリセットして始めるメニューの文字です。</summary>
-	std::unique_ptr<GameObject> newGameTextObject_;
+	std::unique_ptr<Entity> newGameTextObject_;
 	/// <summary>ショップメニューの文字です。</summary>
-	std::unique_ptr<GameObject> shopTextObject_;
+	std::unique_ptr<Entity> shopTextObject_;
 	/// <summary>SceneManagerが保持する現在の所持金表示です。</summary>
-	std::unique_ptr<GameObject> moneyTextObject_;
+	std::unique_ptr<Entity> moneyTextObject_;
 	/// <summary>キーボードとゲームパッドの操作説明です。</summary>
-	std::unique_ptr<GameObject> instructionTextObject_;
+	std::unique_ptr<Entity> instructionTextObject_;
 	/// <summary>画面下部で決定操作を促す文字です。</summary>
-	std::unique_ptr<GameObject> versionTextObject_;
+	std::unique_ptr<Entity> versionTextObject_;
 	/// <summary>ゲームデータ初期化前の確認メッセージです。</summary>
-	std::unique_ptr<GameObject> confirmationTextObject_;
+	std::unique_ptr<Entity> confirmationTextObject_;
 	/// <summary>初期化の実行・キャンセル操作を案内する文字です。</summary>
-	std::unique_ptr<GameObject> confirmationInstructionTextObject_;
+	std::unique_ptr<Entity> confirmationInstructionTextObject_;
 	/// <summary>0がゲーム開始、1が初めから、2がショップを表す現在の選択位置です。</summary>
 	int selectedMenuIndex_ = 0;
 	/// <summary>ゲームデータ初期化の確認画面を表示中かどうかです。</summary>
@@ -114,11 +110,11 @@ private:
 	/// <summary>現在の導入演出またはメニュー段階です。</summary>
 	TitlePhase titlePhase_ = TitlePhase::FadeIn;
 	/// <summary>タイトル終了演出で移動させる勾玉への非所有参照です。</summary>
-	std::vector<GameObject*> exitMagatamas_;
+	std::vector<Entity*> exitMagatamas_;
 	/// <summary>終了演出開始時の各勾玉位置です。</summary>
 	std::vector<Vector3> exitMagatamaStartPositions_;
 	/// <summary>タイトル終了演出で撃破する妖怪への非所有参照です。</summary>
-	std::vector<GameObject*> exitEnemies_;
+	std::vector<Entity*> exitEnemies_;
 	/// <summary>縮小消滅後に元の大きさを失わないための各妖怪の開始スケールです。</summary>
 	std::vector<Vector3> exitEnemyStartScales_;
 	/// <summary>タイトル終了演出の経過秒数です。</summary>

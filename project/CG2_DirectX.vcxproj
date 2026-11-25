@@ -178,6 +178,11 @@ copy  "$(WindowsSdkDir)bin\$(TargetPlatFormVersion)\x64\dxil.dll" "$(TargetDir)d
     <ClCompile Include="Engine\3d\sky\AtmosphereSky.cpp" />
     <ClCompile Include="Engine\3d\utilities\SkeletonAnimationUtility.cpp" />
     <ClCompile Include="Engine\flame\base_scene\BaseScene.cpp" />
+	<ClCompile Include="Engine\flame\base_scene\runtime\GameplaySession.cpp" />
+	<ClCompile Include="Engine\flame\base_scene\runtime\SceneWorld.cpp" />
+	<ClCompile Include="Engine\flame\base_scene\serialization\SceneSerializer.cpp" />
+	<ClCompile Include="Engine\flame\base_scene\runtime\EnemySpawnSystem.cpp" />
+	<ClCompile Include="Engine\flame\services\LootDropService.cpp" />
     <ClCompile Include="Engine\flame\base_scene\editor\BaseSceneEditor.cpp" />
     <ClCompile Include="Engine\flame\base_scene\editor\BaseSceneEnemyEditor.cpp" />
     <ClCompile Include="Engine\flame\base_scene\editor\BaseScenePlayerEditor.cpp" />
@@ -187,13 +192,18 @@ copy  "$(WindowsSdkDir)bin\$(TargetPlatFormVersion)\x64\dxil.dll" "$(TargetDir)d
     <ClCompile Include="Engine\flame\base_scene\runtime\BaseSceneHud.cpp" />
     <ClCompile Include="Engine\flame\base_scene\runtime\BaseScenePlayerAttackEntityRuntime.cpp" />
     <ClCompile Include="Engine\flame\base_scene\runtime\BaseSceneRuntime.cpp" />
-    <ClCompile Include="Engine\flame\base_scene\BaseSceneSerialization.cpp" />
+    <ClCompile Include="Engine\flame\base_scene\serialization\BaseSceneSerialization.cpp" />
     <ClCompile Include="Engine\flame\components\PlayerAttack\PlayerAttackComponent.cpp" />
     <ClCompile Include="Engine\flame\components\PlayerAttackEntity\PlayerAttackEntityComponent.cpp" />
     <ClCompile Include="Engine\flame\components\Enemy\EnemyComponent.cpp" />
     <ClCompile Include="Engine\flame\components\EnemySpawnPoint\EnemySpawnPointComponent.cpp" />
     <ClCompile Include="Engine\flame\components\EnemyAttackEntity\EnemyAttackEntityComponent.cpp" />
     <ClCompile Include="Engine\flame\repositories\PlayerStatusRepository.cpp" />
+	<ClCompile Include="Engine\flame\repositories\ParticlePresetRepository.cpp" />
+	<ClCompile Include="Engine\flame\services\PlayerStatsCalculator.cpp" />
+	<ClCompile Include="Engine\flame\services\PlayerAttackAssembler.cpp" />
+	<ClCompile Include="Engine\flame\services\PlayerAssembler.cpp" />
+	<ClCompile Include="Engine\flame\services\ParticlePresetAssembler.cpp" />
     <ClCompile Include="Engine\audio\Audio.cpp" />
     <ClCompile Include="Engine\base\D3DResourceLeakChecker.cpp" />
     <ClCompile Include="Engine\base\DirectXCommon.cpp" />
@@ -205,6 +215,7 @@ copy  "$(WindowsSdkDir)bin\$(TargetPlatFormVersion)\x64\dxil.dll" "$(TargetDir)d
     <ClCompile Include="Engine\base\PerformanceMonitor.cpp" />
     <ClCompile Include="Engine\flame\core\Game.cpp" />
     <ClCompile Include="Engine\flame\core\FlameWork.cpp" />
+    <ClCompile Include="Engine\flame\components\Gravity\GravityComponent.cpp" />
     <ClCompile Include="Engine\base\PostEffect.cpp" />
     <ClCompile Include="Engine\2d\LineDrawer.cpp" />
     <ClCompile Include="Engine\2d\LineCommon.cpp" />
@@ -213,9 +224,14 @@ copy  "$(WindowsSdkDir)bin\$(TargetPlatFormVersion)\x64\dxil.dll" "$(TargetDir)d
     <ClCompile Include="Engine\3d\instancing\GrassInstancingModel.cpp" />
     <ClCompile Include="Engine\collision\CollisionPrimitive.cpp" />
     <ClCompile Include="Engine\math\Quaternion.cpp" />
-    <ClCompile Include="Player\Player.cpp" />
+    <ClCompile Include="Player\PlayerComponent.cpp" />
     <ClCompile Include="scene\SceneFactory.cpp" />
     <ClCompile Include="scene\SceneManager.cpp" />
+	<ClCompile Include="scene\GameProgress.cpp" />
+	<ClCompile Include="scene\GameProgressRepository.cpp" />
+	<ClCompile Include="scene\StageUnlockConditionsRepository.cpp" />
+	<ClCompile Include="scene\StageUnlockCatalog.cpp" />
+	<ClCompile Include="scene\DemoDirector.cpp" />
     <ClCompile Include="scene\GamePlayScene.cpp" />
 	<ClCompile Include="scene\PlayerSelectScene.cpp" />
 	<ClCompile Include="scene\StageSelectScene.cpp" />
@@ -374,21 +390,43 @@ copy  "$(WindowsSdkDir)bin\$(TargetPlatFormVersion)\x64\dxil.dll" "$(TargetDir)d
     <ClInclude Include="Engine\math\algorithm.h" />
     <ClInclude Include="Engine\flame\core\AbstractSceneFactory.h" />
     <ClInclude Include="Engine\flame\base_scene\BaseScene.h" />
+	<ClInclude Include="Engine\flame\base_scene\runtime\GameplaySession.h" />
+	<ClInclude Include="Engine\flame\base_scene\runtime\GameplayHud.h" />
+	<ClInclude Include="Engine\flame\base_scene\runtime\SceneWorld.h" />
+	<ClInclude Include="Engine\flame\base_scene\editor\SceneEditorSkyBox.h" />
+	<ClInclude Include="Engine\flame\base_scene\editor\SceneEditorState.h" />
+	<ClInclude Include="Engine\flame\base_scene\serialization\SceneSerializer.h" />
+	<ClInclude Include="Engine\flame\base_scene\runtime\EnemySpawnSystem.h" />
+	<ClInclude Include="Engine\flame\base_scene\runtime\CombatSystem.h" />
+	<ClInclude Include="Engine\flame\services\LootDropService.h" />
     <ClInclude Include="Engine\flame\helpers\BaseSceneResourceCatalog.h" />
     <ClInclude Include="Engine\flame\helpers\BaseSceneCollisionHelpers.h" />
     <ClInclude Include="Engine\flame\helpers\CollisionSpatialGrid.h" />
     <ClInclude Include="Engine\flame\helpers\BaseSceneEditorGeometry.h" />
     <ClInclude Include="Engine\flame\repositories\EnemyStatusRepository.h" />
     <ClInclude Include="Engine\flame\repositories\PlayerStatusRepository.h" />
+	<ClInclude Include="Engine\flame\data\PlayerStatsData.h" />
+	<ClInclude Include="Engine\flame\data\PlayerStatusItemDefinition.h" />
+	<ClInclude Include="Engine\flame\data\PlayerAttackDefinition.h" />
+	<ClInclude Include="Engine\flame\data\ParticlePresetData.h" />
+	<ClInclude Include="Engine\flame\data\EnemyStatsData.h" />
+	<ClInclude Include="Engine\flame\services\PlayerStatsCalculator.h" />
+	<ClInclude Include="Engine\flame\services\PlayerAttackAssembler.h" />
+    <ClInclude Include="Engine\flame\services\PlayerAssembler.h" />
+	<ClInclude Include="Engine\flame\services\ParticlePresetAssembler.h" />
 	<ClInclude Include="Engine\flame\components\Enemy\EnemyComponent.h" />
 	<ClInclude Include="Engine\flame\base_scene\StageResultData.h" />
 	<ClInclude Include="Engine\flame\components\EnemyAttackEntity\EnemyAttackEntityComponent.h" />
     <ClInclude Include="Engine\flame\components\EnemySpawnPoint\EnemySpawnPointComponent.h" />
     <ClInclude Include="Engine\flame\components\Experience\ExperienceComponent.h" />
+    <ClInclude Include="Engine\flame\components\Gravity\GravityComponent.h" />
     <ClInclude Include="Engine\flame\components\ItemDrop\ItemDropComponent.h" />
     <ClInclude Include="Engine\flame\components\PlayerAttack\PlayerAttackComponent.h" />
     <ClInclude Include="Engine\flame\components\PlayerAttackEntity\PlayerAttackEntityComponent.h" />
     <ClInclude Include="Engine\flame\repositories\ParticlePresetRepository.h" />
+    <ClInclude Include="Engine\flame\helpers\ParticleEmitParamJson.h" />
+    <ClInclude Include="Engine\flame\data\PlayerAttackLevel.h" />
+    <ClInclude Include="Engine\flame\data\ComponentTypeMetadata.h" />
     <ClInclude Include="Engine\flame\helpers\SceneJsonUtility.h" />
     <ClInclude Include="Engine\flame\helpers\SceneUiUtility.h" />
     <ClInclude Include="Engine\flame\base_scene\details\BaseSceneRuntimeDetails.h" />
@@ -434,12 +472,18 @@ copy  "$(WindowsSdkDir)bin\$(TargetPlatFormVersion)\x64\dxil.dll" "$(TargetDir)d
 	<ClInclude Include="Engine\3d\particle\TrailRendererComponent.h" />
     <ClInclude Include="Engine\3d\collision\SphereColliderComponent.h" />
     <ClInclude Include="Engine\collision\CollisionPrimitive.h" />
-    <ClInclude Include="Engine\flame\core\Component.h" />
-    <ClInclude Include="Engine\flame\core\GameObject.h" />
+    <ClInclude Include="Engine\flame\core\EntityComponent.h" />
+    <ClInclude Include="Engine\flame\core\Entity.h" />
     <ClInclude Include="Engine\math\Quaternion.h" />
-    <ClInclude Include="Player\Player.h" />
+    <ClInclude Include="Player\PlayerComponent.h" />
     <ClInclude Include="scene\SceneFactory.h" />
     <ClInclude Include="scene\SceneManager.h" />
+	<ClInclude Include="scene\GameProgress.h" />
+	<ClInclude Include="scene\GameProgressRepository.h" />
+	<ClInclude Include="scene\StageUnlockConditionsRepository.h" />
+	<ClInclude Include="scene\StageUnlockCatalog.h" />
+	<ClInclude Include="scene\DemoSceneControl.h" />
+	<ClInclude Include="scene\DemoDirector.h" />
     <ClInclude Include="scene\GamePlayScene.h" />
 	<ClInclude Include="scene\PlayerSelectScene.h" />
 	<ClInclude Include="scene\StageSelectScene.h" />
@@ -463,6 +507,12 @@ copy  "$(WindowsSdkDir)bin\$(TargetPlatFormVersion)\x64\dxil.dll" "$(TargetDir)d
     <None Include="Resources\Shader\SkyBox.hlsli" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="CopyBundledFonts" AfterTargets="Build">
+    <ItemGroup>
+      <BundledFontAsset Include="$(ProjectDir)Resources\Fonts\*.otf;$(ProjectDir)Resources\Fonts\OFL.txt" />
+    </ItemGroup>
+    <Copy SourceFiles="@(BundledFontAsset)" DestinationFolder="$(OutDir)Resources\Fonts" SkipUnchangedFiles="true" />
+  </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>

@@ -1,0 +1,27 @@
+# Gabled roof prism. Ridge runs on the Z axis; origin is centered at eave height.
+mtllib japanese_roof.mtl
+o JapaneseGabledRoof
+v -0.5 0.0 -0.5
+v  0.5 0.0 -0.5
+v  0.0 0.5 -0.5
+v -0.5 0.0  0.5
+v  0.5 0.0  0.5
+v  0.0 0.5  0.5
+vt 0.0 0.0
+vt 1.0 0.0
+vt 0.5 1.0
+vt 0.0 1.0
+vn  0.0  0.0 -1.0
+vn  0.0  0.0  1.0
+vn -0.447214 0.894427 0.0
+vn  0.447214 0.894427 0.0
+vn  0.0 -1.0 0.0
+usemtl JapaneseWhite
+f 1/1/1 3/3/1 2/2/1
+f 4/1/2 5/2/2 6/3/2
+f 1/1/3 4/2/3 6/3/3
+f 1/1/3 6/3/3 3/4/3
+f 2/1/4 3/4/4 6/3/4
+f 2/1/4 6/3/4 5/2/4
+f 1/1/5 2/2/5 5/3/5
+f 1/1/5 5/3/5 4/4/5

@@ -1,4 +1,6 @@
 #include "base_scene/BaseScene.h"
+#include "base_scene/runtime/GameplayHud.h"
+#include "data/PlayerAttackLevel.h"
 #include "helpers/BaseSceneCollisionHelpers.h"
 #include "helpers/BaseSceneEditorGeometry.h"
 #include "repositories/EnemyStatusRepository.h"
@@ -20,10 +22,11 @@
 #include "../../../../../imgui/ImGuizmo.h"
 #endif
 #include "base_scene/details/BaseSceneRuntimeDetails.h"
+#include <algorithm>
 
-Player* BaseScene::FindActivePlayer() const {
+PlayerComponent* BaseScene::FindActivePlayer() const {
 	for (const auto& object : sceneObjects_) {
-		Player* candidate = object->GetComponent<Player>();
+		PlayerComponent* candidate = object->GetComponent<PlayerComponent>();
 		if (candidate && candidate->IsEnabled()) {
 			return candidate;
 		}
@@ -31,9 +34,74 @@ Player* BaseScene::FindActivePlayer() const {
 	return nullptr;
 }
 
-void BaseScene::UpdatePlayerHealthHud() {
-	Player* player = FindActivePlayer();
+void BaseScene::UpdateGameplayHud() {
+	gameplayHud_.Update(
+		FindActivePlayer(),
+		sceneName_ == "GAMEPLAY",
+		gameplaySession_.GetChallengeMoney());
+}
 
+void GameplayHud::Reset() {
+	playerHealthBarBackground_.reset();
+	playerHealthBarFill_.reset();
+	isPlayerHealthHudVisible_ = false;
+	challengeMoneyTextObject_.reset();
+	isChallengeMoneyHudVisible_ = false;
+	playerExperienceBarBackground_.reset();
+	playerExperienceBarFill_.reset();
+	playerExperienceTextObject_.reset();
+	playerExperienceRate_ = 0.0f;
+	isPlayerExperienceHudVisible_ = false;
+	for (auto& sprite : playerAttackSlotBackgroundSprites_) sprite.reset();
+	for (auto& sprite : playerAttackSlotIconSprites_) sprite.reset();
+	for (auto& sprite : playerStatusSlotBackgroundSprites_) sprite.reset();
+	for (auto& sprite : playerStatusSlotIconSprites_) sprite.reset();
+	for (auto& sprite : playerAttackSlotLevelBackgroundSprites_) sprite.reset();
+	for (auto& sprite : playerStatusSlotLevelBackgroundSprites_) sprite.reset();
+	for (auto& object : playerAttackSlotLevelTextObjects_) object.reset();
+	for (auto& object : playerStatusSlotLevelTextObjects_) object.reset();
+	playerAttackSlotIconVisible_.fill(false);
+	playerStatusSlotIconVisible_.fill(false);
+	playerAttackSlotLevelVisible_.fill(false);
+	playerStatusSlotLevelVisible_.fill(false);
+	playerAttackSlotTextureKeys_.fill({});
+	playerAttackSlotTexturePaths_.fill({});
+	playerStatusSlotTextureKeys_.fill({});
+	playerStatusSlotTexturePaths_.fill({});
+	playerAttackSlotLabelObject_.reset();
+	playerStatusSlotLabelObject_.reset();
+	isPlayerSlotHudVisible_ = false;
+}
+
+void GameplayHud::Update(PlayerComponent* player, bool showChallengeMoney, int challengeMoney) {
+	UpdatePlayerHealth(player);
+	UpdateChallengeMoney(showChallengeMoney, challengeMoney);
+	UpdatePlayerExperience(player);
+	UpdatePlayerSlots(player);
+}
+
+void GameplayHud::InvalidateAttackTextures() {
+	playerAttackSlotTextureKeys_.fill({});
+	playerAttackSlotTexturePaths_.fill({});
+}
+
+void GameplayHud::InvalidateStatusTextures() {
+	playerStatusSlotTextureKeys_.fill({});
+	playerStatusSlotTexturePaths_.fill({});
+}
+
+void GameplayHud::Draw() {
+	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
+	if (isPlayerHealthHudVisible_ && playerHealthBarBackground_ && playerHealthBarFill_) {
+		playerHealthBarBackground_->Draw();
+		playerHealthBarFill_->Draw();
+	}
+	DrawChallengeMoney();
+	DrawPlayerExperience();
+	DrawPlayerSlots();
+}
+
+void GameplayHud::UpdatePlayerHealth(PlayerComponent* player) {
 	isPlayerHealthHudVisible_ = player != nullptr;
 	if (!player) {
 		return;
@@ -75,14 +143,14 @@ void BaseScene::UpdatePlayerHealthHud() {
 	playerHealthBarFill_->Update();
 }
 
-void BaseScene::UpdateChallengeMoneyHud() {
+void GameplayHud::UpdateChallengeMoney(bool visible, int challengeMoney) {
 	// GAMEPLAY以外のプレイヤー編集画面などには、ステージ戦績HUDを表示しない。
-	isChallengeMoneyHudVisible_ = sceneName_ == "GAMEPLAY";
+	isChallengeMoneyHudVisible_ = visible;
 	if (!isChallengeMoneyHudVisible_) return;
 
 	if (!challengeMoneyTextObject_) {
 		// 初回表示時だけ文字オブジェクトを生成し、以降は表示文字列だけを差し替える。
-		challengeMoneyTextObject_ = std::make_unique<GameObject>();
+		challengeMoneyTextObject_ = std::make_unique<Entity>();
 		TextComponent* text = challengeMoneyTextObject_->AddComponent<TextComponent>();
 		text->SetFontSize(26.0f);
 		text->SetAnchor(TextComponent::Anchor::TopLeft);
@@ -93,20 +161,17 @@ void BaseScene::UpdateChallengeMoneyHud() {
 	// 左上基準で固定し、右上のHP・装備HUDや画面下部の経験値バーとの重なりを避ける。
 	challengeMoneyTextObject_->GetTransform().translate = {24.0f, 24.0f, 0.0f};
 	challengeMoneyTextObject_->GetComponent<TextComponent>()->SetText(
-	    "G: " + std::to_string(challengeMoneyEarned_));
+	    "G: " + std::to_string(challengeMoney));
 }
 
-void BaseScene::DrawChallengeMoneyHud() {
+void GameplayHud::DrawChallengeMoney() {
 	// 更新側がGAMEPLAY以外で非表示にした場合は、保持中の古い文字オブジェクトを描画しない。
 	if (isChallengeMoneyHudVisible_ && challengeMoneyTextObject_) {
 		challengeMoneyTextObject_->Draw2D();
 	}
 }
 
-void BaseScene::UpdatePlayerExperienceHud() {
-	// HUDはシーン内で最初に見つかった有効なプレイヤーの経験値を表示する。
-	Player* player = FindActivePlayer();
-
+void GameplayHud::UpdatePlayerExperience(PlayerComponent* player) {
 	isPlayerExperienceHudVisible_ = player != nullptr;
 	if (!player) {
 		playerExperienceRate_ = 0.0f;
@@ -123,7 +188,7 @@ void BaseScene::UpdatePlayerExperienceHud() {
 		playerExperienceBarFill_->Initialize("Resources/human/white.png");
 	}
 	if (!playerExperienceTextObject_) {
-		playerExperienceTextObject_ = std::make_unique<GameObject>();
+		playerExperienceTextObject_ = std::make_unique<Entity>();
 		TextComponent* text = playerExperienceTextObject_->AddComponent<TextComponent>();
 		text->SetFontSize(17.0f);
 		text->SetAnchor(TextComponent::Anchor::BottomCenter);
@@ -133,8 +198,8 @@ void BaseScene::UpdatePlayerExperienceHud() {
 	const PlayerStats& stats = player->GetBaseStats();
 	const int level = (std::max)(1, stats.level);
 	// experienceはゲーム全体の累積値なので、現在レベルの開始値を引いてレベル内の進捗へ変換する。
-	const int previousLevelExperience = level > 1 ? Player::GetRequiredExperienceForNextLevel(level - 1) : 0;
-	const int nextLevelExperience = Player::GetRequiredExperienceForNextLevel(level);
+	const int previousLevelExperience = level > 1 ? PlayerComponent::GetRequiredExperienceForNextLevel(level - 1) : 0;
+	const int nextLevelExperience = PlayerComponent::GetRequiredExperienceForNextLevel(level);
 	const long long requiredExperience = (std::max)(1LL, static_cast<long long>(nextLevelExperience) - previousLevelExperience);
 	const long long currentExperience = (std::max)(0LL, static_cast<long long>(stats.experience) - previousLevelExperience);
 	playerExperienceRate_ = static_cast<float>(currentExperience) / static_cast<float>(requiredExperience);
@@ -170,7 +235,7 @@ void BaseScene::UpdatePlayerExperienceHud() {
 	    "LV " + std::to_string(level) + "    EXP " + std::to_string(currentExperience) + " / " + std::to_string(requiredExperience));
 }
 
-void BaseScene::DrawPlayerExperienceHud() {
+void GameplayHud::DrawPlayerExperience() {
 	if (!isPlayerExperienceHudVisible_ || !playerExperienceBarBackground_ || !playerExperienceBarFill_) return;
 	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
 	playerExperienceBarBackground_->Draw();
@@ -179,10 +244,7 @@ void BaseScene::DrawPlayerExperienceHud() {
 	if (playerExperienceTextObject_) playerExperienceTextObject_->Draw2D();
 }
 
-void BaseScene::UpdatePlayerSlotHud() {
-	// HUDはシーン内で最初に見つかった有効なプレイヤーの基礎スロット設定を表示する。
-	Player* player = FindActivePlayer();
-
+void GameplayHud::UpdatePlayerSlots(PlayerComponent* player) {
 	isPlayerSlotHudVisible_ = player != nullptr;
 	if (!player) {
 		playerAttackSlotIconVisible_.fill(false);
@@ -199,7 +261,7 @@ void BaseScene::UpdatePlayerSlotHud() {
 		return sprite;
 	};
 	auto createLabel = [](const std::string& label) {
-		auto object = std::make_unique<GameObject>();
+		auto object = std::make_unique<Entity>();
 		TextComponent* text = object->AddComponent<TextComponent>();
 		text->SetText(label);
 		text->SetFontSize(15.0f);
@@ -208,14 +270,14 @@ void BaseScene::UpdatePlayerSlotHud() {
 		return object;
 	};
 	auto createLevelText = []() {
-		auto object = std::make_unique<GameObject>();
+		auto object = std::make_unique<Entity>();
 		TextComponent* text = object->AddComponent<TextComponent>();
 		text->SetFontSize(12.0f);
 		text->SetAnchor(TextComponent::Anchor::Center);
 		text->SetColor({1.0f, 1.0f, 1.0f, 1.0f});
 		return object;
 	};
-	for (int index = 0; index < 5; ++index) {
+	for (std::size_t index = 0; index < kPlayerEquipmentSlotCount; ++index) {
 		if (!playerAttackSlotBackgroundSprites_[index]) playerAttackSlotBackgroundSprites_[index] = createSprite();
 		if (!playerAttackSlotIconSprites_[index]) playerAttackSlotIconSprites_[index] = createSprite();
 		if (!playerStatusSlotBackgroundSprites_[index]) playerStatusSlotBackgroundSprites_[index] = createSprite();
@@ -225,10 +287,10 @@ void BaseScene::UpdatePlayerSlotHud() {
 		if (!playerAttackSlotLevelTextObjects_[index]) playerAttackSlotLevelTextObjects_[index] = createLevelText();
 		if (!playerStatusSlotLevelTextObjects_[index]) playerStatusSlotLevelTextObjects_[index] = createLevelText();
 	}
-	if (!playerAttackSlotLabelObject_) playerAttackSlotLabelObject_ = createLabel("ATTACK");
-	if (!playerStatusSlotLabelObject_) playerStatusSlotLabelObject_ = createLabel("STATUS");
+	if (!playerAttackSlotLabelObject_) playerAttackSlotLabelObject_ = createLabel("武器");
+	if (!playerStatusSlotLabelObject_) playerStatusSlotLabelObject_ = createLabel("加護");
 
-	// HPバー直下を起点に、5枠全体が画面右端へ揃うよう左端座標を逆算する。
+	// HPバー直下を起点に、3枠全体が画面右端へ揃うよう左端座標を逆算する。
 	const float screenWidth = static_cast<float>(Input::GetInstance()->GetClientWidth());
 	constexpr float kRightMargin = 24.0f;
 	constexpr float kTop = 68.0f;
@@ -238,7 +300,8 @@ void BaseScene::UpdatePlayerSlotHud() {
 	constexpr float kRowGap = 7.0f;
 	constexpr float kInnerMargin = 3.0f;
 	constexpr float kLevelHeight = 16.0f;
-	const float slotsWidth = kSlotSize * 5.0f + kSlotGap * 4.0f;
+	const float slotCount = static_cast<float>(kPlayerEquipmentSlotCount);
+	const float slotsWidth = kSlotSize * slotCount + kSlotGap * (slotCount - 1.0f);
 	const float slotsLeft = (std::max)(kRightMargin + kLabelWidth, screenWidth - kRightMargin - slotsWidth);
 	const float labelRight = slotsLeft - 8.0f;
 	const float attackY = kTop;
@@ -247,7 +310,7 @@ void BaseScene::UpdatePlayerSlotHud() {
 	playerStatusSlotLabelObject_->GetTransform().translate = {labelRight, statusY + kSlotSize * 0.5f, 0.0f};
 
 	const PlayerStats& stats = player->GetBaseStats();
-	for (int index = 0; index < 5; ++index) {
+	for (std::size_t index = 0; index < kPlayerEquipmentSlotCount; ++index) {
 		const float slotX = slotsLeft + static_cast<float>(index) * (kSlotSize + kSlotGap);
 		const PlayerAttackSlot& attackSlot = stats.attackSlots[index];
 		const PlayerStatusSlot& statusSlot = stats.statusSlots[index];
@@ -271,7 +334,7 @@ void BaseScene::UpdatePlayerSlotHud() {
 		              : Vector4{0.05f, 0.06f, 0.08f, 0.82f});
 
 		auto updateLevel = [slotX, kSlotSize, kLevelHeight](
-		    Sprite* background, GameObject* textObject, float y, const std::string& levelText, bool enabled) {
+		    Sprite* background, Entity* textObject, float y, const std::string& levelText, bool enabled) {
 			EulerTransform transform = background->GetTransform();
 			transform.translate = {slotX, y + kSlotSize - kLevelHeight, 0.0f};
 			background->SetTransform(transform);
@@ -290,7 +353,7 @@ void BaseScene::UpdatePlayerSlotHud() {
 		playerAttackSlotLevelVisible_[index] = hasAttack;
 		playerStatusSlotLevelVisible_[index] = hasStatus;
 		if (hasAttack) {
-			const std::string levelText = attackSlot.attackLevel == "super"
+			const std::string levelText = PlayerAttackLevel::IsSuper(attackSlot.attackLevel)
 			    ? "SUPER"
 			    : "Lv." + attackSlot.attackLevel;
 			updateLevel(playerAttackSlotLevelBackgroundSprites_[index].get(),
@@ -311,9 +374,9 @@ void BaseScene::UpdatePlayerSlotHud() {
 				const PlayerAttackStats attackStats = LoadPlayerAttackStats(attackSlot.attackName);
 				playerAttackSlotTexturePaths_[index] = attackStats.choiceTextureFilePath;
 				// 通常Lv1～5は攻撃共通画像、Superだけはレベル専用画像を使用する。
-				if (attackSlot.attackLevel == "super") {
+				if (PlayerAttackLevel::IsSuper(attackSlot.attackLevel)) {
 					for (const PlayerAttackLevelStats& levelStats : attackStats.levels) {
-						if (levelStats.level == "super") {
+						if (PlayerAttackLevel::IsSuper(levelStats.level)) {
 							playerAttackSlotTexturePaths_[index] = levelStats.choiceTextureFilePath;
 							break;
 						}
@@ -352,11 +415,11 @@ void BaseScene::UpdatePlayerSlotHud() {
 	}
 }
 
-void BaseScene::DrawPlayerSlotHud() {
+void GameplayHud::DrawPlayerSlots() {
 	if (!isPlayerSlotHudVisible_) return;
 	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
 	// 背景、アイコン、レベル帯、レベル文字の順に重ね、最後に行ラベルを描画する。
-	for (int index = 0; index < 5; ++index) {
+	for (std::size_t index = 0; index < kPlayerEquipmentSlotCount; ++index) {
 		playerAttackSlotBackgroundSprites_[index]->Draw();
 		if (playerAttackSlotIconVisible_[index]) playerAttackSlotIconSprites_[index]->Draw();
 		if (playerAttackSlotLevelVisible_[index]) {
@@ -380,6 +443,7 @@ void BaseScene::DrawPlayerSlotHud() {
 
 void BaseScene::UpdateLevelUpSelection() {
 	Input* input = Input::GetInstance();
+	if (gameplaySession_.GetMode() == GameplayMode::BossRewardPresentation) return;
 	if (IsLevelUpSelectionActive()) {
 		if (levelUpChoices_.empty()) {
 			SetGameplayMode(GameplayMode::Playing);
@@ -392,7 +456,7 @@ void BaseScene::UpdateLevelUpSelection() {
 		if (input->TriggerKey(DIK_D) || input->TriggerGamepadRight()) {
 			selectedLevelUpChoiceIndex_ = (selectedLevelUpChoiceIndex_ + 1) % static_cast<int>(levelUpChoices_.size());
 		}
-		if (gameplayMode_ != GameplayMode::BossReward &&
+		if (gameplaySession_.GetMode() != GameplayMode::BossReward &&
 		    (input->TriggerKey(DIK_R) || input->TriggerGamepadButton(XINPUT_GAMEPAD_Y))) {
 			RerollLevelUpChoices();
 		}
@@ -407,7 +471,7 @@ void BaseScene::UpdateLevelUpSelection() {
 	}
 
 	for (const auto& object : sceneObjects_) {
-		Player* player = object->GetComponent<Player>();
+		PlayerComponent* player = object->GetComponent<PlayerComponent>();
 		if (!player || !player->ConsumePendingLevelUp()) {
 			continue;
 		}
@@ -422,7 +486,22 @@ void BaseScene::UpdateLevelUpSelection() {
 	}
 }
 
-bool BaseScene::BuildLevelUpChoices(Player* player) {
+void BaseScene::UpdateBossRewardPresentation() {
+	if (gameplaySession_.GetMode() != GameplayMode::BossRewardPresentation) return;
+	// GameTimeは演出中停止しているため、UI専用の固定刻みで進行させる。
+	bossRewardPresentationTimer_ += 1.0f / 60.0f;
+	const float revealEnd = 1.35f + 0.20f * static_cast<float>(bossRewardResults_.size());
+	if (bossRewardPresentationTimer_ >= revealEnd) bossRewardPresentationReady_ = true;
+	if (!bossRewardPresentationReady_) return;
+	Input* input = Input::GetInstance();
+	if (!input->TriggerKey(DIK_SPACE) && !input->TriggerGamepadButton(XINPUT_GAMEPAD_A)) return;
+
+	bossRewardResults_.clear();
+	SetGameplayMode(GameplayMode::Playing);
+	if (!ShowNextBossAcquisitionOffer()) bossAcquisitionPlayer_ = nullptr;
+}
+
+bool BaseScene::BuildLevelUpChoices(PlayerComponent* player) {
 	levelUpChoices_.clear();
 	selectedLevelUpChoiceIndex_ = 0;
 	if (!player) {
@@ -456,7 +535,7 @@ bool BaseScene::BuildLevelUpChoices(Player* player) {
 	// 攻撃画像は通常Lv1～5で共通、Superだけレベル設定内の専用画像を参照する。
 	auto getAttackTexture = [](const std::string& attackName, const std::string& targetLevel) {
 		const PlayerAttackStats attackStats = LoadPlayerAttackStats(attackName);
-		if (targetLevel != "super") {
+		if (!PlayerAttackLevel::IsSuper(targetLevel)) {
 			return attackStats.choiceTextureFilePath;
 		}
 		for (const PlayerAttackLevelStats& levelStats : attackStats.levels) {
@@ -483,10 +562,11 @@ bool BaseScene::BuildLevelUpChoices(Player* player) {
 		}
 		equippedAttacks.push_back(slot.attackName);
 		const int level = std::atoi(slot.attackLevel.c_str());
-		if (slot.attackLevel != "super" && level >= 1 && level < 5) {
+		if (!PlayerAttackLevel::IsSuper(slot.attackLevel) && level >= 1 && level < 5) {
 			const std::string targetLevel = std::to_string(level + 1);
 			const std::string fallback = "Attack level " + slot.attackLevel + " -> " + targetLevel;
-			candidates.push_back({LevelUpChoiceType::AttackLevelUp, slot.attackName, slot.attackName, getAttackDescription(slot.attackName, targetLevel, fallback), index, getAttackTexture(slot.attackName, targetLevel)});
+			const PlayerAttackStats attackStats = LoadPlayerAttackStats(slot.attackName);
+			candidates.push_back({LevelUpChoiceType::AttackLevelUp, slot.attackName, attackStats.GetDisplayName(), getAttackDescription(slot.attackName, targetLevel, fallback), index, getAttackTexture(slot.attackName, targetLevel)});
 		}
 		if (slot.attackLevel == "5") {
 			const PlayerAttackStats attackStats = LoadPlayerAttackStats(slot.attackName);
@@ -502,7 +582,7 @@ bool BaseScene::BuildLevelUpChoices(Player* player) {
 				}
 			}
 			if (conditionMet) {
-				candidates.push_back({LevelUpChoiceType::AttackSuper, slot.attackName, slot.attackName + " SUPER", getAttackDescription(slot.attackName, "super", "Promote attack level 5 -> super"), index, getAttackTexture(slot.attackName, "super")});
+				candidates.push_back({LevelUpChoiceType::AttackSuper, slot.attackName, attackStats.GetDisplayName(true), getAttackDescription(slot.attackName, "super", "Promote attack level 5 -> super"), index, getAttackTexture(slot.attackName, "super")});
 			}
 		}
 	}
@@ -518,7 +598,8 @@ bool BaseScene::BuildLevelUpChoices(Player* player) {
 		if (level >= 1 && level < 5) {
 			const std::string targetLevel = std::to_string(level + 1);
 			const std::string fallback = "Status level " + slot.level + " -> " + targetLevel;
-			candidates.push_back({LevelUpChoiceType::StatusLevelUp, slot.statusName, slot.statusName, getStatusDescription(slot.statusName, level, fallback), index, getStatusTexture(slot.statusName, level)});
+			const PlayerStatusItemStats statusStats = LoadPlayerStatusItemStats(slot.statusName);
+			candidates.push_back({LevelUpChoiceType::StatusLevelUp, slot.statusName, statusStats.GetDisplayName(), getStatusDescription(slot.statusName, level, fallback), index, getStatusTexture(slot.statusName, level)});
 		}
 	}
 
@@ -527,14 +608,16 @@ bool BaseScene::BuildLevelUpChoices(Player* player) {
 			// 装備済み武器と他タイプ専用の初期武器を除き、空きスロットへ追加可能な武器だけを残す。
 			if (std::find(equippedAttacks.begin(), equippedAttacks.end(), attackName) == equippedAttacks.end() &&
 			    !otherPlayerInitialAttacks.contains(attackName)) {
-				candidates.push_back({LevelUpChoiceType::NewAttack, attackName, attackName, getAttackDescription(attackName, "1", "Add a new attack at level 1"), emptyAttackSlot, getAttackTexture(attackName, "1")});
+				const PlayerAttackStats attackStats = LoadPlayerAttackStats(attackName);
+				candidates.push_back({LevelUpChoiceType::NewAttack, attackName, attackStats.GetDisplayName(), getAttackDescription(attackName, "1", "Add a new attack at level 1"), emptyAttackSlot, getAttackTexture(attackName, "1")});
 			}
 		}
 	}
 	if (emptyStatusSlot >= 0) {
 		for (const std::string& statusName : LoadPlayerStatusItemNames()) {
 			if (std::find(equippedStatuses.begin(), equippedStatuses.end(), statusName) == equippedStatuses.end()) {
-				candidates.push_back({LevelUpChoiceType::NewStatus, statusName, statusName, getStatusDescription(statusName, 0, "Add a new status at level 1"), emptyStatusSlot, getStatusTexture(statusName, 0)});
+				const PlayerStatusItemStats statusStats = LoadPlayerStatusItemStats(statusName);
+				candidates.push_back({LevelUpChoiceType::NewStatus, statusName, statusStats.GetDisplayName(), getStatusDescription(statusName, 0, "Add a new status at level 1"), emptyStatusSlot, getStatusTexture(statusName, 0)});
 			}
 		}
 	}
@@ -556,13 +639,64 @@ bool BaseScene::BuildLevelUpChoices(Player* player) {
 	}
 	for (int index = 0; index < 3; ++index) {
 		levelUpChoices_.push_back(candidates[index % candidates.size()]);
+		PopulateCorrespondingOwnedIcons(levelUpChoices_.back(), stats);
 	}
 	return true;
 }
 
+void BaseScene::PopulateCorrespondingOwnedIcons(LevelUpChoice& choice, const PlayerStats& stats) const {
+	choice.correspondingOwnedTextureFilePaths.clear();
+	if (choice.type == LevelUpChoiceType::Decline) return;
+
+	auto addTextureIfAvailable = [&choice](const std::string& textureFilePath) {
+		if (textureFilePath.empty() ||
+		    !std::filesystem::exists(StringUtility::Utf8ToPath(textureFilePath)) ||
+		    std::find(choice.correspondingOwnedTextureFilePaths.begin(),
+		              choice.correspondingOwnedTextureFilePaths.end(), textureFilePath) !=
+		        choice.correspondingOwnedTextureFilePaths.end()) {
+			return;
+		}
+		choice.correspondingOwnedTextureFilePaths.push_back(textureFilePath);
+	};
+
+	const bool attackChoice = choice.type == LevelUpChoiceType::AttackLevelUp ||
+	                          choice.type == LevelUpChoiceType::AttackSuper ||
+	                          choice.type == LevelUpChoiceType::NewAttack;
+	if (attackChoice) {
+		const PlayerAttackStats attackStats = LoadPlayerAttackStats(choice.name);
+		if (attackStats.superConditionStatusName.empty()) return;
+		for (const PlayerStatusSlot& slot : stats.statusSlots) {
+			if (!slot.enabled || slot.statusName != attackStats.superConditionStatusName) continue;
+			const PlayerStatusItemStats statusStats = LoadPlayerStatusItemStats(slot.statusName);
+			const int levelIndex = std::clamp(std::atoi(slot.level.c_str()) - 1, 0,
+			    static_cast<int>(statusStats.levelTextureFilePaths.size()) - 1);
+			addTextureIfAvailable(statusStats.levelTextureFilePaths[levelIndex]);
+			return;
+		}
+		return;
+	}
+
+	// アイテム候補では、そのアイテムをSuper条件にしている所持武器をすべて表示する。
+	for (const PlayerAttackSlot& slot : stats.attackSlots) {
+		if (!slot.enabled || slot.attackName.empty()) continue;
+		const PlayerAttackStats attackStats = LoadPlayerAttackStats(slot.attackName);
+		if (attackStats.superConditionStatusName != choice.name) continue;
+		std::string textureFilePath = attackStats.choiceTextureFilePath;
+		if (PlayerAttackLevel::IsSuper(slot.attackLevel)) {
+			for (const PlayerAttackLevelStats& levelStats : attackStats.levels) {
+				if (PlayerAttackLevel::IsSuper(levelStats.level)) {
+					textureFilePath = levelStats.choiceTextureFilePath;
+					break;
+				}
+			}
+		}
+		addTextureIfAvailable(textureFilePath);
+	}
+}
+
 void BaseScene::RerollLevelUpChoices() {
-	if (!sceneManager || !levelUpPlayer_ || gameplayMode_ == GameplayMode::BossReward || levelUpRerollUsed_ ||
-	    sceneManager->GetGlobalShopUpgradeLevel("level_up_reroll") <= 0 || levelUpChoices_.empty()) {
+	if (!sceneManager_ || !levelUpPlayer_ || gameplaySession_.GetMode() == GameplayMode::BossReward || levelUpRerollUsed_ ||
+	    sceneManager_->GetGlobalShopUpgradeLevel("level_up_reroll") <= 0 || levelUpChoices_.empty()) {
 		return;
 	}
 
@@ -599,7 +733,7 @@ void BaseScene::RerollLevelUpChoices() {
 
 void BaseScene::ApplyLevelUpChoice(int choiceIndex) {
 	if (!levelUpPlayer_ || choiceIndex < 0 || choiceIndex >= static_cast<int>(levelUpChoices_.size())) return;
-	const bool wasBossAcquisitionOffer = gameplayMode_ == GameplayMode::BossReward;
+	const bool wasBossAcquisitionOffer = gameplaySession_.GetMode() == GameplayMode::BossReward;
 	const LevelUpChoice choice = levelUpChoices_[choiceIndex];
 	PlayerStats stats = levelUpPlayer_->GetBaseStats();
 	switch (choice.type) {
@@ -625,9 +759,14 @@ void BaseScene::ApplyLevelUpChoice(int choiceIndex) {
 		break;
 	}
 	if (choice.type != LevelUpChoiceType::Decline) {
-		levelUpPlayer_->ApplyStats(stats, ApplyPlayerStatusItems(stats));
-		if (GameObject* owner = levelUpPlayer_->GetOwner()) {
-			ApplyPlayerAttackSlots(owner->GetComponent<PlayerAttackComponent>(), stats);
+		levelUpPlayer_->ApplyStats(
+			stats,
+			ApplyPlayerStatusItems(stats, LoadPlayerStatusItemDefinitions()));
+		if (Entity* owner = levelUpPlayer_->GetOwner()) {
+			ApplyPlayerAttackSlots(
+				owner->GetComponent<PlayerAttackComponent>(),
+				stats,
+				LoadPlayerAttackDefinitions());
 		}
 	}
 	levelUpChoices_.clear();
@@ -655,22 +794,28 @@ void BaseScene::EnsureLevelUpSelectionSprites() {
 	};
 	levelUpOverlaySprite_ = createSprite();
 	levelUpPanelSprite_ = createSprite();
+	for (auto& sprite : levelUpPanelAccentSprites_) sprite = createSprite();
 	for (int index = 0; index < 3; ++index) {
 		levelUpChoiceBorderSprites_[index] = createSprite();
-		levelUpChoiceSprites_[index] = createSprite();
+		levelUpChoiceSprites_[index] = std::make_unique<Sprite>();
+		levelUpChoiceSprites_[index]->Initialize("Resources/UI/World/level_up_ofuda_card.png");
+		levelUpChoiceAccentSprites_[index] = createSprite();
 		levelUpChoiceIconSprites_[index] = createSprite();
+		for (auto& sprite : levelUpChoiceCorrespondingIconSprites_[index]) {
+			sprite = createSprite();
+		}
 	}
 
 	auto createTextObject = [](const std::string& text, float fontSize) {
-		auto object = std::make_unique<GameObject>();
+		auto object = std::make_unique<Entity>();
 		TextComponent* textComponent = object->AddComponent<TextComponent>();
 		textComponent->SetText(text);
 		textComponent->SetFontSize(fontSize);
 		textComponent->SetAnchor(TextComponent::Anchor::Center);
 		return object;
 	};
-	levelUpTitleTextObject_ = createTextObject("LEVEL UP!", 46.0f);
-	levelUpInstructionTextObject_ = createTextObject("A / D or Pad: Select    Space or Pad A: Confirm", 21.0f);
+	levelUpTitleTextObject_ = createTextObject("神授の選択", 42.0f);
+	levelUpInstructionTextObject_ = createTextObject("A / D・左右キー: 選択    Space・Pad A: 授かる", 19.0f);
 	for (auto& object : levelUpChoiceTextObjects_) {
 		object = createTextObject("", 23.0f);
 	}
@@ -684,13 +829,14 @@ void BaseScene::DrawLevelUpSelection2D() {
 	const float screenWidth = static_cast<float>(dxCommon->GetRenderWidth());
 	const float screenHeight = static_cast<float>(dxCommon->GetRenderHeight());
 	const float panelWidth = (std::min)(screenWidth - 48.0f, 1120.0f);
-	const float panelHeight = (std::min)(screenHeight - 48.0f, 440.0f);
+	// 御札テクスチャの縦横比を保ちやすい高さを確保する。
+	const float panelHeight = (std::min)(screenHeight - 48.0f, 520.0f);
 	const float panelX = (screenWidth - panelWidth) * 0.5f;
 	const float panelY = (screenHeight - panelHeight) * 0.5f;
 	const float gap = 24.0f;
 	const float cardWidth = (panelWidth - 64.0f - gap * 2.0f) / 3.0f;
-	const float cardHeight = panelHeight - 145.0f;
-	const float cardY = panelY + 92.0f;
+	const float cardHeight = panelHeight - 158.0f;
+	const float cardY = panelY + 102.0f;
 
 	auto drawSprite = [](Sprite* sprite, float x, float y, float width, float height, const Vector4& color) {
 		EulerTransform transform = sprite->GetTransform();
@@ -701,68 +847,107 @@ void BaseScene::DrawLevelUpSelection2D() {
 		sprite->Update();
 		sprite->Draw();
 	};
-	auto choiceColor = [](LevelUpChoiceType type) {
+	auto drawSpriteContained = [&drawSprite](Sprite* sprite, float x, float y, float width, float height,
+	                                      const Vector4& color) {
+		const Vector2 textureSize = sprite->GetTextureSize();
+		if (textureSize.x <= 0.0f || textureSize.y <= 0.0f) return;
+		const float scale = (std::min)(width / textureSize.x, height / textureSize.y);
+		const float drawWidth = textureSize.x * scale;
+		const float drawHeight = textureSize.y * scale;
+		drawSprite(sprite, x + (width - drawWidth) * 0.5f, y + (height - drawHeight) * 0.5f,
+		           drawWidth, drawHeight, color);
+	};
+	auto choiceAccentColor = [](LevelUpChoiceType type) {
 		switch (type) {
-		case LevelUpChoiceType::AttackSuper: return Vector4{0.72f, 0.42f, 0.05f, 0.98f};
-		case LevelUpChoiceType::NewAttack: return Vector4{0.55f, 0.18f, 0.08f, 0.98f};
-		case LevelUpChoiceType::StatusLevelUp: return Vector4{0.08f, 0.35f, 0.20f, 0.98f};
-		case LevelUpChoiceType::NewStatus: return Vector4{0.06f, 0.32f, 0.38f, 0.98f};
-		case LevelUpChoiceType::Decline: return Vector4{0.22f, 0.22f, 0.25f, 0.98f};
+		case LevelUpChoiceType::AttackSuper: return Vector4{0.78f, 0.47f, 0.08f, 1.0f};
+		case LevelUpChoiceType::NewAttack: return Vector4{0.63f, 0.10f, 0.055f, 1.0f};
+		case LevelUpChoiceType::StatusLevelUp: return Vector4{0.18f, 0.42f, 0.22f, 1.0f};
+		case LevelUpChoiceType::NewStatus: return Vector4{0.12f, 0.38f, 0.42f, 1.0f};
+		case LevelUpChoiceType::Decline: return Vector4{0.28f, 0.27f, 0.25f, 1.0f};
 		case LevelUpChoiceType::AttackLevelUp:
-		default: return Vector4{0.08f, 0.22f, 0.48f, 0.98f};
+		default: return Vector4{0.32f, 0.20f, 0.46f, 1.0f};
 		}
 	};
 
 	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
-	drawSprite(levelUpOverlaySprite_.get(), 0.0f, 0.0f, screenWidth, screenHeight, {0.0f, 0.0f, 0.0f, 0.68f});
-	drawSprite(levelUpPanelSprite_.get(), panelX, panelY, panelWidth, panelHeight, {0.035f, 0.045f, 0.075f, 0.98f});
+	drawSprite(levelUpOverlaySprite_.get(), 0.0f, 0.0f, screenWidth, screenHeight, {0.025f, 0.008f, 0.030f, 0.76f});
+	// 墨色の祭壇へ朱と金の細線を重ね、戦闘中の選択を「神授の儀式」として見せる。
+	drawSprite(levelUpPanelSprite_.get(), panelX, panelY, panelWidth, panelHeight, {0.055f, 0.040f, 0.050f, 0.985f});
+	drawSprite(levelUpPanelAccentSprites_[0].get(), panelX, panelY, panelWidth, 5.0f, {0.67f, 0.085f, 0.045f, 1.0f});
+	drawSprite(levelUpPanelAccentSprites_[1].get(), panelX + 18.0f, panelY + 9.0f, panelWidth - 36.0f, 2.0f, {0.86f, 0.65f, 0.27f, 0.92f});
 	for (int index = 0; index < static_cast<int>(levelUpChoices_.size()) && index < 3; ++index) {
 		const float cardX = panelX + 32.0f + static_cast<float>(index) * (cardWidth + gap);
 		const bool selected = index == selectedLevelUpChoiceIndex_;
+		const Vector4 accent = choiceAccentColor(levelUpChoices_[index].type);
 		drawSprite(levelUpChoiceBorderSprites_[index].get(), cardX - 5.0f, cardY - 5.0f, cardWidth + 10.0f, cardHeight + 10.0f,
-			selected ? Vector4{1.0f, 0.78f, 0.12f, 1.0f} : Vector4{0.20f, 0.23f, 0.30f, 1.0f});
-		Vector4 color = choiceColor(levelUpChoices_[index].type);
-		if (selected) {
-			color.x = (std::min)(1.0f, color.x + 0.14f);
-			color.y = (std::min)(1.0f, color.y + 0.14f);
-			color.z = (std::min)(1.0f, color.z + 0.14f);
-		}
-		drawSprite(levelUpChoiceSprites_[index].get(), cardX, cardY, cardWidth, cardHeight, color);
+			selected ? Vector4{0.96f, 0.69f, 0.20f, 1.0f} : Vector4{0.30f, 0.20f, 0.16f, 1.0f});
+		// 各候補は生成した和紙の御札。未選択時だけ少し落とし、紙の質感と朱模様を保つ。
+		drawSprite(levelUpChoiceSprites_[index].get(), cardX, cardY, cardWidth, cardHeight,
+			selected ? Vector4{1.0f, 1.0f, 1.0f, 1.0f} : Vector4{0.78f, 0.78f, 0.75f, 0.98f});
+		// 種別色は御札の下端へ細く置き、生成素材の上部意匠やアイコンを隠さない。
+		drawSprite(levelUpChoiceAccentSprites_[index].get(), cardX + 22.0f, cardY + cardHeight - 8.0f,
+			cardWidth - 44.0f, selected ? 5.0f : 3.0f, accent);
 		const std::string& textureFilePath = levelUpChoices_[index].textureFilePath;
 		const bool hasTexture = !textureFilePath.empty() && std::filesystem::exists(StringUtility::Utf8ToPath(textureFilePath));
-		const float iconMargin = 18.0f;
-		const float iconHeight = (std::min)(cardHeight * 0.43f, 125.0f);
+		// 御札上部の朱模様を避け、アイコンは中央の無地領域から描く。
+		const float iconMargin = 46.0f;
+		const float iconHeight = (std::min)(cardHeight * 0.30f, 94.0f);
 		if (hasTexture) {
 			Sprite* iconSprite = levelUpChoiceIconSprites_[index].get();
 			if (iconSprite->GetTextureFilePath() != textureFilePath) {
 				iconSprite->SetTexture(textureFilePath);
 			}
-			drawSprite(iconSprite, cardX + iconMargin, cardY + iconMargin, cardWidth - iconMargin * 2.0f, iconHeight,
+			drawSpriteContained(iconSprite, cardX + iconMargin, cardY + iconMargin, cardWidth - iconMargin * 2.0f, iconHeight,
 			    selected ? Vector4{1.0f, 1.0f, 1.0f, 1.0f} : Vector4{0.88f, 0.88f, 0.88f, 1.0f});
 		}
 
-		GameObject* textObject = levelUpChoiceTextObjects_[index].get();
+		Entity* textObject = levelUpChoiceTextObjects_[index].get();
 		const float textTop = hasTexture ? cardY + iconMargin + iconHeight + 12.0f : cardY + 18.0f;
-		const float textBottom = cardY + cardHeight - 18.0f;
+		const auto& correspondingTextures = levelUpChoices_[index].correspondingOwnedTextureFilePaths;
+		const int correspondingIconCount = (std::min)(
+			static_cast<int>(correspondingTextures.size()), static_cast<int>(kPlayerEquipmentSlotCount));
+		const float correspondingIconSize = 36.0f;
+		const float correspondingIconGap = 8.0f;
+		const float paperBottomInset = 42.0f;
+		const float correspondingRowHeight = correspondingIconCount > 0 ? correspondingIconSize + 12.0f : 0.0f;
+		const float textBottom = cardY + cardHeight - paperBottomInset - correspondingRowHeight;
 		const float textCenterY = (textTop + textBottom) * 0.5f;
 		textObject->GetTransform().translate = {cardX + cardWidth * 0.5f, textCenterY, 0.0f};
 		TextComponent* text = textObject->GetComponent<TextComponent>();
 		// 名前と説明をカードの内側へ文字単位で折り返し、縦に長い場合は自動縮小する。
 		text->SetLayoutBounds((std::max)(1.0f, cardWidth - 36.0f), (std::max)(1.0f, textBottom - textTop));
 		text->SetText(levelUpChoices_[index].title + "\n\n" + levelUpChoices_[index].description);
-		text->SetColor(selected ? Vector4{1.0f, 0.92f, 0.55f, 1.0f} : Vector4{1.0f, 1.0f, 1.0f, 1.0f});
+		text->SetColor(selected ? Vector4{0.26f, 0.055f, 0.035f, 1.0f} : Vector4{0.14f, 0.12f, 0.11f, 1.0f});
+
+		if (correspondingIconCount > 0) {
+			const float rowWidth = correspondingIconSize * correspondingIconCount +
+			                       correspondingIconGap * (correspondingIconCount - 1);
+			const float rowX = cardX + (cardWidth - rowWidth) * 0.5f;
+			const float rowY = cardY + cardHeight - paperBottomInset - correspondingIconSize;
+			for (int relatedIndex = 0; relatedIndex < correspondingIconCount; ++relatedIndex) {
+				Sprite* iconSprite = levelUpChoiceCorrespondingIconSprites_[index][relatedIndex].get();
+				const std::string& relatedTexture = correspondingTextures[relatedIndex];
+				if (iconSprite->GetTextureFilePath() != relatedTexture) iconSprite->SetTexture(relatedTexture);
+				drawSpriteContained(iconSprite,
+					rowX + relatedIndex * (correspondingIconSize + correspondingIconGap), rowY,
+					correspondingIconSize, correspondingIconSize,
+					selected ? Vector4{1.0f, 1.0f, 1.0f, 1.0f} : Vector4{0.88f, 0.88f, 0.88f, 1.0f});
+			}
+		}
 	}
 
 	if (TextComponent* titleText = levelUpTitleTextObject_->GetComponent<TextComponent>()) {
-		titleText->SetText(gameplayMode_ == GameplayMode::BossReward ? "BOSS REWARD!" : "LEVEL UP!");
+		titleText->SetText(gameplaySession_.GetMode() == GameplayMode::BossReward ? "討伐の恩賞" : "神授の選択");
+		titleText->SetColor({0.98f, 0.84f, 0.48f, 1.0f});
 	}
 	if (TextComponent* instructionText = levelUpInstructionTextObject_->GetComponent<TextComponent>()) {
-		std::string instruction = "A / D or Pad: Select    Space or Pad A: Confirm";
-		if (gameplayMode_ != GameplayMode::BossReward && sceneManager &&
-		    sceneManager->GetGlobalShopUpgradeLevel("level_up_reroll") > 0) {
-			instruction += levelUpRerollUsed_ ? "    Reroll: Used" : "    R or Pad Y: Reroll";
+		std::string instruction = "A / D・左右キー: 選択    Space・Pad A: 授かる";
+		if (gameplaySession_.GetMode() != GameplayMode::BossReward && sceneManager_ &&
+		    sceneManager_->GetGlobalShopUpgradeLevel("level_up_reroll") > 0) {
+			instruction += levelUpRerollUsed_ ? "    再抽選: 使用済み" : "    R・Pad Y: 再抽選";
 		}
 		instructionText->SetText(instruction);
+		instructionText->SetColor({0.82f, 0.75f, 0.62f, 1.0f});
 	}
 	levelUpTitleTextObject_->GetTransform().translate = {screenWidth * 0.5f, panelY + 35.0f, 0.0f};
 	levelUpInstructionTextObject_->GetTransform().translate = {screenWidth * 0.5f, panelY + panelHeight - 24.0f, 0.0f};
@@ -771,6 +956,162 @@ void BaseScene::DrawLevelUpSelection2D() {
 	for (int index = 0; index < static_cast<int>(levelUpChoices_.size()) && index < 3; ++index) {
 		levelUpChoiceTextObjects_[index]->Draw2D();
 	}
+}
+
+void BaseScene::EnsureBossRewardPresentationSprites() {
+	if (bossRewardOverlaySprite_) return;
+	const std::string whiteTexture = "Resources/human/white.png";
+	auto createSprite = [&whiteTexture]() {
+		auto sprite = std::make_unique<Sprite>();
+		sprite->Initialize(whiteTexture);
+		return sprite;
+	};
+	bossRewardOverlaySprite_ = createSprite();
+	bossRewardFlashSprite_ = createSprite();
+	bossRewardChestBackSprite_ = createSprite();
+	bossRewardChestFrontSprite_ = createSprite();
+	bossRewardChestLidSprite_ = createSprite();
+	for (auto& sprite : bossRewardBurstSprites_) sprite = createSprite();
+	for (int index = 0; index < 5; ++index) {
+		bossRewardIconBackSprites_[index] = createSprite();
+		bossRewardIconSprites_[index] = createSprite();
+	}
+	auto createText = [](const std::string& value, float size) {
+		auto object = std::make_unique<Entity>();
+		TextComponent* text = object->AddComponent<TextComponent>();
+		text->SetText(value);
+		text->SetFontSize(size);
+		text->SetAnchor(TextComponent::Anchor::Center);
+		return object;
+	};
+	bossRewardTitleTextObject_ = createText("BOSS REWARD", 54.0f);
+	bossRewardMoneyTextObject_ = createText("", 34.0f);
+	bossRewardInstructionTextObject_ = createText("", 22.0f);
+}
+
+void BaseScene::DrawBossRewardPresentation2D() {
+	if (gameplaySession_.GetMode() != GameplayMode::BossRewardPresentation) return;
+	EnsureBossRewardPresentationSprites();
+	DirectXCommon* dxCommon = SpriteCommon::GetInstance()->GetDxCommon();
+	if (!dxCommon) return;
+	const float screenWidth = static_cast<float>(dxCommon->GetRenderWidth());
+	const float screenHeight = static_cast<float>(dxCommon->GetRenderHeight());
+	const int rewardCount = static_cast<int>(bossRewardResults_.size());
+	const float rarity = rewardCount >= 5 ? 1.0f : (rewardCount >= 3 ? 0.65f : 0.35f);
+	const float pulse = 0.5f + 0.5f * std::sin(bossRewardPresentationTimer_ * (5.0f + rarity * 5.0f));
+
+	auto drawSprite = [](Sprite* sprite, float x, float y, float width, float height, const Vector4& color) {
+		EulerTransform transform = sprite->GetTransform();
+		transform.translate = {x, y, 0.0f};
+		sprite->SetTransform(transform);
+		sprite->SetSize({width, height});
+		sprite->SetColor(color);
+		sprite->Update();
+		sprite->Draw();
+	};
+
+	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
+	drawSprite(bossRewardOverlaySprite_.get(), 0.0f, 0.0f, screenWidth, screenHeight,
+		{0.01f, 0.005f, 0.025f, 0.88f});
+	const float lidProgress = (std::clamp)((bossRewardPresentationTimer_ - 0.48f) / 0.42f, 0.0f, 1.0f);
+	const float openingFlash = 1.0f - (std::clamp)((bossRewardPresentationTimer_ - 0.78f) / 0.38f, 0.0f, 1.0f);
+	const float flashAlpha = bossRewardPresentationReady_
+		? 0.05f + 0.07f * pulse
+		: openingFlash * lidProgress * (0.34f + rarity * 0.38f);
+	drawSprite(bossRewardFlashSprite_.get(), 0.0f, 0.0f, screenWidth, screenHeight,
+		{1.0f, 0.72f, 0.12f, flashAlpha});
+
+	TextComponent* title = bossRewardTitleTextObject_->GetComponent<TextComponent>();
+	title->SetText(rewardCount >= 5 ? "LEGENDARY BOSS REWARD!" :
+		(rewardCount >= 3 ? "GREAT BOSS REWARD!" : "BOSS REWARD!"));
+	title->SetColor({1.0f, 0.82f + 0.12f * pulse, 0.22f, 1.0f});
+	bossRewardTitleTextObject_->GetTransform().translate = {screenWidth * 0.5f, screenHeight * 0.20f, 0.0f};
+	bossRewardTitleTextObject_->Draw2D();
+
+	// 箱は画面中央下に弾むように現れ、ふたが後方へ回転して開く。
+	const float chestCenterX = screenWidth * 0.5f;
+	const float chestCenterY = screenHeight * 0.62f;
+	const float chestAppear = (std::clamp)(bossRewardPresentationTimer_ / 0.38f, 0.0f, 1.0f);
+	const float chestBounce = chestAppear < 1.0f
+		? 1.0f + std::sin(chestAppear * MathConstants::kPi) * 0.18f
+		: 1.0f + 0.025f * pulse;
+	const float chestWidth = 210.0f * chestBounce;
+	const float chestHeight = 118.0f * chestBounce;
+	const Vector4 chestDark{0.30f, 0.10f, 0.015f, chestAppear};
+	const Vector4 chestGold{0.92f, 0.50f + 0.18f * pulse, 0.045f, chestAppear};
+	drawSprite(bossRewardChestBackSprite_.get(), chestCenterX - chestWidth * 0.48f,
+		chestCenterY - chestHeight * 0.40f, chestWidth * 0.96f, chestHeight * 0.65f, chestDark);
+	drawSprite(bossRewardChestFrontSprite_.get(), chestCenterX - chestWidth * 0.5f,
+		chestCenterY - chestHeight * 0.02f, chestWidth, chestHeight * 0.58f, chestGold);
+	{
+		Sprite* lid = bossRewardChestLidSprite_.get();
+		EulerTransform lidTransform = lid->GetTransform();
+		const float lidWidth = chestWidth * (1.0f - 0.12f * lidProgress);
+		const float lidHeight = chestHeight * 0.30f;
+		lidTransform.translate = {
+			chestCenterX - lidWidth * 0.5f - 18.0f * lidProgress,
+			chestCenterY - chestHeight * (0.12f + 0.55f * lidProgress), 0.0f};
+		lidTransform.rotate.z = -0.42f * lidProgress;
+		lid->SetTransform(lidTransform);
+		lid->SetSize({lidWidth, lidHeight});
+		lid->SetColor(chestGold);
+		lid->Update();
+		lid->Draw();
+	}
+
+	// ふたが開いた瞬間、報酬数に応じた本数の光片を箱から放射する。
+	const int burstCount = rewardCount >= 5 ? 16 : (rewardCount >= 3 ? 12 : 8);
+	const float burstProgress = (std::clamp)((bossRewardPresentationTimer_ - 0.72f) / 0.72f, 0.0f, 1.0f);
+	for (int index = 0; index < burstCount; ++index) {
+		const float angle = -2.85f + 2.56f * static_cast<float>(index) / static_cast<float>((std::max)(1, burstCount - 1));
+		const float distance = (70.0f + rarity * 105.0f + 12.0f * (index % 3)) * burstProgress;
+		const float x = chestCenterX + std::cos(angle) * distance;
+		const float y = chestCenterY + std::sin(angle) * distance;
+		const float alpha = lidProgress * (1.0f - burstProgress);
+		drawSprite(bossRewardBurstSprites_[index].get(), x - 5.0f, y - 16.0f,
+			10.0f + rarity * 5.0f, 32.0f + rarity * 25.0f,
+			{1.0f, 0.72f + 0.22f * pulse, 0.12f, alpha});
+	}
+
+	const float iconSize = rewardCount >= 5 ? 130.0f : 150.0f;
+	const float gap = rewardCount >= 5 ? 24.0f : 34.0f;
+	const float totalWidth = rewardCount > 0 ? iconSize * rewardCount + gap * (rewardCount - 1) : 0.0f;
+	const float startX = (screenWidth - totalWidth) * 0.5f;
+	for (int index = 0; index < rewardCount && index < 5; ++index) {
+		const float revealTime = 0.88f + 0.20f * static_cast<float>(index);
+		if (bossRewardPresentationTimer_ < revealTime) continue;
+		const float revealProgress = (std::clamp)((bossRewardPresentationTimer_ - revealTime) / 0.52f, 0.0f, 1.0f);
+		const float easedProgress = 1.0f - std::pow(1.0f - revealProgress, 3.0f);
+		const float easedScale = 0.45f + 0.55f * easedProgress;
+		const float size = iconSize * easedScale;
+		const float destinationX = startX + iconSize * 0.5f + index * (iconSize + gap);
+		const float destinationY = screenHeight * 0.43f;
+		const float centerX = chestCenterX + (destinationX - chestCenterX) * easedProgress;
+		const float centerY = chestCenterY + (destinationY - chestCenterY) * easedProgress
+			- std::sin(revealProgress * MathConstants::kPi) * (95.0f + rarity * 55.0f);
+		drawSprite(bossRewardIconBackSprites_[index].get(), centerX - size * 0.5f - 8.0f,
+			centerY - size * 0.5f - 8.0f, size + 16.0f, size + 16.0f,
+			{1.0f, 0.55f + 0.30f * pulse, 0.04f, (std::min)(1.0f, revealProgress * 2.0f)});
+		const std::string& texture = bossRewardResults_[index].textureFilePath;
+		if (!texture.empty() && std::filesystem::exists(StringUtility::Utf8ToPath(texture))) {
+			Sprite* icon = bossRewardIconSprites_[index].get();
+			if (icon->GetTextureFilePath() != texture) icon->SetTexture(texture);
+			drawSprite(icon, centerX - size * 0.5f, centerY - size * 0.5f, size, size,
+				{1.0f, 1.0f, 1.0f, (std::min)(1.0f, revealProgress * 2.0f)});
+		}
+	}
+
+	TextComponent* money = bossRewardMoneyTextObject_->GetComponent<TextComponent>();
+	money->SetText("+ " + std::to_string(bossRewardPresentationMoney_) + " G");
+	money->SetColor({1.0f, 0.86f, 0.28f, 1.0f});
+	bossRewardMoneyTextObject_->GetTransform().translate = {screenWidth * 0.5f, screenHeight * 0.72f, 0.0f};
+	bossRewardMoneyTextObject_->Draw2D();
+
+	TextComponent* instruction = bossRewardInstructionTextObject_->GetComponent<TextComponent>();
+	instruction->SetText(bossRewardPresentationReady_ ? "Space / Pad A: Continue" : "Opening reward...");
+	instruction->SetColor({0.92f, 0.92f, 1.0f, bossRewardPresentationReady_ ? 0.65f + 0.35f * pulse : 0.7f});
+	bossRewardInstructionTextObject_->GetTransform().translate = {screenWidth * 0.5f, screenHeight * 0.84f, 0.0f};
+	bossRewardInstructionTextObject_->Draw2D();
 }
 
 

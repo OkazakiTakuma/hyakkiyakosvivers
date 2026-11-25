@@ -1,7 +1,7 @@
 #pragma once
-#include "core/Component.h"
-#include "core/GameObject.h"
-#include "../../../../Player/Player.h"
+#include "core/EntityComponent.h"
+#include "core/Entity.h"
+#include "../../../../Player/PlayerComponent.h"
 
 /// <summary>敵が落とす特殊アイテムの種類です。</summary>
 enum class ItemDropType {
@@ -14,11 +14,11 @@ enum class ItemDropType {
 };
 
 /// <summary>特殊アイテムの接触回収と、プレイヤーへ直接作用する効果を管理します。</summary>
-class ItemDropComponent : public Component {
+class ItemDropComponent : public EntityComponent {
 public:
 	/// <summary>プレイヤーとの距離に応じて待機、吸着、回収を切り替えます。</summary>
 	void Update() override {
-		GameObject* owner = GetOwner();
+		Entity* owner = GetOwner();
 		if (!owner || !target_ || collected_) {
 			return;
 		}
@@ -36,7 +36,7 @@ public:
 			return;
 		}
 
-		Player* player = target_->GetComponent<Player>();
+		PlayerComponent* player = target_->GetComponent<PlayerComponent>();
 		if (!player) {
 			return;
 		}
@@ -51,8 +51,8 @@ public:
 
 	void SetType(ItemDropType type) { type_ = type; }
 	ItemDropType GetType() const { return type_; }
-	void SetTarget(GameObject* target) { target_ = target; }
-	GameObject* GetTarget() const { return target_; }
+	void SetTarget(Entity* target) { target_ = target; }
+	Entity* GetTarget() const { return target_; }
 	void SetHealAmount(float amount) { healAmount_ = amount < 0.0f ? 0.0f : amount; }
 	float GetHealAmount() const { return healAmount_; }
 	void SetMoneyAmount(int amount) { moneyAmount_ = amount < 0 ? 0 : amount; }
@@ -71,7 +71,7 @@ private:
 	/// <summary>回収時に発動する効果の種類です。</summary>
 	ItemDropType type_ = ItemDropType::Health;
 	/// <summary>吸着および回収対象となるプレイヤーへの非所有参照です。</summary>
-	GameObject* target_ = nullptr;
+	Entity* target_ = nullptr;
 	/// <summary>Healthタイプを回収した際のHP回復量です。</summary>
 	float healAmount_ = 25.0f;
 	/// <summary>Moneyタイプを回収した時に加算する金額です。</summary>

@@ -8,6 +8,7 @@
 #include <wrl.h>
 #include <d3d12.h>
 #include <unordered_map>
+#include <utility>
 
 /// <summary>
 /// テクスチャの読み込み、GPUリソース、SRVとファイルパスの対応を一元管理します。
@@ -15,6 +16,27 @@
 /// </summary>
 class TextureManager {
 public:
+	/// <summary>UIインスタンスと同じ寿命で実行時テクスチャを解放するムーブ専用ハンドルです。</summary>
+	class RuntimeTextureHandle {
+	public:
+		RuntimeTextureHandle() = default;
+		~RuntimeTextureHandle() { Reset(); }
+		RuntimeTextureHandle(const RuntimeTextureHandle&) = delete;
+		RuntimeTextureHandle& operator=(const RuntimeTextureHandle&) = delete;
+		RuntimeTextureHandle(RuntimeTextureHandle&& other) noexcept;
+		RuntimeTextureHandle& operator=(RuntimeTextureHandle&& other) noexcept;
+		void Reset();
+		bool IsValid() const { return owner_ != nullptr; }
+		const std::string& GetKey() const { return key_; }
+
+	private:
+		friend class TextureManager;
+		RuntimeTextureHandle(TextureManager* owner, std::string key)
+			: owner_(owner), key_(std::move(key)) {}
+		TextureManager* owner_ = nullptr;
+		std::string key_;
+	};
+
 	/// <summary>
 	/// 共有インスタンスを取得します。
 	/// </summary>
@@ -41,6 +63,9 @@ public:
 	/// <param name="height">テクスチャの高さです。</param>
 	/// <param name="pixels">1ピクセル4バイトのRGBAデータです。</param>
 	void CreateTextureFromRGBA(const std::string& key, uint32_t width, uint32_t height, const std::vector<uint8_t>& pixels);
+	/// <summary>呼び出し元の寿命に追従する実行時テクスチャを生成します。</summary>
+	RuntimeTextureHandle CreateOwnedTextureFromRGBA(
+		const std::string& key, uint32_t width, uint32_t height, const std::vector<uint8_t>& pixels);
 	/// <summary>
 	/// 登録済みのSRVを維持したまま、ファイルからGPUリソースを再作成します。
 	/// </summary>
@@ -92,7 +117,9 @@ private:
 	/// <summary>画像を読み込み、必要に応じてミップマップを生成します。</summary>
 	bool LoadTextureImage(const std::string& filepath, DirectX::ScratchImage& mipImages) const;
 	/// <summary>テクスチャ用SRVを1つ確保し、CPU/GPUハンドルを保存します。</summary>
-	void AllocateSrv(TextureData& textureData) const;
+	bool AllocateSrv(TextureData& textureData) const;
+	/// <summary>所有ハンドルから返却された実行時テクスチャとSRVを安全に解放します。</summary>
+	void ReleaseOwnedTexture(const std::string& key);
 	/// <summary>メタデータに合わせたSRVを、確保済みディスクリプタへ作成します。</summary>
 	void CreateSrv(const TextureData& textureData) const;
 	/// <summary>画像をGPUへ転送し、描画可能なリソース状態へ遷移させます。</summary>

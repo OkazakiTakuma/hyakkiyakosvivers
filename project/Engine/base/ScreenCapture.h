@@ -17,7 +17,8 @@ struct IMFSinkWriter;
 /// </summary>
 class ScreenCapture {
 public:
-	ScreenCapture() = default;
+	// IMFSinkWriter の完全型を参照できる実装ファイル側で生成処理を定義する。
+	ScreenCapture();
 	~ScreenCapture();
 
 	/// <summary>次に処理する完成フレームを PNG として保存するよう予約します。</summary>

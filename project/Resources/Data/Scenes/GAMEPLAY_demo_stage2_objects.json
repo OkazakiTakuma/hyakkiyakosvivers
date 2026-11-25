@@ -1,0 +1,18 @@
+{
+    "extends": "GAMEPLAY_stage2_objects.json",
+    "objectOverrides": [
+        {
+            "name": "EnemySpawnPoint_8",
+            "enemySpawnPoint": {
+                "enabled": false,
+                "spawnEnabled": false
+            }
+        },
+        {
+            "name": "勾玉_653",
+            "particleEmitter": {
+                "enabled": false
+            }
+        }
+    ]
+}

@@ -1,19 +1,19 @@
 #pragma once
 
 #include "base_scene/BaseScene.h"
+#include "DemoSceneControl.h"
 
 /// <summary>左側の3Dモデルと右側の能力・初期武器情報からプレイヤーを選択します。</summary>
-class PlayerSelectScene : public BaseScene {
+class PlayerSelectScene : public BaseScene, public IDemoPlayerSelectionControl {
 public:
 	void Initialize() override;
 	void Update() override;
 	void Draw2D() override;
 	void Draw3D() override;
 	void Finalize() override;
-	void SetSceneManager(SceneManager* manager) override { sceneManager_ = manager; }
 	bool IsParticleRenderingEnabled() const override { return false; }
 	/// <summary>指定キャラクターを選び、通常の決定操作と同じ確定演出をデモ進行から開始します。</summary>
-	bool BeginDemoPlayerConfirmation(const std::string& playerTypeName);
+	bool BeginDemoPlayerConfirmation(const std::string& playerTypeName) override;
 
 private:
 	/// <summary>左右2カラムのパネル、見出し、操作案内を生成します。</summary>
@@ -35,8 +35,6 @@ private:
 	/// <summary>右下の初期武器パネルへ表示する文字列を生成します。</summary>
 	std::string MakeWeaponDescription(const PlayerStats& stats) const;
 
-	/// <summary>決定したタイプの保存、開放状態の確認、シーン遷移に使用します。</summary>
-	SceneManager* sceneManager_ = nullptr;
 	/// <summary>Defaultを除いた、画面上で選択できるプレイヤータイプ一覧です。</summary>
 	std::vector<std::string> playerTypeNames_;
 	/// <summary>入力で現在フォーカスしているタイプの位置です。</summary>
@@ -49,12 +47,13 @@ private:
 	bool isSelectionConfirming_ = false;
 	float selectionConfirmationElapsed_ = 0.0f;
 	EulerTransform selectionConfirmationBaseTransform_{};
-	/// <summary>登場モーションを選ぶため、現在表示しているプレイヤータイプ名を保持します。</summary>
-	std::string presentedPlayerTypeName_;
+	/// <summary>現在表示中の登場演出スタイルと、その再生時間です。</summary>
+	std::string entrancePresentationStyle_ = "pop";
+	float entrancePresentationDuration_ = 1.2f;
 	/// <summary>選択画面だけで使う3Dプレビュー用カメラです。</summary>
 	std::unique_ptr<Camera> previewCamera_;
 	/// <summary>選択中キャラクターの3D表示を所有します。</summary>
-	std::unique_ptr<GameObject> characterModelObject_;
+	std::unique_ptr<Entity> characterModelObject_;
 
 	// 左のモデル領域と右の詳細領域を構成する単色パネルです。
 	std::unique_ptr<Sprite> backgroundSprite_;
@@ -67,14 +66,14 @@ private:
 	std::unique_ptr<Sprite> weaponIconSprite_;
 	std::unique_ptr<Sprite> confirmationFlashSprite_;
 	// キャラクター名、能力、武器詳細、操作案内を描画する文字オブジェクトです。
-	std::unique_ptr<GameObject> titleTextObject_;
-	std::unique_ptr<GameObject> characterNameTextObject_;
-	std::unique_ptr<GameObject> characterStateTextObject_;
-	std::unique_ptr<GameObject> statusHeadingTextObject_;
-	std::unique_ptr<GameObject> statusTextObject_;
-	std::unique_ptr<GameObject> weaponHeadingTextObject_;
-	std::unique_ptr<GameObject> weaponNameTextObject_;
-	std::unique_ptr<GameObject> weaponTextObject_;
-	std::unique_ptr<GameObject> pageTextObject_;
-	std::unique_ptr<GameObject> instructionTextObject_;
+	std::unique_ptr<Entity> titleTextObject_;
+	std::unique_ptr<Entity> characterNameTextObject_;
+	std::unique_ptr<Entity> characterStateTextObject_;
+	std::unique_ptr<Entity> statusHeadingTextObject_;
+	std::unique_ptr<Entity> statusTextObject_;
+	std::unique_ptr<Entity> weaponHeadingTextObject_;
+	std::unique_ptr<Entity> weaponNameTextObject_;
+	std::unique_ptr<Entity> weaponTextObject_;
+	std::unique_ptr<Entity> pageTextObject_;
+	std::unique_ptr<Entity> instructionTextObject_;
 };

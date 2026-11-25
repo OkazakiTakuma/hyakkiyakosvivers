@@ -8,6 +8,29 @@ using namespace StringUtility;
 
 uint32_t TextureManager::kSRVIndexTop = 1;
 
+TextureManager::RuntimeTextureHandle::RuntimeTextureHandle(RuntimeTextureHandle&& other) noexcept
+	: owner_(other.owner_), key_(std::move(other.key_)) {
+	other.owner_ = nullptr;
+}
+
+TextureManager::RuntimeTextureHandle& TextureManager::RuntimeTextureHandle::operator=(RuntimeTextureHandle&& other) noexcept {
+	if (this != &other) {
+		Reset();
+		owner_ = other.owner_;
+		key_ = std::move(other.key_);
+		other.owner_ = nullptr;
+	}
+	return *this;
+}
+
+void TextureManager::RuntimeTextureHandle::Reset() {
+	if (owner_) {
+		owner_->ReleaseOwnedTexture(key_);
+		owner_ = nullptr;
+		key_.clear();
+	}
+}
+
 /// <summary>
 /// 必要なリソースを準備し、オブジェクトを初期化します。
 /// </summary>
@@ -61,12 +84,15 @@ bool TextureManager::LoadTextureImage(const std::string& filepath, DirectX::Scra
 	return SUCCEEDED(hr);
 }
 
-void TextureManager::AllocateSrv(TextureData& textureData) const {
+bool TextureManager::AllocateSrv(TextureData& textureData) const {
 	SrvManager* srvManager = SrvManager::GetInstance();
 	// 同じインデックスからCPU用・GPU用の両ハンドルを取得して対応を保つ。
-	textureData.srvIndex = srvManager->Allocate();
+	if (!srvManager->TryAllocate(textureData.srvIndex)) {
+		return false;
+	}
 	textureData.srvHandleCPU = srvManager->GetCPUDescriptorHandle(textureData.srvIndex);
 	textureData.srvHandleGPU = srvManager->GetGPUDescriptorHandle(textureData.srvIndex);
+	return true;
 }
 
 void TextureManager::CreateSrv(const TextureData& textureData) const {
@@ -118,7 +144,10 @@ bool TextureManager::LoadTexture(const std::string& filepath) {
 	TextureData& textureData = textureDatas[filepath];
 	textureData.metadata = mipImages.GetMetadata();
 	textureData.resource = dxCommon_->CreateTextureResource(textureData.metadata);
-	AllocateSrv(textureData);
+	if (!AllocateSrv(textureData)) {
+		textureDatas.erase(filepath);
+		return false;
+	}
 	CreateSrv(textureData);
 	UploadAndTransition(textureData, mipImages);
 	return true;
@@ -143,7 +172,10 @@ void TextureManager::CreateTextureFromRGBA(const std::string& key, uint32_t widt
 		TextureData& textureData = textureDatas[key];
 		textureData.metadata = image.GetMetadata();
 		textureData.resource = dxCommon_->CreateTextureResource(textureData.metadata);
-		AllocateSrv(textureData);
+		if (!AllocateSrv(textureData)) {
+			textureDatas.erase(key);
+			return;
+		}
 		CreateSrv(textureData);
 		UploadAndTransition(textureData, image);
 		return;
@@ -156,6 +188,29 @@ void TextureManager::CreateTextureFromRGBA(const std::string& key, uint32_t widt
 	CreateSrv(replacement);
 	UploadAndTransition(replacement, image);
 	textureIt->second = std::move(replacement);
+}
+
+TextureManager::RuntimeTextureHandle TextureManager::CreateOwnedTextureFromRGBA(
+	const std::string& key, uint32_t width, uint32_t height, const std::vector<uint8_t>& pixels) {
+	// 所有キーの重複は二重解放につながるため、新規生成時だけハンドルを発行する。
+	if (textureDatas.contains(key)) {
+		return {};
+	}
+	CreateTextureFromRGBA(key, width, height, pixels);
+	return textureDatas.contains(key) ? RuntimeTextureHandle(this, key) : RuntimeTextureHandle{};
+}
+
+void TextureManager::ReleaseOwnedTexture(const std::string& key) {
+	auto textureIt = textureDatas.find(key);
+	if (textureIt == textureDatas.end()) {
+		return;
+	}
+	// 描画中のSRVを即再利用しないようGPU完了を待ってから、リソースと番号をまとめて返却する。
+	if (dxCommon_) {
+		dxCommon_->FlushGPU();
+	}
+	SrvManager::GetInstance()->Release(textureIt->second.srvIndex);
+	textureDatas.erase(textureIt);
 }
 
 bool TextureManager::ReloadTexture(const std::string& filepath) {

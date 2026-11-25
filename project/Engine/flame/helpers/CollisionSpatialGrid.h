@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../collision/CollisionPrimitive.h"
-#include "core/GameObject.h"
+#include "core/Entity.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -32,7 +32,7 @@ public:
 	}
 
 	/// <summary>指定範囲と重なるすべてのセルへオブジェクトを登録します。</summary>
-	void Insert(GameObject* object, const Bounds& sourceBounds) {
+	void Insert(Entity* object, const Bounds& sourceBounds) {
 		if (!object) {
 			return;
 		}
@@ -49,12 +49,12 @@ public:
 	}
 
 	/// <summary>指定範囲が触れるセルから候補を取得します。同じオブジェクトは一度だけ返します。</summary>
-	std::vector<GameObject*> Query(const Bounds& sourceBounds) const {
+	std::vector<Entity*> Query(const Bounds& sourceBounds) const {
 		const Bounds bounds = NormalizeBounds(sourceBounds);
 		const CellCoordinate minimum = ToCell(bounds.minX, bounds.minZ);
 		const CellCoordinate maximum = ToCell(bounds.maxX, bounds.maxZ);
-		std::vector<GameObject*> result;
-		std::unordered_set<GameObject*> visited;
+		std::vector<Entity*> result;
+		std::unordered_set<Entity*> visited;
 
 		for (int z = minimum.z; z <= maximum.z; ++z) {
 			for (int x = minimum.x; x <= maximum.x; ++x) {
@@ -62,7 +62,7 @@ public:
 				if (cell == cells_.end()) {
 					continue;
 				}
-				for (GameObject* object : cell->second) {
+				for (Entity* object : cell->second) {
 					if (visited.insert(object).second) {
 						result.push_back(object);
 					}
@@ -161,5 +161,5 @@ private:
 
 	float cellSize_ = 10.0f;
 	size_t entryCount_ = 0;
-	std::unordered_map<CellCoordinate, std::vector<GameObject*>, CellCoordinateHash> cells_;
+	std::unordered_map<CellCoordinate, std::vector<Entity*>, CellCoordinateHash> cells_;
 };

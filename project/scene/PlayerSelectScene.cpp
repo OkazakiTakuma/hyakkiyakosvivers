@@ -1,6 +1,7 @@
 #include "PlayerSelectScene.h"
 
 #include "SceneManager.h"
+#include "data/PlayerAttackLevel.h"
 #include "helpers/SceneUiUtility.h"
 #include "repositories/PlayerStatusRepository.h"
 #include <model/ModelManager.h>
@@ -31,7 +32,7 @@ float SmoothStep(float value) {
 	return value * value * (3.0f - 2.0f * value);
 }
 
-std::unique_ptr<GameObject> CreateTextObject(
+std::unique_ptr<Entity> CreateTextObject(
 	const std::string& text, float fontSize, TextComponent::Anchor anchor = TextComponent::Anchor::Center) {
 	return SceneUiUtility::CreateTextObject(text, fontSize, anchor, kUiFontName);
 }
@@ -47,28 +48,6 @@ const PlayerAttackLevelStats* FindAttackLevel(const PlayerAttackStats& attack, c
 	return attack.levels.empty() ? nullptr : &attack.levels.front();
 }
 
-std::string GetModelDirectory(const std::string& modelFilePath) {
-	// 現在のモデル配置規則に合わせ、ファイル名から読込元ディレクトリを解決する。
-	if (modelFilePath == "miko.gltf") return "/human";
-	if (modelFilePath == "neko.gltf") return "/cat";
-	if (modelFilePath == "doppelganger.gltf") return "/doppelganger";
-	return "/";
-}
-
-std::string GetEntranceAnimationName(const std::string& playerTypeName) {
-	if (playerTypeName == "巫女") return "選択登場_巫女";
-	if (playerTypeName == "烏天狗") return "選択登場_烏天狗";
-	if (playerTypeName == "猫") return "選択登場_猫";
-	return "";
-}
-
-float GetEntranceAnimationDuration(const std::string& playerTypeName) {
-	// bin内の専用クリップと同じ長さにし、骨格と画面内移動を同時に決めポーズへ到達させる。
-	if (playerTypeName == "巫女") return 1.60f;
-	if (playerTypeName == "烏天狗") return 1.45f;
-	if (playerTypeName == "猫") return 1.75f;
-	return 1.20f;
-}
 }
 
 void PlayerSelectScene::Initialize() {
@@ -103,11 +82,12 @@ void PlayerSelectScene::Initialize() {
 }
 
 void PlayerSelectScene::CreateUi() {
-	// 画像素材に依存しない単色パネルを個別に所有し、描画順と透明度を制御する。
+	// モデル領域は墨色、詳細領域は御札として描き分ける。
 	backgroundSprite_ = CreateColorSprite();
 	modelPanelSprite_ = CreateColorSprite();
 	modelPanelAccentSprite_ = CreateColorSprite();
-	detailPanelSprite_ = CreateColorSprite();
+	detailPanelSprite_ = std::make_unique<Sprite>();
+	detailPanelSprite_->Initialize("Resources/UI/World/level_up_ofuda_card.png");
 	statusPanelSprite_ = CreateColorSprite();
 	weaponPanelSprite_ = CreateColorSprite();
 	weaponIconBackgroundSprite_ = CreateColorSprite();
@@ -117,19 +97,23 @@ void PlayerSelectScene::CreateUi() {
 	weaponIconSprite_->SetAnchorPoint({0.5f, 0.5f});
 	confirmationFlashSprite_ = CreateColorSprite();
 
-	titleTextObject_ = CreateTextObject("キャラクター選択", 42.0f);
-	characterNameTextObject_ = CreateTextObject("", 40.0f);
+	titleTextObject_ = SceneUiUtility::CreateHeadingText("御使い選び", 42.0f, {1.0f, 1.0f, 1.0f, 1.0f}, DWRITE_FONT_WEIGHT_EXTRA_BOLD);
+	characterNameTextObject_ = SceneUiUtility::CreateHeadingText("", 40.0f, {1.0f, 1.0f, 1.0f, 1.0f});
 	characterStateTextObject_ = CreateTextObject("", 20.0f);
-	statusHeadingTextObject_ = CreateTextObject("STATUS", 20.0f, TextComponent::Anchor::TopLeft);
+	statusHeadingTextObject_ = CreateTextObject("御身の力", 20.0f, TextComponent::Anchor::TopLeft);
 	statusTextObject_ = CreateTextObject("", 22.0f, TextComponent::Anchor::TopLeft);
-	weaponHeadingTextObject_ = CreateTextObject("INITIAL WEAPON", 20.0f, TextComponent::Anchor::TopLeft);
+	weaponHeadingTextObject_ = CreateTextObject("初期武器", 20.0f, TextComponent::Anchor::TopLeft);
 	weaponNameTextObject_ = CreateTextObject("", 27.0f, TextComponent::Anchor::TopLeft);
 	weaponTextObject_ = CreateTextObject("", 18.0f, TextComponent::Anchor::TopLeft);
 	pageTextObject_ = CreateTextObject("", 18.0f);
 	instructionTextObject_ = CreateTextObject("A / D・左右キー・Pad左右: 選択    Enter・Pad A: 決定    Q・Pad B: 戻る", 18.0f);
-	statusHeadingTextObject_->GetComponent<TextComponent>()->SetColor({0.35f, 0.78f, 1.0f, 1.0f});
-	weaponHeadingTextObject_->GetComponent<TextComponent>()->SetColor({1.0f, 0.74f, 0.24f, 1.0f});
-	instructionTextObject_->GetComponent<TextComponent>()->SetColor({0.68f, 0.75f, 0.86f, 1.0f});
+	titleTextObject_->GetComponent<TextComponent>()->SetColor({0.98f, 0.84f, 0.52f, 1.0f});
+	statusHeadingTextObject_->GetComponent<TextComponent>()->SetColor({0.56f, 0.08f, 0.04f, 1.0f});
+	weaponHeadingTextObject_->GetComponent<TextComponent>()->SetColor({0.56f, 0.08f, 0.04f, 1.0f});
+	statusTextObject_->GetComponent<TextComponent>()->SetColor({0.16f, 0.13f, 0.10f, 1.0f});
+	weaponNameTextObject_->GetComponent<TextComponent>()->SetColor({0.34f, 0.07f, 0.035f, 1.0f});
+	weaponTextObject_->GetComponent<TextComponent>()->SetColor({0.16f, 0.13f, 0.10f, 1.0f});
+	instructionTextObject_->GetComponent<TextComponent>()->SetColor({0.86f, 0.78f, 0.64f, 1.0f});
 }
 
 void PlayerSelectScene::RefreshSelectionPresentation() {
@@ -145,16 +129,18 @@ void PlayerSelectScene::RefreshSelectionPresentation() {
 	statusTextObject_->GetComponent<TextComponent>()->SetText(unlocked ? MakeStatusDescription(stats) : "？？？\n\n未開放のため能力は表示されません");
 
 	if (unlocked) {
-		characterStateTextObject_->GetComponent<TextComponent>()->SetText("◀  SELECTED  ▶");
-		characterStateTextObject_->GetComponent<TextComponent>()->SetColor({0.42f, 0.82f, 1.0f, 1.0f});
-		weaponNameTextObject_->GetComponent<TextComponent>()->SetText(stats.attackSlots[0].attackName);
+		characterStateTextObject_->GetComponent<TextComponent>()->SetText("◀  選択中  ▶");
+		characterStateTextObject_->GetComponent<TextComponent>()->SetColor({0.98f, 0.65f, 0.20f, 1.0f});
+		const PlayerAttackStats attack = LoadPlayerAttackStats(stats.attackSlots[0].attackName);
+		weaponNameTextObject_->GetComponent<TextComponent>()->SetText(
+			attack.GetDisplayName(PlayerAttackLevel::IsSuper(stats.attackSlots[0].attackLevel)));
 		weaponTextObject_->GetComponent<TextComponent>()->SetText(MakeWeaponDescription(stats));
 	} else {
 		// 未開放キャラクターは数値を伏せ、解除条件だけをプレイヤーへ案内する。
 		std::string prerequisite = sceneManager_ ? sceneManager_->GetPlayerUnlockPrerequisiteStage(stats.name) : "";
 		const std::string prerequisiteId = prerequisite;
 		if (sceneManager_) prerequisite = sceneManager_->GetGameplayStageDisplayName(prerequisite);
-		if (prerequisiteId != "default") {
+		if (prerequisiteId != "default" && prerequisiteId != "stage2") {
 			std::transform(prerequisite.begin(), prerequisite.end(), prerequisite.begin(), [](unsigned char character) { return static_cast<char>(std::toupper(character)); });
 		}
 		characterStateTextObject_->GetComponent<TextComponent>()->SetText("LOCKED  /  " + prerequisite + "クリアで開放");
@@ -171,21 +157,25 @@ void PlayerSelectScene::RefreshSelectionPresentation() {
 	if (iconPath.empty() && level) iconPath = level->choiceTextureFilePath;
 	if (iconPath.empty() || !std::filesystem::exists(iconPath)) iconPath = "Resources/circle.png";
 	weaponIconSprite_->SetTexture(iconPath);
-	weaponIconSprite_->SetColor(unlocked ? Vector4{1.0f, 0.72f, 0.24f, 1.0f} : Vector4{0.30f, 0.32f, 0.36f, 1.0f});
+	// 武器ごとの演出色をアイコンでも維持し、未開放時だけグレーへ落とす。
+	weaponIconSprite_->SetColor(unlocked ? Vector4{1.0f, 1.0f, 1.0f, 1.0f} : Vector4{0.30f, 0.32f, 0.36f, 1.0f});
 	RebuildCharacterModel(stats);
 }
 
 void PlayerSelectScene::RebuildCharacterModel(const PlayerStats& stats) {
 	// 選択変更時は旧モデルを破棄し、共有ModelManagerから新しい表示モデルを参照する。
 	characterModelObject_.reset();
-	presentedPlayerTypeName_ = stats.name;
+	// 骨格アニメーションと画面内移動を同期する設定を、表示中モデルと一緒に保持する。
+	entrancePresentationStyle_ = stats.entrancePresentationStyle;
+	entrancePresentationDuration_ = stats.selectionEntranceDuration;
 	if (stats.modelFilePath.empty()) return;
 	if (!ModelManager::GetInstance()->FindModel(stats.modelFilePath)) {
-		ModelManager::GetInstance()->LoadModel(stats.modelFilePath, stats.isAnimationModel, GetModelDirectory(stats.modelFilePath));
+		// ファイル名から配置場所を推測せず、プレイヤー定義に保存されたディレクトリを使用する。
+		ModelManager::GetInstance()->LoadModel(stats.modelFilePath, stats.isAnimationModel, stats.modelDirectory);
 	}
 	if (!ModelManager::GetInstance()->FindModel(stats.modelFilePath)) return;
 
-	characterModelObject_ = std::make_unique<GameObject>();
+	characterModelObject_ = std::make_unique<Entity>();
 	characterModelObject_->SetName("PlayerSelectPreview");
 	EulerTransform& transform = characterModelObject_->GetTransform();
 	// UIの左カラム中央へ見えるよう、カメラ正面より左へモデルを配置する。
@@ -197,7 +187,8 @@ void PlayerSelectScene::RebuildCharacterModel(const PlayerStats& stats) {
 	object3d->SetCamera(previewCamera_.get());
 	object3d->SetDrawSkeleton(false);
 	// セレクト画面では歩行を使わず、新規の専用クリップだけを一度再生して決めポーズを維持する。
-	const std::string expectedEntranceAnimationName = GetEntranceAnimationName(stats.name);
+	// プレイヤー定義のクリップ名を参照し、タイプ名を増やしてもコード変更を不要にする。
+	const std::string& expectedEntranceAnimationName = stats.selectionEntranceAnimationName;
 	std::string resolvedEntranceAnimationName;
 	if (stats.isAnimationModel) {
 		const std::vector<std::string>& animationNames = object3d->GetAnimationNames();
@@ -229,25 +220,25 @@ void PlayerSelectScene::UpdateCharacterEntranceAnimation() {
 	transform.rotate = {0.0f, kPreviewBaseRotationY, 0.0f};
 	transform.scale = {kPreviewBaseScale, kPreviewBaseScale, kPreviewBaseScale};
 
-	const float entranceDuration = GetEntranceAnimationDuration(presentedPlayerTypeName_);
+	const float entranceDuration = entrancePresentationDuration_;
 	const float normalizedTime = (std::min)(previewTime_ / entranceDuration, 1.0f);
 	const float remaining = 1.0f - normalizedTime;
 
-	if (presentedPlayerTypeName_ == "巫女") {
+	if (entrancePresentationStyle_ == "shrine_descent") {
 		// 巫女は上方から静かに降り、正面へ向き直りながら着地する。
 		const float progress = SmoothStep(normalizedTime);
 		transform.translate.y += remaining * 2.15f;
 		transform.rotate.y += remaining * 0.58f;
 		const float scale = kPreviewBaseScale * (0.84f + progress * 0.16f);
 		transform.scale = {scale, scale, scale};
-	} else if (presentedPlayerTypeName_ == "烏天狗") {
+	} else if (entrancePresentationStyle_ == "aerial_dash") {
 		// 烏天狗は左奥から一気に飛び込み、鋭く正面へ旋回する。
 		const float progress = EaseOutCubic(normalizedTime);
 		transform.translate.x -= (1.0f - progress) * 3.4f;
 		transform.translate.y += (1.0f - progress) * 0.55f;
 		transform.translate.z += (1.0f - progress) * 0.9f;
 		transform.rotate.y -= (1.0f - progress) * 1.15f;
-	} else if (presentedPlayerTypeName_ == "猫") {
+	} else if (entrancePresentationStyle_ == "cat_jump") {
 		// 猫は右下から弧を描いて跳び込み、空中で伸びてから着地時の大きさへ戻る。
 		const float progress = EaseOutCubic(normalizedTime);
 		const float jumpArc = std::sin(normalizedTime * kPi);
@@ -278,6 +269,16 @@ std::string PlayerSelectScene::MakeStatusDescription(const PlayerStats& stats) c
 	       << "\n移動速度                   " << std::fixed << std::setprecision(2) << stats.baseSpeed * stats.speed / 100.0f
 	       << "\n攻撃速度                   " << static_cast<int>(stats.attackSpeed) << "%"
 	       << "\n攻撃サイズ                 " << static_cast<int>(stats.attackSize) << "%";
+	if (stats.name == "巫女") {
+		stream << "\n\n特性: 五の祝福"
+		       << "\n5レベルごとに追加のレベルアップ報酬を1つ獲得";
+	} else if (stats.name == "猫") {
+		stream << "\n\n特性: 猫の間合い"
+		       << "\n爪の間合い内は2倍、遠距離では最大0.5倍";
+	} else if (stats.name == "烏天狗") {
+		stream << "\n\n特性: 疾風"
+		       << "\nレベルごとに速度+1%、速度10ごとに与ダメージ+1%";
+	}
 	return stream.str();
 }
 
@@ -289,7 +290,8 @@ std::string PlayerSelectScene::MakeWeaponDescription(const PlayerStats& stats) c
 	stream << (level->choiceDescription.empty() ? "初期装備として使用する攻撃です" : level->choiceDescription)
 	       << "\n\n威力  " << static_cast<int>(level->attack)
 	       << "    発射数  " << level->shotCount
-	       << "    間隔  " << std::fixed << std::setprecision(2) << level->attackInterval << "秒";
+	       << "    間隔  " << std::fixed << std::setprecision(2) << level->attackInterval << "秒"
+	       << "    ノックバック  " << level->knockback;
 	return stream.str();
 }
 
@@ -402,26 +404,29 @@ void PlayerSelectScene::Draw2D() {
 	const float rightWidth = width - margin - rightX;
 
 	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
-	DrawColorSprite(backgroundSprite_.get(), 0.0f, 0.0f, width, height, {0.018f, 0.028f, 0.055f, 0.46f});
-	DrawColorSprite(modelPanelSprite_.get(), margin, top, leftWidth, contentHeight, {0.025f, 0.075f, 0.13f, 0.28f});
-	DrawColorSprite(modelPanelAccentSprite_.get(), margin, top, 5.0f, contentHeight, {0.22f, 0.70f, 1.0f, 0.92f});
-	DrawColorSprite(detailPanelSprite_.get(), rightX, top, rightWidth, contentHeight, {0.035f, 0.055f, 0.095f, 0.96f});
+	DrawColorSprite(backgroundSprite_.get(), 0.0f, 0.0f, width, height, {0.025f, 0.008f, 0.030f, 0.58f});
+	DrawColorSprite(modelPanelSprite_.get(), margin, top, leftWidth, contentHeight, {0.055f, 0.025f, 0.035f, 0.52f});
+	DrawColorSprite(modelPanelAccentSprite_.get(), margin, top, 5.0f, contentHeight, {0.74f, 0.08f, 0.04f, 0.96f});
+	DrawColorSprite(detailPanelSprite_.get(), rightX, top, rightWidth, contentHeight, {1.0f, 0.98f, 0.90f, 1.0f});
 
 	// 右カラムを能力欄と初期武器欄へ縦に分割する。
 	const float innerMargin = 25.0f;
 	const float sectionWidth = rightWidth - innerMargin * 2.0f;
-	const float statusY = top + 58.0f;
+	// 御札上下の朱模様を避けつつ、低い解像度では本文領域を優先して余白を縮める。
+	const float paperTopInset = (std::clamp)(contentHeight * 0.13f, 58.0f, 84.0f);
+	const float paperBottomInset = (std::clamp)(contentHeight * 0.08f, 20.0f, 42.0f);
+	const float statusY = top + paperTopInset;
 	const float statusHeight = contentHeight * 0.45f;
 	const float weaponY = statusY + statusHeight + 18.0f;
-	const float weaponHeight = bottom - weaponY - 20.0f;
-	DrawColorSprite(statusPanelSprite_.get(), rightX + innerMargin, statusY, sectionWidth, statusHeight, {0.045f, 0.095f, 0.145f, 0.96f});
-	DrawColorSprite(weaponPanelSprite_.get(), rightX + innerMargin, weaponY, sectionWidth, weaponHeight, {0.12f, 0.075f, 0.035f, 0.96f});
+	const float weaponHeight = bottom - weaponY - paperBottomInset;
+	DrawColorSprite(statusPanelSprite_.get(), rightX + innerMargin, statusY, sectionWidth, statusHeight, {0.36f, 0.20f, 0.09f, 0.10f});
+	DrawColorSprite(weaponPanelSprite_.get(), rightX + innerMargin, weaponY, sectionWidth, weaponHeight, {0.62f, 0.10f, 0.045f, 0.10f});
 
 	// 武器欄の高さが小さい解像度では、枠内に収まるようアイコンも縮小する。
-	const float iconSize = (std::min)({96.0f, weaponHeight - 34.0f, sectionWidth * 0.24f});
+	const float iconSize = (std::max)(1.0f, (std::min)({96.0f, weaponHeight - 34.0f, sectionWidth * 0.24f}));
 	const float iconX = rightX + innerMargin + 18.0f;
 	const float iconY = weaponY + (weaponHeight - iconSize) * 0.5f;
-	DrawColorSprite(weaponIconBackgroundSprite_.get(), iconX, iconY, iconSize, iconSize, {0.035f, 0.045f, 0.070f, 1.0f});
+	DrawColorSprite(weaponIconBackgroundSprite_.get(), iconX, iconY, iconSize, iconSize, {0.18f, 0.07f, 0.035f, 0.92f});
 	EulerTransform iconTransform = weaponIconSprite_->GetTransform();
 	iconTransform.translate = {iconX + iconSize * 0.5f, iconY + iconSize * 0.5f, 0.0f};
 	weaponIconSprite_->SetTransform(iconTransform);
@@ -432,11 +437,14 @@ void PlayerSelectScene::Draw2D() {
 	titleTextObject_->GetTransform().translate = {width * 0.5f, 52.0f, 0.0f};
 	characterNameTextObject_->GetTransform().translate = {margin + leftWidth * 0.5f, top + 45.0f, 0.0f};
 	characterStateTextObject_->GetTransform().translate = {margin + leftWidth * 0.5f, bottom - 46.0f, 0.0f};
-	statusHeadingTextObject_->GetTransform().translate = {rightX + innerMargin + 18.0f, top + 31.0f, 0.0f};
-	statusTextObject_->GetTransform().translate = {rightX + innerMargin + 22.0f, statusY + 26.0f, 0.0f};
-	weaponHeadingTextObject_->GetTransform().translate = {rightX + innerMargin + 18.0f, weaponY - 11.0f, 0.0f};
-	weaponNameTextObject_->GetTransform().translate = {iconX + iconSize + 20.0f, weaponY + 30.0f, 0.0f};
-	weaponTextObject_->GetTransform().translate = {iconX + iconSize + 20.0f, weaponY + 72.0f, 0.0f};
+	constexpr float kDescriptionTextOffsetX = 10.0f;
+	statusHeadingTextObject_->GetTransform().translate = {rightX + innerMargin + 18.0f + kDescriptionTextOffsetX, statusY + 9.0f, 0.0f};
+	statusTextObject_->GetTransform().translate = {rightX + innerMargin + 22.0f + kDescriptionTextOffsetX, statusY + 40.0f, 0.0f};
+	statusTextObject_->GetComponent<TextComponent>()->SetLayoutBounds(
+		(std::max)(1.0f, sectionWidth - 44.0f - kDescriptionTextOffsetX), (std::max)(1.0f, statusHeight - 52.0f));
+	weaponHeadingTextObject_->GetTransform().translate = {rightX + innerMargin + 18.0f + kDescriptionTextOffsetX, weaponY - 27.0f, 0.0f};
+	weaponNameTextObject_->GetTransform().translate = {iconX + iconSize + 20.0f + kDescriptionTextOffsetX, weaponY + 30.0f, 0.0f};
+	weaponTextObject_->GetTransform().translate = {iconX + iconSize + 20.0f + kDescriptionTextOffsetX, weaponY + 72.0f, 0.0f};
 	// 説明文は右端で自動改行し、縦にも収まらない場合は読みやすさを保てる範囲で縮小する。
 	const float weaponTextRight = rightX + innerMargin + sectionWidth - 18.0f;
 	const float weaponTextBottom = weaponY + weaponHeight - 14.0f;
@@ -493,6 +501,7 @@ void PlayerSelectScene::Finalize() {
 	pageTextObject_.reset();
 	instructionTextObject_.reset();
 	playerTypeNames_.clear();
-	presentedPlayerTypeName_.clear();
+	entrancePresentationStyle_ = "pop";
+	entrancePresentationDuration_ = 1.2f;
 	BaseScene::Finalize();
 }

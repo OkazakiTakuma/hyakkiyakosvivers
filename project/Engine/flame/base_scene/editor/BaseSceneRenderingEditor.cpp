@@ -15,7 +15,7 @@
 #endif
 #include "base_scene/details/BaseSceneEditorDetails.h"
 
-void BaseScene::DrawParticleEmitterInspector(GameObject* selectedObject) {
+void BaseScene::DrawParticleEmitterInspector(Entity* selectedObject) {
 #ifdef USE_IMGUI
 	if (!selectedObject) {
 		return;
@@ -43,7 +43,12 @@ void BaseScene::DrawParticleEmitterInspector(GameObject* selectedObject) {
 
 		ImGui::Combo("Preset", &selectedParticlePresetIndex_, presetLabels.data(), static_cast<int>(presetLabels.size()));
 		if (ImGui::Button("Apply Preset")) {
-			ParticlePresetRepository::Apply(particlePresets[selectedParticlePresetIndex_], emitter);
+			ParticlePresetData preset;
+			// JSONに無い項目は現在値を維持し、旧プリセットも同じ見た目で適用する。
+			CaptureParticlePreset(emitter, preset);
+			if (ParticlePresetRepository::Load(particlePresets[selectedParticlePresetIndex_], preset)) {
+				ApplyParticlePreset(emitter, preset);
+			}
 		}
 	} else {
 		ImGui::Text("No particle presets");
@@ -57,7 +62,10 @@ void BaseScene::DrawParticleEmitterInspector(GameObject* selectedObject) {
 	}
 	ImGui::InputText("Preset Name", particlePresetNameBuffer_.data(), particlePresetNameBuffer_.size());
 	if (ImGui::Button("Save Preset")) {
-		ParticlePresetRepository::Save(particlePresetNameBuffer_.data(), emitter);
+		ParticlePresetData preset;
+		if (CaptureParticlePreset(emitter, preset)) {
+			ParticlePresetRepository::Save(particlePresetNameBuffer_.data(), preset);
+		}
 	}
 
 	const std::vector<std::string> textures = CollectResourceTexturePaths();
@@ -176,7 +184,7 @@ void BaseScene::DrawParticleEmitterInspector(GameObject* selectedObject) {
 /// <summary>
 /// PointLightComponentの編集UIを描画します。
 /// </summary>
-void BaseScene::DrawPointLightInspector(GameObject* selectedObject) {
+void BaseScene::DrawPointLightInspector(Entity* selectedObject) {
 #ifdef USE_IMGUI
 	if (!selectedObject) {
 		return;
@@ -185,14 +193,14 @@ void BaseScene::DrawPointLightInspector(GameObject* selectedObject) {
 	PointLightComponent* pointLight = selectedObject->GetComponent<PointLightComponent>();
 	ImGui::Separator();
 	if (!pointLight) {
-		if (ImGui::Button("Create Point Light Component")) {
+		if (ImGui::Button("Create Point Light EntityComponent")) {
 			selectedObject->AddComponent<PointLightComponent>();
 		}
 		return;
 	}
 
 	ImGui::Text("PointLightComponent");
-	if (ImGui::Button("Destroy Point Light Component")) {
+	if (ImGui::Button("Destroy Point Light EntityComponent")) {
 		selectedObject->RemoveComponent<PointLightComponent>();
 		return;
 	}
@@ -229,7 +237,7 @@ void BaseScene::DrawPointLightInspector(GameObject* selectedObject) {
 /// <summary>
 /// 夕日や魔法球など、発光物の周囲へ重ねる2層Haloを編集します。
 /// </summary>
-void BaseScene::DrawGlowBillboardInspector(GameObject* selectedObject) {
+void BaseScene::DrawGlowBillboardInspector(Entity* selectedObject) {
 #ifdef USE_IMGUI
 	if (!selectedObject) {
 		return;
@@ -238,14 +246,14 @@ void BaseScene::DrawGlowBillboardInspector(GameObject* selectedObject) {
 	GlowBillboardComponent* glow = selectedObject->GetComponent<GlowBillboardComponent>();
 	ImGui::Separator();
 	if (!glow) {
-		if (ImGui::Button("Create Glow Billboard Component")) {
+		if (ImGui::Button("Create Glow Billboard EntityComponent")) {
 			selectedObject->AddComponent<GlowBillboardComponent>();
 		}
 		return;
 	}
 
 	ImGui::Text("GlowBillboardComponent");
-	if (ImGui::Button("Destroy Glow Billboard Component")) {
+	if (ImGui::Button("Destroy Glow Billboard EntityComponent")) {
 		selectedObject->RemoveComponent<GlowBillboardComponent>();
 		return;
 	}
@@ -300,7 +308,7 @@ void BaseScene::DrawGlowBillboardInspector(GameObject* selectedObject) {
 /// <summary>
 /// コライダーコンポーネントの編集UIを描画します。
 /// </summary>
-void BaseScene::DrawOBBColliderInspector(GameObject* selectedObject) {
+void BaseScene::DrawOBBColliderInspector(Entity* selectedObject) {
 #ifdef USE_IMGUI
 	if (!selectedObject) {
 		return;
@@ -363,6 +371,10 @@ void BaseScene::DrawOBBColliderInspector(GameObject* selectedObject) {
 		if (ImGui::Checkbox("OBB Push Back", &isPushBackEnabled)) {
 			collider->SetPushBackEnabled(isPushBackEnabled);
 		}
+		bool playerOnly = collider->GetPlayerOnly();
+		if (ImGui::Checkbox("OBB Player Only", &playerOnly)) {
+			collider->SetPlayerOnly(playerOnly);
+		}
 		ImGui::Text("OBB Collision: %s", collider->IsColliding() ? "Hit" : "None");
 	}
 
@@ -398,7 +410,7 @@ void BaseScene::DrawOBBColliderInspector(GameObject* selectedObject) {
 /// <summary>
 /// カメラコンポーネントの編集UIを描画します。
 /// </summary>
-void BaseScene::DrawCameraInspector(GameObject* selectedObject) {
+void BaseScene::DrawCameraInspector(Entity* selectedObject) {
 #ifdef USE_IMGUI
 	CameraComponent* cameraComponent = selectedObject->GetComponent<CameraComponent>();
 	if (!cameraComponent) {
@@ -408,7 +420,7 @@ void BaseScene::DrawCameraInspector(GameObject* selectedObject) {
 	ImGui::Separator();
 	ImGui::Text("CameraComponent");
 
-	const bool isActive = selectedObject->GetName() == activeCameraObjectName_;
+	const bool isActive = selectedObject->GetName() == sceneEditorState_.GetActiveCameraName();
 	if (isActive) {
 		ImGui::Text("Active Camera");
 	} else if (ImGui::Button("Set Active Camera")) {
@@ -490,7 +502,7 @@ void BaseScene::DrawCameraInspector(GameObject* selectedObject) {
 /// </summary>
 void BaseScene::DrawEditorGizmo() {
 #ifdef USE_IMGUI
-	if (!isGizmoEnabled_ || selectedObjectIndex_ < 0 || selectedObjectIndex_ >= static_cast<int>(sceneObjects_.size())) {
+	if (!isGizmoEnabled_ || !sceneEditorState_.HasValidSelection(sceneObjects_.size())) {
 		return;
 	}
 
@@ -499,7 +511,7 @@ void BaseScene::DrawEditorGizmo() {
 		return;
 	}
 
-	GameObject* selectedObject = sceneObjects_[selectedObjectIndex_].get();
+	Entity* selectedObject = sceneObjects_[sceneEditorState_.GetSelectedObjectIndex()].get();
 	EulerTransform& transform = selectedObject->GetTransform();
 
 	// ギズモの描画・入力範囲を、ドッキングされた GameView の表示領域に合わせます。
@@ -559,21 +571,45 @@ void BaseScene::DrawEditorGizmo() {
 /// <summary>
 /// エディタ用スカイボックスを生成または再読み込みします。
 /// </summary>
-void BaseScene::CreateOrReloadEditorSkyBox(const std::string& textureFilePath) {
+void SceneEditorSkyBox::Reset() {
+	enabled_ = false;
+	selectedTextureIndex_ = 0;
+	textureFilePath_.clear();
+	skyBox_.reset();
+}
+
+void SceneEditorSkyBox::Update() {
+	if (skyBox_) {
+		skyBox_->Update();
+	}
+}
+
+void SceneEditorSkyBox::Draw() {
+	if (enabled_ && skyBox_) {
+		skyBox_->Draw();
+	}
+}
+
+void SceneEditorSkyBox::Restore(bool enabled, const std::string& textureFilePath) {
+	enabled_ = enabled;
+	Load(textureFilePath);
+}
+
+void SceneEditorSkyBox::Load(const std::string& textureFilePath) {
 	if (textureFilePath.empty()) {
-		editorSkyBox_.reset();
-		skyBoxTextureFilePath_.clear();
+		skyBox_.reset();
+		textureFilePath_.clear();
 		return;
 	}
 
 	TextureManager::GetInstance()->LoadTexture(textureFilePath);
 	auto skyBox = std::make_unique<SkyBox>();
 	skyBox->Initialize(textureFilePath);
-	editorSkyBox_ = std::move(skyBox);
-	skyBoxTextureFilePath_ = textureFilePath;
+	skyBox_ = std::move(skyBox);
+	textureFilePath_ = textureFilePath;
 }
 
-void BaseScene::DrawEditorSkyBoxControls() {
+void SceneEditorSkyBox::DrawControls() {
 #ifdef USE_IMGUI
 	if (!ImGui::CollapsingHeader("SkyBox", ImGuiTreeNodeFlags_DefaultOpen)) {
 		return;
@@ -606,45 +642,45 @@ void BaseScene::DrawEditorSkyBoxControls() {
 	}
 	ImGui::Separator();
 
-	ImGui::Checkbox("Enable SkyBox", &isEditorSkyBoxEnabled_);
+	ImGui::Checkbox("Enable SkyBox", &enabled_);
 
 	const std::vector<std::string> ddsTextures = CollectResourceDdsTexturePaths();
 	if (ddsTextures.empty()) {
 		ImGui::Text("No DDS textures in Resources");
 		if (ImGui::Button("Clear SkyBox")) {
-			CreateOrReloadEditorSkyBox("");
-			isEditorSkyBoxEnabled_ = false;
+			Load("");
+			enabled_ = false;
 		}
 		return;
 	}
 
-	if (!skyBoxTextureFilePath_.empty()) {
+	if (!textureFilePath_.empty()) {
 		for (int index = 0; index < static_cast<int>(ddsTextures.size()); ++index) {
-			if (ddsTextures[index] == skyBoxTextureFilePath_) {
-				selectedSkyBoxTextureIndex_ = index;
+			if (ddsTextures[index] == textureFilePath_) {
+				selectedTextureIndex_ = index;
 				break;
 			}
 		}
 	}
-	if (selectedSkyBoxTextureIndex_ >= static_cast<int>(ddsTextures.size())) {
-		selectedSkyBoxTextureIndex_ = 0;
+	if (selectedTextureIndex_ >= static_cast<int>(ddsTextures.size())) {
+		selectedTextureIndex_ = 0;
 	}
 
 	std::vector<const char*> textureLabels = MakeLabelPointers(ddsTextures);
-	ImGui::Combo("DDS Texture", &selectedSkyBoxTextureIndex_, textureLabels.data(), static_cast<int>(textureLabels.size()));
+	ImGui::Combo("DDS Texture", &selectedTextureIndex_, textureLabels.data(), static_cast<int>(textureLabels.size()));
 
 	if (ImGui::Button("Create SkyBox")) {
-		CreateOrReloadEditorSkyBox(ddsTextures[selectedSkyBoxTextureIndex_]);
-		isEditorSkyBoxEnabled_ = true;
+		Load(ddsTextures[selectedTextureIndex_]);
+		enabled_ = true;
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("Remove SkyBox")) {
-		CreateOrReloadEditorSkyBox("");
-		isEditorSkyBoxEnabled_ = false;
+		Load("");
+		enabled_ = false;
 	}
 
-	if (!skyBoxTextureFilePath_.empty()) {
-		ImGui::Text("Current: %s", skyBoxTextureFilePath_.c_str());
+	if (!textureFilePath_.empty()) {
+		ImGui::Text("Current: %s", textureFilePath_.c_str());
 	} else {
 		ImGui::Text("Current: None");
 	}

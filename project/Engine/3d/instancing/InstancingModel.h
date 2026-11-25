@@ -1,7 +1,9 @@
 #pragma once
 #include "../model/Model.h"
 #include "../camera/Camera.h"
+#include "../sky/AtmosphereSystem.h"
 #include "struct.h"
+#include <cstddef>
 #include <vector>
 #include <unordered_map>
 #include <d3d12.h>
@@ -90,14 +92,11 @@ private:
         Matrix4x4 viewProjection;
         Vector3 worldPosition;
         float environmentMultiplier;
-		Vector3 horizonColor;
-		float distanceFogDensity;
-		float heightFogDensity;
-		float aerialPerspectiveStrength;
-		int32_t enableAerialPerspective;
-		float paddingAtmosphere;
+		AerialPerspectiveGpuData atmosphere;
     };
 	static_assert(sizeof(CameraForGPU) == 112, "CameraForGPU must match the HLSL constant-buffer layout.");
+	static_assert(offsetof(CameraForGPU, atmosphere) == 80,
+		"Instancing atmosphere fields must start at the HLSL cbuffer offset.");
 
     Microsoft::WRL::ComPtr<ID3D12Resource> lightResource_;
     DirectionalLight* lightData_ = nullptr;

@@ -134,12 +134,8 @@ void InstancingModel::CreateConstantBuffers() {
     cameraData_->viewProjection = MakeIdentity4x4();
     cameraData_->worldPosition = { 0.0f, 0.0f, -10.0f };
     cameraData_->environmentMultiplier = 0.0f;
-	cameraData_->horizonColor = {0.0f, 0.0f, 0.0f};
-	cameraData_->distanceFogDensity = 0.0f;
-	cameraData_->heightFogDensity = 0.0f;
-	cameraData_->aerialPerspectiveStrength = 0.0f;
-	cameraData_->enableAerialPerspective = 0;
-	cameraData_->paddingAtmosphere = 0.0f;
+	// 共通GPU型を値初期化し、未設定時は大気遠近法を無効にする。
+	cameraData_->atmosphere = {};
 
     pointLightResource_ = dxCommon->CreateBufferResource(sizeof(PointLight));
     pointLightResource_->Map(0, nullptr, reinterpret_cast<void**>(&pointLightData_));
@@ -277,11 +273,7 @@ void InstancingModel::Draw(Camera* camera) {
     cameraData_->viewProjection = viewProjection;
     cameraData_->worldPosition = cameraPosition;
 	const AtmosphereSettings& atmosphere = AtmosphereSystem::GetInstance()->GetSettings();
-	cameraData_->horizonColor = atmosphere.horizonColor;
-	cameraData_->distanceFogDensity = atmosphere.distanceFogDensity;
-	cameraData_->heightFogDensity = atmosphere.heightFogDensity;
-	cameraData_->aerialPerspectiveStrength = atmosphere.aerialPerspectiveStrength;
-	cameraData_->enableAerialPerspective = atmosphere.enabled ? 1 : 0;
+	cameraData_->atmosphere = MakeAerialPerspectiveGpuData(atmosphere);
 
     auto commandList = Object3dCommon::GetInstance()->GetDxCommon()->GetCommandList();
 	PrepareDraw(commandList.Get());

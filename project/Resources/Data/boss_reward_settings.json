@@ -1,0 +1,11 @@
+{
+    "singleRewardWeight": 70.0,
+    "tripleRewardWeight": 25.0,
+    "quintupleRewardWeight": 5.0,
+    "ownedUpgradeTableWeight": 60.0,
+    "unownedWeaponTableWeight": 20.0,
+    "unownedItemTableWeight": 20.0,
+    "singleRewardMoney": 100,
+    "tripleRewardMoney": 300,
+    "quintupleRewardMoney": 500
+}

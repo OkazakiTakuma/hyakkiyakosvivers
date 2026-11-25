@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/GameObject.h"
+#include "core/Entity.h"
 #include "../../2d/Sprite.h"
 #include "../../2d/TextComponent.h"
 
@@ -20,12 +20,12 @@ inline std::unique_ptr<Sprite> CreateColorSprite() {
 	return sprite;
 }
 
-inline std::unique_ptr<GameObject> CreateTextObject(
+inline std::unique_ptr<Entity> CreateTextObject(
 	const std::string& text,
 	float fontSize,
 	TextComponent::Anchor anchor = TextComponent::Anchor::Center,
 	const std::string& fontName = {}) {
-	auto object = std::make_unique<GameObject>();
+	auto object = std::make_unique<Entity>();
 	TextComponent* textComponent = object->AddComponent<TextComponent>();
 	textComponent->SetText(text);
 	if (!fontName.empty()) {
@@ -36,13 +36,23 @@ inline std::unique_ptr<GameObject> CreateTextObject(
 	return object;
 }
 
-inline std::unique_ptr<GameObject> CreateTextObject(
+inline std::unique_ptr<Entity> CreateTextObject(
 	const std::string& text,
 	float fontSize,
 	const Vector4& color,
 	const std::string& fontName = {}) {
 	auto object = CreateTextObject(text, fontSize, TextComponent::Anchor::Center, fontName);
 	object->GetComponent<TextComponent>()->SetColor(color);
+	return object;
+}
+
+inline std::unique_ptr<Entity> CreateHeadingText(
+	const std::string& text,
+	float fontSize,
+	const Vector4& color,
+	DWRITE_FONT_WEIGHT weight = DWRITE_FONT_WEIGHT_SEMI_BOLD) {
+	auto object = CreateTextObject(text, fontSize, color, "Shippori Mincho B1 OTF");
+	object->GetComponent<TextComponent>()->SetFontWeight(weight);
 	return object;
 }
 

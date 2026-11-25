@@ -1,7 +1,8 @@
 #pragma once
-#include "core/Component.h"
+#include "core/EntityComponent.h"
+#include "data/EnemyStatsData.h"
 #include "MathConstants.h"
-#include "core/GameObject.h"
+#include "core/Entity.h"
 #include "LineDrawer.h"
 #include "components/EnemyAttackEntity/EnemyAttackEntityComponent.h"
 #include "GameTime.h"
@@ -9,17 +10,6 @@
 #include <cmath>
 #include <string>
 #include <vector>
-
-/// <summary>敵が使用する移動・攻撃パターンです。</summary>
-enum class EnemyBehaviorType {
-	Chase,
-	Shooter,
-	Charger,
-	NightSlashBoss,
-	SelfDestruct,
-	TornadoBoss,
-	BurstShooter
-};
 
 /// <summary>シーンへ引き渡す敵弾生成パラメーターです。</summary>
 struct EnemyShotRequest {
@@ -38,90 +28,7 @@ struct EnemyShotRequest {
 	float orbitRadialSpeed = 0.0f;
 	float orbitHeight = 0.0f;
 	/// <summary>追尾弾が参照する対象です。要求および生成弾は所有権を持ちません。</summary>
-	GameObject* homingTarget = nullptr;
-};
-
-/// <summary>敵タイプごとに読み込む能力・行動設定です。</summary>
-struct EnemyStats {
-	float health = 10.0f;
-	float attack = 1.0f;
-	float speed = 0.05f;
-	float shootingInterval = 1.0f;
-	float spawnsPerMinute = 12.0f;
-	int experience = 1;
-	std::string experienceModelFilePath = "enemy_drop.obj";
-	/// <summary>敵撃破時に回復アイテムを落とす確率です（0.0～1.0）。</summary>
-	float healthItemDropChance = 0.05f;
-	/// <summary>敵撃破時に経験値全回収アイテムを落とす確率です（0.0～1.0）。</summary>
-	float collectExperienceItemDropChance = 0.05f;
-	/// <summary>この敵が落とす回復アイテムのHP回復量です。</summary>
-	float healthItemHealAmount = 25.0f;
-	EnemyBehaviorType behavior = EnemyBehaviorType::Chase;
-	// Shooter専用: preferredDistanceを中心とした許容帯の中で停止し、近すぎる場合は後退する。
-	float preferredDistance = 7.0f;
-	float distanceTolerance = 1.5f;
-	// 敵弾はEnemyShotRequestへコピーされ、シーン側で実体化される。
-	float projectileSpeed = 0.12f;
-	float projectileSize = 0.22f;
-	float projectileLifeTime = 6.0f;
-	int burstShotCount = 5;
-	float burstSpreadAngle = 0.18f;
-	// Charger専用: 接近、予兆、方向固定済みの突進、硬直を構成する調整値。
-	float chargeTriggerDistance = 7.0f;
-	float chargeDuration = 1.2f;
-	float dashSpeed = 0.28f;
-	float dashDuration = 0.65f;
-	float dashRecovery = 1.0f;
-	// NightSlashBoss専用: プレイヤーの左右を交互に横切る連続斬りの調整値。
-	// TriggerDistance内へ入ると予兆を開始し、DashとSlashPauseを指定回数繰り返す。
-	float comboTriggerDistance = 8.0f;
-	float comboWindup = 0.8f;
-	float comboDashSpeed = 0.48f;
-	float comboDashDuration = 0.24f;
-	float comboSlashPause = 0.16f;
-	float comboRecovery = 1.8f;
-	float comboSideOffset = 1.8f;
-	int comboDashCount = 4;
-	// 最終ダッシュだけに掛ける速度倍率。接触ダメージ倍率はGetContactAttackDamageで管理する。
-	float finisherSpeedMultiplier = 1.35f;
-	// NightSlashBoss専用: 連続斬りの間に挟む全方位弾幕・扇状弾幕の共通調整値。
-	float bossRangedWindup = 0.75f;
-	float bossRangedInterval = 0.32f;
-	int bossRangedWaves = 3;
-	int bossRadialShotCount = 12;
-	int bossAimedShotCount = 5;
-	float bossAimedSpreadAngle = 0.22f;
-	float bossProjectileAttackMultiplier = 0.65f;
-	// TornadoBoss専用: ボス中心から外側へ広がる4方向竜巻。
-	int bossTornadoCount = 4;
-	float bossTornadoInitialRadius = 1.4f;
-	float bossTornadoAngularSpeed = 2.4f;
-	float bossTornadoRadialSpeed = 0.035f;
-	float bossTornadoSize = 0.65f;
-	float bossTornadoLifeTime = 5.0f;
-	float bossTornadoAttackMultiplier = 0.8f;
-	float bossTornadoTriggerDistance = 10.0f;
-	float bossTornadoWindup = 1.0f;
-	float bossTornadoRecovery = 2.0f;
-	// TornadoBoss専用: プレイヤーを囲んで中心へ狭まる包囲竜巻。
-	int bossConvergingTornadoCount = 8;
-	float bossConvergingTornadoInitialRadius = 9.0f;
-	float bossConvergingTornadoAngularSpeed = -2.0f;
-	float bossConvergingTornadoRadialSpeed = 0.035f;
-	float bossConvergingTornadoSize = 0.55f;
-	float bossConvergingTornadoLifeTime = 4.0f;
-	float bossConvergingTornadoAttackMultiplier = 0.55f;
-	// TornadoBoss専用: プレイヤーを追跡する単体の巨大竜巻。
-	float bossGiantTornadoSpeed = 0.035f;
-	float bossGiantTornadoSize = 2.2f;
-	float bossGiantTornadoLifeTime = 7.0f;
-	float bossGiantTornadoAttackMultiplier = 1.2f;
-	float bossGiantTornadoSpawnOffset = 2.2f;
-	float selfDestructTriggerDistance = 2.2f;
-	float selfDestructFuseDuration = 0.8f;
-	float selfDestructRadius = 3.0f;
-	/// <summary>標準敵を1.0とした表示・コライダー・被弾半径の倍率です。</summary>
-	float sizeScale = 1.0f;
+	Entity* homingTarget = nullptr;
 };
 
 class EnemyComponent;
@@ -135,17 +42,21 @@ struct EnemyBehaviorPresentation {
 	bool attackTrailEmitting = false;
 };
 
+/// <summary>夜叉ボスの接近、近接連撃、射撃、硬直を表す状態です。</summary>
+enum class NightSlashState {
+	Approach,
+	Windup,
+	Dashing,
+	Slashing,
+	RangedWindup,
+	RangedFiring,
+	Recovering
+};
+
 class INightSlashState;
-class NightSlashApproachState;
-class NightSlashWindupState;
-class NightSlashDashingState;
-class NightSlashSlashingState;
-class NightSlashRangedWindupState;
-class NightSlashRangedFiringState;
-class NightSlashRecoveringState;
 
 /// <summary>敵の追跡、射撃、突進ステートと体力を管理します。</summary>
-class EnemyComponent : public Component {
+class EnemyComponent : public EntityComponent {
 public:
 	void Initialize() override;
 
@@ -158,19 +69,23 @@ public:
 	const EnemyStats& GetStats() const;
 	void SetEnemyTypeName(const std::string& enemyTypeName);
 	const std::string& GetEnemyTypeName() const;
-	void SetTarget(GameObject* target);
-	GameObject* GetTarget() const;
+	void SetTarget(Entity* target);
+	Entity* GetTarget() const;
 	void SetTargetName(const std::string& targetName);
 	const std::string& GetTargetName() const;
 	void SetCurrentHealth(float health);
 	float GetCurrentHealth() const;
 	/// <summary>ダメージを与え、短時間の被弾カラー演出を開始します。</summary>
 	void TakeDamage(float damage);
+	/// <summary>武器段階から自身の耐性を引いた実効段階に応じ、指定方向へ押し出します。</summary>
+	void ApplyKnockback(const Vector3& direction, int level);
 	bool IsDamageFlashActive() const;
 	/// <summary>HPが0になってから死亡演出を再生しているかを返します。</summary>
 	bool IsDying() const;
 	/// <summary>死亡演出が終了し、シーンから削除できる状態かを返します。</summary>
 	bool IsDeathEffectFinished() const;
+	/// <summary>撃破時に専用の倒れ込み演出を使うボスかを返します。</summary>
+	bool IsBoss() const;
 	void SetRuntimeSpawned(bool runtimeSpawned);
 	bool GetRuntimeSpawned() const;
 	std::vector<EnemyShotRequest> ConsumeShotRequests();
@@ -182,6 +97,8 @@ public:
 	bool IsTornadoWarningActive() const;
 	int GetTornadoPatternIndex() const;
 	float GetTornadoWarningProgress() const;
+	bool IsBarrierWarningActive() const;
+	float GetBarrierWarningProgress() const;
 	bool ConsumeSelfDestructRequest();
 	bool IsBossRangedWarningActive() const;
 	bool IsBossRangedAttacking() const;
@@ -196,19 +113,10 @@ public:
 	EnemyBehaviorPresentation GetBehaviorPresentation();
 
 private:
-	friend class NightSlashApproachState;
-	friend class NightSlashWindupState;
-	friend class NightSlashDashingState;
-	friend class NightSlashSlashingState;
-	friend class NightSlashRangedWindupState;
-	friend class NightSlashRangedFiringState;
-	friend class NightSlashRecoveringState;
-
 	/// <summary>接近、溜め、方向固定済みの突進、攻撃後硬直から成る突進敵の状態です。</summary>
 	enum class ChargeState { Approach, Charging, Dashing, Recovering };
-	/// <summary>接近、斬撃予兆、連続斬り、射撃予兆、射撃、硬直から成るボス行動状態です。</summary>
-	enum class NightSlashState { Approach, Windup, Dashing, Slashing, RangedWindup, RangedFiring, Recovering };
 	enum class TornadoBossState { Approach, Windup, Recovering };
+	enum class BarrierBossState { Approach, Windup, Active, Recovering };
 
 	void UpdateShooter(EulerTransform& transform, const Vector3& direction, float distance);
 
@@ -220,6 +128,8 @@ private:
 	void UpdateSelfDestruct(EulerTransform& transform, const Vector3& direction, float distance);
 
 	void UpdateTornadoBoss(EulerTransform& transform, const Vector3& direction, float distance);
+
+	void UpdateBarrierBoss(EulerTransform& transform, const Vector3& direction, float distance);
 
 	void UpdateNightSlashBoss(EulerTransform& transform, const Vector3& direction, float distance);
 	/// <summary>夜叉ボスの現在Stateを切り替え、状態固有タイマーを初期化します。</summary>
@@ -242,22 +152,39 @@ private:
 	void BeginDeathEffect(EulerTransform& transform);
 	/// <summary>敵を回転・縮小・沈下させる死亡モーションを更新します。</summary>
 	void UpdateDeathEffect(EulerTransform& transform);
+	float GetDeathEffectDuration() const;
+	/// <summary>最終ボス用の時間停止・スロー・ブラー演出を使うかを返します。</summary>
+	bool UsesDefeatCinematic() const;
+	/// <summary>開始位置から目標位置までノックバックを線形補間します。</summary>
+	void UpdateKnockback(EulerTransform& transform, float deltaTime);
 
 	std::string enemyTypeName_ = "Default";
 	std::string targetName_;
 	EnemyStats stats_;
 	/// <summary>行動対象となるGameObjectへの非所有参照です。</summary>
-	GameObject* target_ = nullptr;
+	Entity* target_ = nullptr;
 	float currentHealth_ = 10.0f;
 	/// <summary>被弾時にモデルを赤く表示する残り時間（秒）です。</summary>
 	float damageFlashTimer_ = 0.0f;
 	static constexpr float kDamageFlashDuration = 0.12f;
 	static constexpr float kDeathEffectDuration = 0.62f;
+	// 両ボスのbin内撃破クリップ（約1.5秒）を最後まで再生してから削除します。
+	static constexpr float kBossDeathEffectDuration = 1.52f;
 	float deathEffectTimer_ = 0.0f;
 	bool deathEffectStarted_ = false;
+	/// <summary>モデルのbinに含まれる専用撃破クリップを再生できたかを表します。</summary>
+	bool usesAuthoredDeathAnimation_ = false;
+	/// <summary>時間倍率に影響されず進む、ボス撃破時のヒットストップ演出時間です。</summary>
+	float bossDefeatPresentationTimer_ = 0.0f;
 	Vector3 deathStartPosition_{};
 	Vector3 deathStartRotation_{};
 	Vector3 deathStartScale_{1.0f, 1.0f, 1.0f};
+	/// <summary>ノックバック補間の開始位置と到達位置です。</summary>
+	Vector3 knockbackStartPosition_{};
+	Vector3 knockbackTargetPosition_{};
+	float knockbackElapsedSeconds_ = 0.0f;
+	static constexpr float kKnockbackDuration = 0.16f;
+	bool knockbackActive_ = false;
 	float shootTimer_ = 0.0f;
 	float stateTimer_ = 0.0f;
 	Vector3 dashDirection_{0.0f, 0.0f, 1.0f};
@@ -270,6 +197,7 @@ private:
 	const INightSlashState* nightSlashStateObject_ = nullptr;
 	NightSlashState previousNightSlashMotionState_ = NightSlashState::Approach;
 	TornadoBossState tornadoBossState_ = TornadoBossState::Approach;
+	BarrierBossState barrierBossState_ = BarrierBossState::Approach;
 	Vector3 nightSlashBaseScale_{1.0f, 1.0f, 1.0f};
 	float nightSlashMotionTime_ = 0.0f;
 	bool nightSlashMotionInitialized_ = false;

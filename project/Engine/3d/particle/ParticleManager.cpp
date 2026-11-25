@@ -2,45 +2,11 @@
 #include "PipelineStateUtility.h"
 #include "../camera/Camera.h"
 #include "../../base/GameTime.h"
+#include "../../math/algorithm.h"
 #include <algorithm>
 #include <cassert>
-#include <numbers>
-#include <cmath>
 
-std::vector<VertexData> GenerateRingVerticesForParticle(uint32_t segments, float outerRadius, float innerRadius) {
-	std::vector<VertexData> vertices;
-	vertices.reserve(segments * 6);
-
-	for (uint32_t i = 0; i < segments; ++i) {
-		float ratio1 = static_cast<float>(i) / segments;
-		float ratio2 = static_cast<float>(i + 1) / segments;
-
-		float angle1 = ratio1 * 2.0f * std::numbers::pi_v<float>;
-		float angle2 = ratio2 * 2.0f * std::numbers::pi_v<float>;
-
-		Vector4 outer1 = { outerRadius * std::cos(angle1), outerRadius * std::sin(angle1), 0.0f, 1.0f };
-		Vector4 inner1 = { innerRadius * std::cos(angle1), innerRadius * std::sin(angle1), 0.0f, 1.0f };
-		Vector4 outer2 = { outerRadius * std::cos(angle2), outerRadius * std::sin(angle2), 0.0f, 1.0f };
-		Vector4 inner2 = { innerRadius * std::cos(angle2), innerRadius * std::sin(angle2), 0.0f, 1.0f };
-
-		Vector2 uvOuter1 = { ratio1, 0.0f };
-		Vector2 uvInner1 = { ratio1, 1.0f };
-		Vector2 uvOuter2 = { ratio2, 0.0f };
-		Vector2 uvInner2 = { ratio2, 1.0f };
-
-		Vector3 normal = { 0.0f, 0.0f, -1.0f };
-
-		vertices.push_back({ outer1, uvOuter1, normal });
-		vertices.push_back({ inner1, uvInner1, normal });
-		vertices.push_back({ outer2, uvOuter2, normal });
-
-		vertices.push_back({ inner1, uvInner1, normal });
-		vertices.push_back({ inner2, uvInner2, normal });
-		vertices.push_back({ outer2, uvOuter2, normal });
-	}
-
-	return vertices;
-}using namespace Logger;
+using namespace Logger;
 
 // 1グループあたりに保持・描画できるパーティクルの最大数です。
 const uint32_t ParticleManager::kMaxParticle = 10000;
@@ -167,7 +133,8 @@ void ParticleManager::CreateParticleGroup(const std::string& groupName, const st
 	// =========================================================
 	std::vector<VertexData> vertices;
 	if (meshtype == kMeshTypeRing) {
-		vertices = GenerateRingVerticesForParticle(32, 1.0f, 0.2f);
+		// リング形状の頂点規則は汎用生成関数へ集約し、描画方式ごとの重複を持たない。
+		vertices = GenerateRingVertices(32, 1.0f, 0.2f);
 	}
 	else {
 		vertices = {
@@ -612,6 +579,20 @@ void ParticleManager::SetGroupBlendMode(const std::string& groupName, BlendMode 
 
 bool ParticleManager::HasGroup(const std::string& groupName) const {
 	return particleGroups_.contains(groupName);
+}
+
+std::vector<std::pair<std::string, uint32_t>> ParticleManager::GetActiveParticleGroups() const {
+	std::vector<std::pair<std::string, uint32_t>> activeGroups;
+	activeGroups.reserve(particleGroups_.size());
+	for (const auto& [groupName, group] : particleGroups_) {
+		if (!group.particles.empty()) {
+			activeGroups.emplace_back(groupName, static_cast<uint32_t>(group.particles.size()));
+		}
+	}
+	std::sort(activeGroups.begin(), activeGroups.end(), [](const auto& lhs, const auto& rhs) {
+		return lhs.second > rhs.second;
+	});
+	return activeGroups;
 }
 
 void ParticleManager::SetGroupParticles(const std::string& groupName, std::span<const Particle> particles) {

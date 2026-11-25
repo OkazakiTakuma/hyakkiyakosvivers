@@ -2,7 +2,7 @@
 #include "core/AbstractSceneFactory.h"
 #include "camera/Camera.h"
 #include "core/FlameWork.h"
-#include "core/GameObject.h"
+#include "core/Entity.h"
 #include "SceneManager.h"
 #include <memory>
 
@@ -24,14 +24,11 @@ public:
 	/// 確保したリソースを解放し、終了処理を行います。
 	/// </summary>
 	void Finalize() override;
-	bool IsEndRequest() const override { return endRequest; }	
-
 private:
 	std::unique_ptr<Camera> camera = nullptr;
-	bool endRequest = false;
 	std::unique_ptr<AbstractSceneFactory> sceneFactory = nullptr;
 	std::unique_ptr<SceneManager> sceneManager = nullptr;
-	std::unique_ptr<GameObject> recordingIndicator_ = nullptr;
+	std::unique_ptr<Entity> recordingIndicator_ = nullptr;
 
 };
 

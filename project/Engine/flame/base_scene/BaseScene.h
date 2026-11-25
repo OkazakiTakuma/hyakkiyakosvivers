@@ -6,8 +6,9 @@
 #include "components/EnemyAttackEntity/EnemyAttackEntityComponent.h"
 #include "components/EnemySpawnPoint/EnemySpawnPointComponent.h"
 #include "components/Experience/ExperienceComponent.h"
+#include "components/Gravity/GravityComponent.h"
 #include "components/ItemDrop/ItemDropComponent.h"
-#include "core/GameObject.h"
+#include "core/Entity.h"
 #include "ImGuiManager.h"
 #include "Input.h"
 #include "Matrix.h"
@@ -32,10 +33,21 @@
 #include "particle/GlowBillboardComponent.h"
 #include "components/PlayerAttack/PlayerAttackComponent.h"
 #include "components/PlayerAttackEntity/PlayerAttackEntityComponent.h"
-#include "../../../Player/Player.h"
+#include "../../../Player/PlayerComponent.h"
 #include "collision/SphereColliderComponent.h"
 #include "SpriteComponent.h"
 #include "base_scene/StageResultData.h"
+#include "base_scene/runtime/GameplaySession.h"
+#include "base_scene/runtime/GameplayHud.h"
+#include "base_scene/runtime/SceneWorld.h"
+#include "base_scene/editor/SceneEditorSkyBox.h"
+#include "base_scene/editor/SceneEditorState.h"
+#include "base_scene/runtime/EnemySpawnSystem.h"
+#include "base_scene/runtime/CombatSystem.h"
+#include "services/LootDropService.h"
+#include "services/PlayerStatsCalculator.h"
+#include "services/PlayerAttackAssembler.h"
+#include "services/ParticlePresetAssembler.h"
 #include "TextComponent.h"
 #include "instancing/InstancingModel.h"
 #include "helpers/CollisionSpatialGrid.h"
@@ -55,14 +67,7 @@ public:
 	/// ゲームプレイ中の入力先と時間停止理由を表す排他的なモードです。
 	/// 複数のboolを同時に立てないことで、ポーズと選択画面の競合を防ぎます。
 	/// </summary>
-	enum class GameplayMode {
-		Playing,
-		Intro,
-		Paused,
-		LevelUpSelection,
-		BossReward,
-		Finished
-	};
+	using GameplayMode = GameplaySession::Mode;
 
 	enum class EditorCreateType {
 		Empty,
@@ -109,7 +114,7 @@ public:
 	virtual void Finalize();
 	virtual ~BaseScene();
 
-	virtual void SetSceneManager(SceneManager* manager) { sceneManager = manager; }
+	virtual void SetSceneManager(SceneManager* manager) { sceneManager_ = manager; }
 	/// SceneManagerが共通描画するパーティクルの表示可否を返します。
 	virtual bool IsParticleRenderingEnabled() const { return true; }
 	void SetSceneName(const std::string& sceneName) { sceneName_ = sceneName; }
@@ -124,21 +129,31 @@ public:
 	/// <summary>配置JSONのPlayer設定を上書きする、ゲーム開始時の選択タイプを設定します。</summary>
 	void SetPlayerTypeOverride(const std::string& playerTypeName) { playerTypeOverride_ = playerTypeName; }
 	bool IsLevelUpSelectionActive() const {
-		return gameplayMode_ == GameplayMode::LevelUpSelection || gameplayMode_ == GameplayMode::BossReward;
+		return gameplaySession_.IsSelectionActive();
 	}
-	GameplayMode GetGameplayMode() const { return gameplayMode_; }
+	GameplayMode GetGameplayMode() const { return gameplaySession_.GetMode(); }
 	/// <summary>最終ボスを倒し、ステージクリア条件を満たしたかを返します。</summary>
-	bool IsStageCleared() const { return isStageCleared_; }
+	bool IsStageCleared() const { return gameplaySession_.IsStageCleared(); }
 	/// <summary>プレイヤーの体力が0になったかを返します。</summary>
 	bool IsPlayerDefeated() const;
 	/// <summary>現在の装備とプレイ戦績をリザルト表示用に取得します。</summary>
 	StageResultData GetStageResultData() const;
 protected:
+	/// <summary>派生シーンが遷移や共有進行へアクセスするための、基底で一元管理された参照です。</summary>
+	SceneManager* GetSceneManager() const { return sceneManager_; }
+	/// <summary>全派生シーンで共有するSceneManagerへの唯一の非所有参照です。</summary>
+	SceneManager* sceneManager_ = nullptr;
 	/// <summary>入力先の切り替えとGameTimeの停止状態を一括して反映します。</summary>
 	void SetGameplayMode(GameplayMode mode);
+	Entity* CreateRuntimeEnemy(
+		const std::string& enemyTypeName, const Vector3& position, Entity* target,
+		const EnemySpawnPointComponent::EnemyStatMultipliers& statMultipliers = {});
+	Entity* CreateRuntimePlayerAttackEntity(const PlayerAttackShotRequest& request);
+	void BeginRuntimeBossEncounter(const Entity& boss);
+	Entity* FindObjectByName(const std::string& name) const;
 	/// <summary>派生シーン固有の演出で配置オブジェクトを変更するための非所有ポインタ一覧です。</summary>
-	std::vector<GameObject*> GetMutableSceneObjects() {
-		std::vector<GameObject*> objects;
+	std::vector<Entity*> GetMutableSceneObjects() {
+		std::vector<Entity*> objects;
 		objects.reserve(sceneObjects_.size());
 		for (const auto& object : sceneObjects_) {
 			objects.push_back(object.get());
@@ -146,8 +161,8 @@ protected:
 		return objects;
 	}
 	/// <summary>派生シーンから配置オブジェクトを読み取るための非所有ポインタ一覧です。</summary>
-	std::vector<const GameObject*> GetSceneObjects() const {
-		std::vector<const GameObject*> objects;
+	std::vector<const Entity*> GetSceneObjects() const {
+		std::vector<const Entity*> objects;
 		objects.reserve(sceneObjects_.size());
 		for (const auto& object : sceneObjects_) {
 			objects.push_back(object.get());
@@ -161,6 +176,8 @@ private:
 	void UpdateSceneObjects();
 	/// <summary>エディタ用のカメラ操作とオブジェクト選択を更新します。</summary>
 	void UpdateEditorTools();
+	/// <summary>削除対象を参照する全Componentの非所有ポインタを解除します。</summary>
+	void ClearEntityReferences(Entity* target);
 	/// <summary>シーン内オブジェクトの2D描画を行います。</summary>
 	void DrawSceneObjects2D();
 	/// <summary>シーン内オブジェクトの3D描画を行います。</summary>
@@ -189,11 +206,13 @@ private:
 		std::string description;
 		int slotIndex = -1;
 		std::string textureFilePath;
+		/// <summary>この候補と進化条件で対応し、現在所持している武器・アイテムの画像です。</summary>
+		std::vector<std::string> correspondingOwnedTextureFilePaths;
 	};
 /// <summary>
 /// 指定された種類のエディタオブジェクトを生成します。
 /// </summary>
-	GameObject* CreateEditorObject(EditorCreateType type, const std::string& modelFilePath = "");
+	Entity* CreateEditorObject(EditorCreateType type, const std::string& modelFilePath = "");
 /// <summary>
 /// 現在選択中のエディタオブジェクトを削除します。
 /// </summary>
@@ -212,20 +231,20 @@ private:
 	/// <summary>
 	/// 選択中オブジェクトのComponent固有設定を描画します。
 	/// </summary>
-	void DrawSelectedComponentInspector(GameObject* selectedObject, const std::string& selectedComponentLabel);
+	void DrawSelectedComponentInspector(Entity* selectedObject, const std::string& selectedComponentLabel);
 	/// <summary>
 	/// EnemySpawnPointComponentの生成条件とスケジュール設定を描画します。
 	/// </summary>
-	void DrawEnemySpawnPointInspector(GameObject* selectedObject);
+	void DrawEnemySpawnPointInspector(Entity* selectedObject);
 	void DrawPlayerInspector();
 	/// <summary>
 	/// 選択中プレイヤーの能力値、装備スロット、モデルと保存操作を描画します。
 	/// </summary>
-	void DrawPlayerStatsInspector(GameObject* selectedObject, Player* player);
+	void DrawPlayerStatsInspector(Entity* selectedObject, PlayerComponent* player);
 	/// <summary>
 	/// プレイヤーのステータスアイテム定義、モデル選択、変更反映と保存操作を描画します。
 	/// </summary>
-	void DrawPlayerPersistenceInspector(GameObject* selectedObject, Player* player, PlayerStats& stats, bool& statsChanged, bool statusSlotsChanged);
+	void DrawPlayerPersistenceInspector(Entity* selectedObject, PlayerComponent* player, PlayerStats& stats, bool& statsChanged, bool statusSlotsChanged);
 	void DrawEnemyInspector();
 	void DrawPlayerAttackInspector();
 	void ReloadPlayerAttackInspectorCache();
@@ -237,19 +256,19 @@ private:
 /// <summary>
 /// カメラコンポーネントの編集UIを描画します。
 /// </summary>
-	void DrawCameraInspector(GameObject* selectedObject);
+	void DrawCameraInspector(Entity* selectedObject);
 /// <summary>
 /// コライダーコンポーネントの編集UIを描画します。
 /// </summary>
-	void DrawOBBColliderInspector(GameObject* selectedObject);
+	void DrawOBBColliderInspector(Entity* selectedObject);
 	/// <summary>PointLightComponentの追加、削除、光源設定を描画します。</summary>
-	void DrawPointLightInspector(GameObject* selectedObject);
+	void DrawPointLightInspector(Entity* selectedObject);
 	/// <summary>GlowBillboardComponentの追加、削除、Halo設定を描画します。</summary>
-	void DrawGlowBillboardInspector(GameObject* selectedObject);
+	void DrawGlowBillboardInspector(Entity* selectedObject);
 /// <summary>
 /// パーティクルエミッターコンポーネントの編集UIを描画します。
 /// </summary>
-	void DrawParticleEmitterInspector(GameObject* selectedObject);
+	void DrawParticleEmitterInspector(Entity* selectedObject);
 /// <summary>
 /// マウスクリックによるエディタオブジェクト選択を更新します。
 /// </summary>
@@ -261,7 +280,6 @@ private:
 /// <summary>
 /// 有効なコライダー同士の当たり判定と押し戻しを行います。
 /// </summary>
-	void UpdateColliderCollisions();
 /// <summary>
 /// 指定したカメラを描画用の既定カメラへ反映します。
 /// </summary>
@@ -279,109 +297,98 @@ private:
 	void ResolveEnemySpawnPointLinks();
 	void ResolveEnemyLinks();
 	void UpdateEnemySpawning();
+	/// <summary>ボス戦中だけ存在する、地形1枚分の閉鎖壁を生成します。</summary>
+	void CreateBossArenaWalls(const EnemySpawnPointComponent::BossEncounterSettings& settings);
+	/// <summary>ボス撃破を検知したら実行時アリーナ壁を取り除きます。</summary>
+	void UpdateBossArenaWalls();
+	/// <summary>ボス戦中のプレイヤーを、コライダー全体がアリーナ内に収まる位置へ補正します。</summary>
+	void ConstrainPlayersToBossArena();
+	void RemoveBossArenaWalls();
 	/// <summary>プレイヤーのワールド座標は変えず、周囲の地形タイルだけを再配置します。</summary>
 	void UpdateLoopingTerrain();
 	void UpdateEnemyAttacks();
-	void UpdateEnemyAttackEntityHits();
 	void UpdatePlayerAttacks();
 	void UpdatePlayerAttackEntityHits();
+	/// <summary>命中地点の敵頭上へ、上昇しながら消えるダメージ数値を追加します。</summary>
+	void CreateDamageNumber(float damage, const Vector3& enemyPosition, float enemySizeScale);
+	void UpdateDamageNumbers();
+	void DrawDamageNumbers();
 	/// <summary>近接する同単位の通常経験値を、合計値を保ったまま次の単位へ圧縮します。</summary>
 	void UpdateExperienceCompression();
 	void UpdateItemDrops();
 	void UpdateBossUpgradeRewards();
+	void UpdateBossRewardPresentation();
 	void CleanupExpiredPlayerAttackEntities();
 	/// <summary>シーン内で最初に見つかった有効なプレイヤーを返します。</summary>
-	Player* FindActivePlayer() const;
-	void UpdatePlayerHealthHud();
-	/// <summary>ステージ中に回収したGの累計を左上HUDへ反映します。</summary>
-	void UpdateChallengeMoneyHud();
-	/// <summary>ステージ中の今回獲得Gを左上へ描画します。</summary>
-	void DrawChallengeMoneyHud();
-	/// <summary>現在レベル内の経験値進捗を計算し、画面下部のバーと表示文字列を更新します。</summary>
-	void UpdatePlayerExperienceHud();
-	/// <summary>画面下部へ次のレベルアップまでの経験値バーを描画します。</summary>
-	void DrawPlayerExperienceHud();
-	/// <summary>攻撃・ステータススロットの背景、画像、表示キャッシュを更新します。</summary>
-	void UpdatePlayerSlotHud();
-	/// <summary>右上へ攻撃5枠とステータス5枠を描画します。</summary>
-	void DrawPlayerSlotHud();
+	PlayerComponent* FindActivePlayer() const;
+	void UpdateGameplayHud();
 	void UpdateLevelUpSelection();
-	bool BuildLevelUpChoices(Player* player);
+	bool BuildLevelUpChoices(PlayerComponent* player);
+	/// <summary>候補の進化条件に対応する所持装備の画像を設定します。</summary>
+	void PopulateCorrespondingOwnedIcons(LevelUpChoice& choice, const PlayerStats& stats) const;
 	/// <summary>購入済みの場合、通常レベルアップ候補を1回だけ再抽選します。</summary>
 	void RerollLevelUpChoices();
 	void ApplyLevelUpChoice(int choiceIndex);
 	void EnsureLevelUpSelectionSprites();
 	void DrawLevelUpSelection2D();
+	void EnsureBossRewardPresentationSprites();
+	void DrawBossRewardPresentation2D();
 /// <summary>
 /// 指定したオブジェクトのカメラをアクティブカメラに設定します。
 /// </summary>
-	void SetActiveCameraObject(GameObject* object);
+	void SetActiveCameraObject(Entity* object);
 /// <summary>
 /// 最初に見つかった有効なカメラオブジェクトを返します。
 /// </summary>
-	GameObject* FindFirstCameraObject();
+	Entity* FindFirstCameraObject();
 /// <summary>
 /// 名前に一致するシーンオブジェクトを検索します。
 /// </summary>
-	GameObject* FindObjectByName(const std::string& name) const;
+/// <summary>指定した親が存在し、自己参照や循環を作らないか検証します。</summary>
+bool CanSetObjectParent(const Entity* child, const std::string& parentName) const;
+/// <summary>検証に成功した場合だけ親子関係を更新します。</summary>
+bool TrySetObjectParent(Entity* child, const std::string& parentName);
 /// <summary>
 /// 既存名と重複しないオブジェクト名を生成します。
 /// </summary>
 	std::string MakeUniqueObjectName(const std::string& baseName) const;
-	GameObject* CreateRuntimeEnemy(
-		const std::string& enemyTypeName, const Vector3& position, GameObject* target,
-		const EnemySpawnPointComponent::EnemyStatMultipliers& statMultipliers = {});
-	GameObject* CreateRuntimeEnemyAttackEntity(const EnemyShotRequest& request);
-	GameObject* CreateRuntimeExperience(const EnemyStats& enemyStats, const Vector3& position, GameObject* target);
-	GameObject* CreateRuntimeItemDrop(ItemDropType type, const Vector3& position, GameObject* target, float healAmount = 0.0f, int moneyAmount = 0);
+	Entity* CreateRuntimeEnemyAttackEntity(const EnemyShotRequest& request);
+	Entity* CreateRuntimeExperience(const EnemyStats& enemyStats, const Vector3& position, Entity* target);
+	Entity* CreateRuntimeItemDrop(ItemDropType type, const Vector3& position, Entity* target, float healAmount = 0.0f, int moneyAmount = 0);
 	/// <summary>指定回数の強化を内包したボス報酬を1個だけ生成します。</summary>
-	void CreateRuntimeBossUpgradeDrop(const Vector3& position, GameObject* target, int upgradeCount);
-	/// <summary>装備中の攻撃・アイテムから強化可能な対象を抽選し、実際に適用できた回数を返します。</summary>
-	int ApplyRandomBossUpgrades(Player* player, int upgradeCount);
-	/// <summary>強化先がなかった残り回数について、未所持装備の取得確認を予約します。</summary>
-	void QueueBossAcquisitionOffers(Player* player, int offerCount);
+	void CreateRuntimeBossUpgradeDrop(const Vector3& position, Entity* target, int upgradeCount);
+	/// <summary>設定された3テーブルから指定数を抽選し、所持品強化と未所持品候補を作成します。</summary>
+	void RollBossRewards(PlayerComponent* player, int rewardCount);
 	/// <summary>予約された取得候補を1件ずつ確認画面へ表示します。</summary>
 	bool ShowNextBossAcquisitionOffer();
-	GameObject* CreateRuntimePlayerAttackEntity(const PlayerAttackShotRequest& request);
-	GameObject* FindNearestEnemy(const Vector3& position) const;
+	Entity* FindNearestEnemy(const Vector3& position) const;
 /// <summary>
 /// 文字列からエディタ生成タイプへ変換します。
 /// </summary>
 	EditorCreateType EditorCreateTypeFromName(const std::string& typeName) const;
-	void CreateOrReloadEditorSkyBox(const std::string& textureFilePath);
-	void DrawEditorSkyBoxControls();
 
-	SceneManager* sceneManager = nullptr;
 	std::string sceneName_ = "None";
 	std::string sceneObjectFilePathOverride_;
 	/// <summary>空でない場合、Playerの能力・モデル・初期装備をこのタイプから読み込みます。</summary>
 	std::string playerTypeOverride_;
-	std::vector<std::unique_ptr<GameObject>> sceneObjects_;
-	/// <summary>一般衝突・弾命中判定で再利用するXZ平面のBroad Phaseグリッドです。</summary>
-	CollisionSpatialGrid collisionSpatialGrid_{10.0f};
-	struct CollisionDebugStats {
-		size_t colliderObjects = 0;
-		size_t occupiedCells = 0;
-		size_t gridEntries = 0;
-		size_t colliderCandidatePairs = 0;
-		size_t colliderNarrowPhaseTests = 0;
-		size_t playerProjectileCandidates = 0;
-		size_t playerProjectileNarrowPhaseTests = 0;
-		size_t enemyProjectileCandidates = 0;
-		size_t enemyProjectileNarrowPhaseTests = 0;
+	/// <summary>シーン内Entityの所有と共通更新・描画を担当します。</summary>
+	SceneWorld sceneObjects_;
+	/// <summary>空間分割を用いた衝突候補抽出と戦闘命中処理を担当します。</summary>
+	CombatSystem combatSystem_;
+	/// <summary>通常敵・ボスの生成要求と、ボス戦終了条件を管理します。</summary>
+	EnemySpawnSystem enemySpawnSystem_;
+	/// <summary>敵撃破時の経験値・アイテム・ボス報酬の抽選を担当します。</summary>
+	LootDropService lootDropService_;
+	/// <summary>今回のプレイに属するモード・戦績・クリア状態の所有者です。</summary>
+	GameplaySession gameplaySession_;
+	struct DamageNumberPopup {
+		std::unique_ptr<Entity> textObject;
+		Vector3 worldPosition{};
+		float elapsedSeconds = 0.0f;
+		float horizontalOffset = 0.0f;
 	};
-	CollisionDebugStats collisionDebugStats_{};
-	/// <summary>生存中のボス戦用ランタイム敵名です。空なら通常スポーンを再開します。</summary>
-	std::string activeBossEncounterObjectName_;
-	/// <summary>最終ボス撃破後、リザルトへ遷移するまで保持するクリアフラグです。</summary>
-	bool isStageCleared_ = false;
-	/// <summary>今回のゲームプレイでHPを0にした敵の累計です。</summary>
-	int defeatedEnemyCount_ = 0;
-	/// <summary>現在のゲームプレイで回収済みのコインとボス報酬の合計金額です。</summary>
-	int challengeMoneyEarned_ = 0;
-	/// <summary>GameTimeが進行しているフレームだけ加算する生存時間です。</summary>
-	float survivalTimeSeconds_ = 0.0f;
-	int selectedObjectIndex_ = -1;
+	std::vector<DamageNumberPopup> damageNumberPopups_;
+	uint32_t nextDamageNumberIndex_ = 0;
 	int nextObjectId_ = 1;
 	EditorCreateType createType_ = EditorCreateType::Object3dSphere;
 	int selectedLoadedModelIndex_ = 0;
@@ -393,7 +400,6 @@ private:
 	int selectedPlayerTypeIndex_ = 0;
 	int selectedPlayerAttackTypeIndex_ = 0;
 	int selectedPlayerAttackLevelIndex_ = 0;
-	int selectedSkyBoxTextureIndex_ = 0;
 	int selectedInspectorComponentIndex_ = 0;
 	std::array<char, 64> particlePresetNameBuffer_ = {};
 	std::array<char, 64> enemyTypeNameBuffer_ = {};
@@ -406,49 +412,14 @@ private:
 	std::vector<PlayerAttackStats> cachedPlayerAttackStats_;
 	bool isPlayerAttackCacheLoaded_ = false;
 	bool isGizmoEnabled_ = true;
-	bool isEditorSkyBoxEnabled_ = false;
 	int gizmoOperationIndex_ = 0;
-	std::string activeCameraObjectName_;
-	std::string skyBoxTextureFilePath_;
-	std::unique_ptr<SkyBox> editorSkyBox_;
-	std::unique_ptr<Sprite> playerHealthBarBackground_;
-	std::unique_ptr<Sprite> playerHealthBarFill_;
-	bool isPlayerHealthHudVisible_ = false;
-	/// <summary>今回の挑戦で取得した、全体強化適用後のG累計を表示するHUD文字です。</summary>
-	std::unique_ptr<GameObject> challengeMoneyTextObject_;
-	bool isChallengeMoneyHudVisible_ = false;
-	/// <summary>経験値バーの背景、進捗部分、レベル・経験値表示を構成するHUD要素です。</summary>
-	std::unique_ptr<Sprite> playerExperienceBarBackground_;
-	std::unique_ptr<Sprite> playerExperienceBarFill_;
-	std::unique_ptr<GameObject> playerExperienceTextObject_;
-	/// <summary>現在レベル開始時を0、次レベル到達時を1とした経験値進捗率です。</summary>
-	float playerExperienceRate_ = 0.0f;
-	bool isPlayerExperienceHudVisible_ = false;
-	/// <summary>上段の攻撃5枠、下段のステータス5枠を構成する背景とアイコンです。</summary>
-	std::array<std::unique_ptr<Sprite>, 5> playerAttackSlotBackgroundSprites_;
-	std::array<std::unique_ptr<Sprite>, 5> playerAttackSlotIconSprites_;
-	std::array<std::unique_ptr<Sprite>, 5> playerStatusSlotBackgroundSprites_;
-	std::array<std::unique_ptr<Sprite>, 5> playerStatusSlotIconSprites_;
-	/// <summary>各スロット下端でレベル文字の可読性を確保する半透明帯です。</summary>
-	std::array<std::unique_ptr<Sprite>, 5> playerAttackSlotLevelBackgroundSprites_;
-	std::array<std::unique_ptr<Sprite>, 5> playerStatusSlotLevelBackgroundSprites_;
-	/// <summary>装備中の武器・ステータスの現在レベル表示です。</summary>
-	std::array<std::unique_ptr<GameObject>, 5> playerAttackSlotLevelTextObjects_;
-	std::array<std::unique_ptr<GameObject>, 5> playerStatusSlotLevelTextObjects_;
-	std::array<bool, 5> playerAttackSlotIconVisible_{};
-	std::array<bool, 5> playerStatusSlotIconVisible_{};
-	std::array<bool, 5> playerAttackSlotLevelVisible_{};
-	std::array<bool, 5> playerStatusSlotLevelVisible_{};
-	/// <summary>名前とレベルが変化したスロットだけJSONを再読込するためのキャッシュです。</summary>
-	std::array<std::string, 5> playerAttackSlotTextureKeys_{};
-	std::array<std::string, 5> playerAttackSlotTexturePaths_{};
-	std::array<std::string, 5> playerStatusSlotTextureKeys_{};
-	std::array<std::string, 5> playerStatusSlotTexturePaths_{};
-	std::unique_ptr<GameObject> playerAttackSlotLabelObject_;
-	std::unique_ptr<GameObject> playerStatusSlotLabelObject_;
-	bool isPlayerSlotHudVisible_ = false;
-	GameplayMode gameplayMode_ = GameplayMode::Playing;
-	Player* levelUpPlayer_ = nullptr;
+	/// <summary>エディタの選択対象とアクティブカメラ指定を管理します。</summary>
+	SceneEditorState sceneEditorState_;
+	/// <summary>エディタ用SkyBoxのリソースと編集状態を管理します。</summary>
+	SceneEditorSkyBox sceneEditorSkyBox_;
+	/// <summary>戦闘HUDの表示状態と描画リソースを管理します。</summary>
+	GameplayHud gameplayHud_;
+	PlayerComponent* levelUpPlayer_ = nullptr;
 	int selectedLevelUpChoiceIndex_ = 0;
 	std::vector<LevelUpChoice> levelUpChoices_;
 	/// <summary>現在の通常レベルアップ選択でリロールを消費したかを示します。</summary>
@@ -456,15 +427,34 @@ private:
 	/// <summary>ボス報酬で提示する未所持攻撃・アイテムの待機列です。</summary>
 	std::vector<LevelUpChoice> bossAcquisitionOfferQueue_;
 	/// <summary>取得確認の反映先となるプレイヤーへの非所有参照です。</summary>
-	Player* bossAcquisitionPlayer_ = nullptr;
+	PlayerComponent* bossAcquisitionPlayer_ = nullptr;
 	std::unique_ptr<Sprite> levelUpOverlaySprite_;
 	std::unique_ptr<Sprite> levelUpPanelSprite_;
+	std::array<std::unique_ptr<Sprite>, 2> levelUpPanelAccentSprites_;
 	std::array<std::unique_ptr<Sprite>, 3> levelUpChoiceBorderSprites_;
 	std::array<std::unique_ptr<Sprite>, 3> levelUpChoiceSprites_;
+	std::array<std::unique_ptr<Sprite>, 3> levelUpChoiceAccentSprites_;
 	std::array<std::unique_ptr<Sprite>, 3> levelUpChoiceIconSprites_;
-	std::unique_ptr<GameObject> levelUpTitleTextObject_;
-	std::unique_ptr<GameObject> levelUpInstructionTextObject_;
-	std::array<std::unique_ptr<GameObject>, 3> levelUpChoiceTextObjects_;
+	std::array<std::array<std::unique_ptr<Sprite>, kPlayerEquipmentSlotCount>, 3> levelUpChoiceCorrespondingIconSprites_;
+	std::unique_ptr<Entity> levelUpTitleTextObject_;
+	std::unique_ptr<Entity> levelUpInstructionTextObject_;
+	std::array<std::unique_ptr<Entity>, 3> levelUpChoiceTextObjects_;
+	/// <summary>開封演出の最後に表示する全抽選結果です。</summary>
+	std::vector<LevelUpChoice> bossRewardResults_;
+	float bossRewardPresentationTimer_ = 0.0f;
+	bool bossRewardPresentationReady_ = false;
+	int bossRewardPresentationMoney_ = 0;
+	std::unique_ptr<Sprite> bossRewardOverlaySprite_;
+	std::unique_ptr<Sprite> bossRewardFlashSprite_;
+	std::unique_ptr<Sprite> bossRewardChestBackSprite_;
+	std::unique_ptr<Sprite> bossRewardChestFrontSprite_;
+	std::unique_ptr<Sprite> bossRewardChestLidSprite_;
+	std::array<std::unique_ptr<Sprite>, 16> bossRewardBurstSprites_;
+	std::array<std::unique_ptr<Sprite>, 5> bossRewardIconBackSprites_;
+	std::array<std::unique_ptr<Sprite>, 5> bossRewardIconSprites_;
+	std::unique_ptr<Entity> bossRewardTitleTextObject_;
+	std::unique_ptr<Entity> bossRewardMoneyTextObject_;
+	std::unique_ptr<Entity> bossRewardInstructionTextObject_;
 	Camera* fallbackCamera_ = nullptr;
 };
 

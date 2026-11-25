@@ -1,8 +1,8 @@
 #pragma once
 
 #include "../../base/GameTime.h"
-#include "core/Component.h"
-#include "core/GameObject.h"
+#include "core/EntityComponent.h"
+#include "core/Entity.h"
 #include "ParticleManager.h"
 #include <array>
 #include <cmath>
@@ -12,7 +12,7 @@
 /// 1つのGameObjectの周囲へ、カメラを向く2層の加算Haloを表示します。
 /// 内側は明るい芯のにじみ、外側は大きく薄い光の広がりを担当します。
 /// </summary>
-class GlowBillboardComponent final : public Component {
+class GlowBillboardComponent final : public EntityComponent {
 public:
 	void Initialize() override {
 		// GameObject名を含め、ほかのHaloとパーティクルグループが衝突しないようにする。

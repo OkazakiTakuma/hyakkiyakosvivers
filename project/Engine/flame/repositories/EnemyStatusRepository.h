@@ -1,6 +1,7 @@
 #pragma once
 
-#include "components/Enemy/EnemyComponent.h"
+#include "data/EnemyStatsData.h"
+#include "helpers/SceneJsonUtility.h"
 #include "../../base/StringUtility.h"
 
 #include <algorithm>
@@ -38,6 +39,7 @@ inline const char* BehaviorToString(EnemyBehaviorType behavior) {
 	case EnemyBehaviorType::SelfDestruct: return "SelfDestruct";
 	case EnemyBehaviorType::TornadoBoss: return "TornadoBoss";
 	case EnemyBehaviorType::BurstShooter: return "BurstShooter";
+	case EnemyBehaviorType::BarrierBoss: return "BarrierBoss";
 	default: return "Chase";
 	}
 }
@@ -49,6 +51,7 @@ inline EnemyBehaviorType BehaviorFromString(const std::string& behavior) {
 	if (behavior == "SelfDestruct") return EnemyBehaviorType::SelfDestruct;
 	if (behavior == "TornadoBoss") return EnemyBehaviorType::TornadoBoss;
 	if (behavior == "BurstShooter") return EnemyBehaviorType::BurstShooter;
+	if (behavior == "BarrierBoss") return EnemyBehaviorType::BarrierBoss;
 	return EnemyBehaviorType::Chase;
 }
 
@@ -57,14 +60,22 @@ inline nlohmann::json ToJson(const EnemyStats& stats) {
 	json["health"] = stats.health;
 	json["attack"] = stats.attack;
 	json["speed"] = stats.speed;
+	json["knockbackResistance"] = stats.knockbackResistance;
 	json["shootingInterval"] = stats.shootingInterval;
 	json["spawnsPerMinute"] = stats.spawnsPerMinute;
 	json["experience"] = stats.experience;
 	json["experienceModel"] = stats.experienceModelFilePath;
+	json["modelFilePath"] = stats.modelFilePath;
+	json["modelDirectory"] = stats.modelDirectory;
+	json["usesAnimatedModel"] = stats.usesAnimatedModel;
+	json["defeatAnimationName"] = stats.defeatAnimationName;
+	json["baseColor"] = SceneJsonUtility::Vector4ToJson(stats.baseColor);
+	json["overridesBaseColor"] = stats.overridesBaseColor;
 	// アイテム調整値も敵タイプ別に保存し、エディタで設定した値を次回起動時に復元する。
 	json["healthItemDropChance"] = stats.healthItemDropChance;
 	json["collectExperienceItemDropChance"] = stats.collectExperienceItemDropChance;
 	json["healthItemHealAmount"] = stats.healthItemHealAmount;
+	json["dropsBossUpgrade"] = stats.dropsBossUpgrade;
 	json["behavior"] = BehaviorToString(stats.behavior);
 	json["preferredDistance"] = stats.preferredDistance;
 	json["distanceTolerance"] = stats.distanceTolerance;
@@ -121,6 +132,8 @@ inline nlohmann::json ToJson(const EnemyStats& stats) {
 	json["selfDestructTriggerDistance"] = stats.selfDestructTriggerDistance;
 	json["selfDestructFuseDuration"] = stats.selfDestructFuseDuration;
 	json["selfDestructRadius"] = stats.selfDestructRadius;
+	json["selfDestructSpawnInFront"] = stats.selfDestructSpawnInFront;
+	json["selfDestructSpawnDistance"] = stats.selfDestructSpawnDistance;
 	json["sizeScale"] = stats.sizeScale;
 	return json;
 }
@@ -134,14 +147,23 @@ inline EnemyStats FromJson(const nlohmann::json& json, const EnemyStats& fallbac
 	stats.health = (std::max)(0.0f, json.value("health", stats.health));
 	stats.attack = (std::max)(0.0f, json.value("attack", stats.attack));
 	stats.speed = (std::max)(0.0f, json.value("speed", stats.speed));
+	stats.knockbackResistance = (std::clamp)(json.value("knockbackResistance", stats.knockbackResistance), 0, 3);
 	stats.shootingInterval = (std::max)(0.0f, json.value("shootingInterval", stats.shootingInterval));
 	stats.spawnsPerMinute = (std::max)(0.0f, json.value("spawnsPerMinute", stats.spawnsPerMinute));
 	stats.experience = (std::max)(0, json.value("experience", stats.experience));
 	stats.experienceModelFilePath = json.value("experienceModel", stats.experienceModelFilePath);
+	stats.modelFilePath = json.value("modelFilePath", stats.modelFilePath);
+	stats.modelDirectory = json.value("modelDirectory", stats.modelDirectory);
+	stats.usesAnimatedModel = json.value("usesAnimatedModel", stats.usesAnimatedModel);
+	stats.defeatAnimationName = json.value("defeatAnimationName", stats.defeatAnimationName);
+	stats.baseColor = SceneJsonUtility::JsonToVector4(
+		json.value("baseColor", nlohmann::json::array()), stats.baseColor);
+	stats.overridesBaseColor = json.value("overridesBaseColor", stats.overridesBaseColor);
 	// 不正なJSON値で抽選確率や回復量が範囲外にならないよう、読み込み時に補正する。
 	stats.healthItemDropChance = (std::clamp)(json.value("healthItemDropChance", stats.healthItemDropChance), 0.0f, 1.0f);
 	stats.collectExperienceItemDropChance = (std::clamp)(json.value("collectExperienceItemDropChance", stats.collectExperienceItemDropChance), 0.0f, 1.0f);
 	stats.healthItemHealAmount = (std::max)(0.0f, json.value("healthItemHealAmount", stats.healthItemHealAmount));
+	stats.dropsBossUpgrade = json.value("dropsBossUpgrade", stats.dropsBossUpgrade);
 	stats.behavior = BehaviorFromString(json.value("behavior", std::string(BehaviorToString(stats.behavior))));
 	stats.preferredDistance = (std::max)(0.0f, json.value("preferredDistance", stats.preferredDistance));
 	stats.distanceTolerance = (std::max)(0.0f, json.value("distanceTolerance", stats.distanceTolerance));
@@ -216,6 +238,9 @@ inline EnemyStats FromJson(const nlohmann::json& json, const EnemyStats& fallbac
 	stats.selfDestructFuseDuration =
 	    (std::max)(0.0f, json.value("selfDestructFuseDuration", stats.selfDestructFuseDuration));
 	stats.selfDestructRadius = (std::max)(0.0f, json.value("selfDestructRadius", stats.selfDestructRadius));
+	stats.selfDestructSpawnInFront = json.value("selfDestructSpawnInFront", stats.selfDestructSpawnInFront);
+	stats.selfDestructSpawnDistance =
+	    (std::max)(0.0f, json.value("selfDestructSpawnDistance", stats.selfDestructSpawnDistance));
 	// 0以下の倍率でモデルやコライダーが消失しないよう、最小サイズを保証する。
 	stats.sizeScale = (std::max)(0.1f, json.value("sizeScale", stats.sizeScale));
 	return stats;

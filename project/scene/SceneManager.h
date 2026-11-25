@@ -1,19 +1,21 @@
 #pragma once
 #include "core/AbstractSceneFactory.h"
 #include "base_scene/StageResultData.h"
+#include "DemoDirector.h"
+#include "GameProgress.h"
+#include "StageUnlockCatalog.h"
 #include "Vector.h"
 
 #include <memory>
 #include <array>
 #include <string>
 #include <vector>
-#include <unordered_map>
-#include <unordered_set>
 
 class BaseScene;
 class Camera;
-class GameObject;
+class Entity;
 class Sprite;
+struct PlayerStats;
 
 /// <summary>シーン切り替え時に使用する画面演出です。</summary>
 enum class SceneTransitionType {
@@ -104,7 +106,7 @@ public:
 	void SetScenePlaying(bool isPlaying) { isScenePlaying_ = isPlaying; }
 	bool IsScenePlaying() const { return isScenePlaying_; }
 	/// <summary>F1で開始した自動デモが実行中かどうかを返します。</summary>
-	bool IsDemoPlayActive() const { return isDemoPlayActive_; }
+	bool IsDemoPlayActive() const { return demoDirector_.IsActive(); }
 	void RequestFrameStep() { isFrameStepRequested_ = true; }
 	/// <summary>シーン遷移中でなければ、現在の配置JSONからシーンを再構築します。</summary>
 	bool ReloadCurrentSceneJson();
@@ -129,16 +131,18 @@ public:
 	/// <summary>最後に確定した戦績を返します。</summary>
 	const StageResultData& GetStageResultData() const { return stageResultData_; }
 	/// <summary>全シーンで共有する現在の所持金を返します。</summary>
-	int GetMoney() const { return money_; }
+	int GetMoney() const { return gameProgress_.GetMoney(); }
 	/// <summary>保存済みのゲーム進行と実行中の進行状態を初期状態へ戻します。</summary>
 	void ResetGameProgress();
 	/// <summary>獲得金を所持金へ加算し、進行データへ保存します。</summary>
 	void AddMoney(int amount);
 	/// <summary>残高が足りる場合だけ所持金を消費し、進行データへ保存します。</summary>
 	bool SpendMoney(int amount);
-	/// <summary>指定プレイヤーの商品購入レベルを取得します。ショップ内の対象切り替えで使用します。</summary>
+	/// <summary>ショップ購入を一度だけ保存し、失敗時は残高とレベルを購入前へ戻します。</summary>
+	ShopPurchaseResult PurchaseGlobalShopUpgrade(const std::string& upgradeId, int price, int maxLevel);
+	/// <summary>指定プレイヤーへ共通ステータス強化を適用済みのレベルを取得します。</summary>
 	int GetShopUpgradeLevelForPlayer(const std::string& playerTypeName, const std::string& upgradeId) const;
-	/// <summary>指定プレイヤーの商品購入レベルを更新し、進行データへ保存します。</summary>
+	/// <summary>指定プレイヤーへ共通ステータス強化を適用済みのレベルを更新して保存します。</summary>
 	void SetShopUpgradeLevelForPlayer(const std::string& playerTypeName, const std::string& upgradeId, int level);
 	/// <summary>全キャラクター共通商品の購入レベルを取得します。</summary>
 	int GetGlobalShopUpgradeLevel(const std::string& upgradeId) const;
@@ -148,6 +152,8 @@ public:
 	float GetGlobalExperienceBonusPercent() const;
 	/// <summary>全体強化倍率を適用したステージ獲得Gを返します。</summary>
 	int ApplyGlobalGoldBonus(int baseAmount) const;
+	/// <summary>基礎定義を変更せず、購入レベルからプレイヤーの実効能力を計算します。</summary>
+	PlayerStats ApplyGlobalShopStatUpgrades(const PlayerStats& stats) const;
 
 private:
 	/// <summary>
@@ -160,7 +166,7 @@ private:
 	void SwitchToNextScene();
 	/// <summary>経過時間から遷移のフェーズと画面被覆率を更新します。</summary>
 	void UpdateTransition();
-	/// <summary>F1入力と、キャラクター選択から敗北リザルトまでを繰り返す自動デモの進行を更新します。</summary>
+	/// <summary>F1入力とステージ2の自動デモの再上映を処理します。</summary>
 	void UpdateDemoPlay();
 	/// <summary>デモ再生中であることと停止操作を、全シーン共通の最前面へ表示します。</summary>
 	void DrawDemoPlayGuide();
@@ -173,17 +179,11 @@ private:
 	/// <summary>所持金とショップ購入レベルを進行データJSONから読み込みます。</summary>
 	void LoadGameProgress();
 	/// <summary>所持金とショップ購入レベルを進行データJSONへ書き込みます。</summary>
-	void SaveGameProgress() const;
+	bool SaveGameProgress() const;
 	/// <summary>ステージごとの開放条件を編集用JSONから読み込みます。</summary>
 	void LoadStageUnlockConditions();
 	/// <summary>ImGuiで編集したステージ開放条件をJSONへ保存します。</summary>
 	void SaveStageUnlockConditions() const;
-	/// <summary>開放条件の変更によって循環参照が発生するかを判定します。</summary>
-	bool WouldCreateStageUnlockCycle(const std::string& stageId, const std::string& prerequisiteStageId) const;
-	/// <summary>ショップ対象を明示して商品レベルの保存キーを生成します。</summary>
-	std::string MakeShopUpgradeKey(const std::string& playerTypeName, const std::string& upgradeId) const;
-	/// <summary>全キャラクター共通商品の保存キーを生成します。</summary>
-	std::string MakeGlobalShopUpgradeKey(const std::string& upgradeId) const;
 	bool IsValidGameplayStageId(const std::string& stageId) const;
 	int FindGameplayStageIndex(const std::string& stageId) const;
 
@@ -196,7 +196,10 @@ private:
 	/// <summary>デモ再生中の操作案内を読みやすくする半透明パネルです。</summary>
 	std::unique_ptr<Sprite> demoGuideBackgroundSprite_;
 	/// <summary>デモ再生中に全シーンで表示するF1停止案内です。</summary>
-	std::unique_ptr<GameObject> demoGuideTextObject_;
+	std::unique_ptr<Entity> demoGuideTextObject_;
+	/// <summary>ゲーム画面で、現在発生中のパーティクルと使用箇所を説明します。</summary>
+	std::unique_ptr<Entity> demoParticleGuideTextObject_;
+	std::unique_ptr<Sprite> demoParticleGuideBackgroundSprite_;
 	TransitionPhase transitionPhase_ = TransitionPhase::Idle;
 	SceneTransitionSettings transitionSettings_{};
 	/// <summary>遷移開始時に確定し、途中の設定変更によるパターン切り替わりを防ぎます。</summary>
@@ -220,20 +223,10 @@ private:
 	int selectedSceneIndex_ = 0;
 	bool isScenePlaying_ = true;
 	bool isFrameStepRequested_ = false;
-	/// <summary>キャラクター選択、検証ステージ、敗北リザルトを巡回する自動デモの有効状態です。</summary>
-	bool isDemoPlayActive_ = false;
-	/// <summary>自動デモで現在のシーンを見せ始めてからの経過秒数です。</summary>
-	float demoSceneElapsed_ = 0.0f;
-	/// <summary>自動デモのタイマーをシーン切り替え時にリセットするための直前シーン名です。</summary>
-	std::string demoObservedSceneName_;
-	/// <summary>どの画面でF1を押しても、キャラクター選択からデモを始めるための要求です。</summary>
-	bool isDemoRestartRequested_ = false;
-	/// <summary>現在のシーンで通常の決定演出を開始済みかどうかです。</summary>
-	bool isDemoAdvancePresentationStarted_ = false;
-	/// <summary>自動デモで順番に使用する、Defaultを除いた全プレイヤータイプです。</summary>
-	std::vector<std::string> demoPlayerTypeNames_;
-	/// <summary>次のデモ周回で使用するプレイヤータイプの位置です。</summary>
-	size_t demoPlayerTypeIndex_ = 0;
+	/// <summary>自動デモのタイマー・周回順・進行判断を所有します。</summary>
+	DemoDirector demoDirector_;
+	bool demoToggleRequested_ = false;
+	std::string stageBeforeDemo_;
 	/// <summary>シーンをまたいで引き継ぐプレイヤータイプです。初回は唯一開放済みの巫女を使用します。</summary>
 	std::string selectedPlayerTypeName_ = "巫女";
 	std::vector<std::string> gameplayStageIds_ = {"default"};
@@ -244,21 +237,8 @@ private:
 	std::string gameplayStageMessage_;
 	/// <summary>GamePlaySceneからResultSceneへ受け渡す戦績のスナップショットです。</summary>
 	StageResultData stageResultData_;
-	/// <summary>ゲーム全体で共有し、シーンをまたいで保持する所持金です。</summary>
-	int money_ = 0;
-	/// <summary>「プレイヤー名:商品ID」をキーとする購入済みレベルです。</summary>
-	std::unordered_map<std::string, int> shopUpgradeLevels_;
-	/// <summary>クリア進行によって開放済みになったゲームプレイステージIDです。</summary>
-	std::unordered_set<std::string> unlockedGameplayStageIds_ = {"default"};
-	/// <summary>一度でもクリアしたステージIDです。開放条件を編集した場合も判定へ再利用します。</summary>
-	std::unordered_set<std::string> clearedGameplayStageIds_;
-	/// <summary>選択画面で使用可能なプレイヤータイプ名です。新規・旧形式セーブでは巫女だけを開放します。</summary>
-	std::unordered_set<std::string> unlockedPlayerTypeNames_ = {"巫女"};
-	/// <summary>キーのプレイヤーを開放するためにクリアが必要なステージIDです。</summary>
-	std::unordered_map<std::string, std::string> playerUnlockStagePrerequisites_ = {
-		{"猫", "default"},
-		{"烏天狗", "stage2"}
-	};
-	/// <summary>キーのステージを開放するためにクリアが必要なステージIDです。</summary>
-	std::unordered_map<std::string, std::string> stageUnlockPrerequisites_ = {{"stage2", "default"}};
+	/// <summary>遷移状態から分離した所持金・永続強化の正本です。</summary>
+	GameProgress gameProgress_;
+	/// <summary>進行状態とは分離した、ステージ・キャラクター開放条件の正本です。</summary>
+	StageUnlockCatalog stageUnlockCatalog_;
 };

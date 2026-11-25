@@ -1,11 +1,13 @@
 #pragma once
 #include "../../base/struct.h"
 #include "../camera/Camera.h"
+#include "../sky/AtmosphereSystem.h"
 #include "Matrix.h"
 #include "Vector.h"
 #include "struct.h"
 #include <Windows.h>
 #include <cassert>
+#include <cstddef>
 #include <d3d12.h>
 #include <fstream>
 #include <sstream>
@@ -31,6 +33,8 @@ public:
 	/// 毎フレームの状態更新を行います。
 	/// </summary>
 	void Update();
+	/// <summary>アニメーション時間を進めず、Transform・カメラ・GPU描画情報だけを再同期します。</summary>
+	void SyncRenderState();
 	/// <summary>
 	/// 現在の状態をもとに描画処理を行います。
 	/// </summary>
@@ -80,6 +84,8 @@ public:
 	/// <param name="radius">半径を指定します。</param>
 	/// <param name="height">高さを指定します。</param>
 	void CreateCylinder(float radius = 1.0f, float height = 2.0f, uint32_t subdivision = 16, bool createTopCap = true, bool createBottomCap = true);
+	/// <summary>テクスチャ付き壁面などに使う、両面表示の板ポリゴンを作成します。</summary>
+	void CreatePlane(float width = 2.0f, float height = 2.0f);
 	/// <param name="textureFilePath">使用するテクスチャまたはモデルのファイルパスを指定します。</param>
 	void SetTexture(const std::string& textureFilePath);
 	void SetModelTexture(const std::string& textureFilePath);
@@ -103,11 +109,18 @@ public:
 	/// <param name="radius">半径を指定します。</param>
 	void SetPointLight(const Vector4& color, const Vector3& position, float intensity, float radius, float decay);
 	void SetEnvironmentMultiplier(float multiplier);
-	void SetColor(const Vector4& color) { if (materialOverrideData_) materialOverrideData_->color = color; }
+	void SetColor(const Vector4& color) {
+		if (materialOverrideData_) materialOverrideData_->color = color;
+		if (materialDataCylinder) materialDataCylinder->color = color;
+	}
 	void SetEmission(const Vector3& color, float intensity) {
 		if (materialOverrideData_) {
 			materialOverrideData_->emissiveColor = color;
 			materialOverrideData_->emissiveIntensity = intensity;
+		}
+		if (materialDataCylinder) {
+			materialDataCylinder->emissiveColor = color;
+			materialDataCylinder->emissiveIntensity = intensity;
 		}
 	}
 	/// <summary>指定ボーンへ、モデルのバインド姿勢へ加える回転オフセットを設定します。</summary>
@@ -139,6 +152,7 @@ public:
 	}
 	void SetLightingEnabled(bool enabled) {
 		if (materialOverrideData_) materialOverrideData_->enableLighting = enabled ? 1 : 0;
+		if (materialDataCylinder) materialDataCylinder->enableLighting = enabled ? 1 : 0;
 	}
 	bool GetLightingEnabled() const {
 		return materialOverrideData_ && materialOverrideData_->enableLighting != 0;
@@ -162,18 +176,18 @@ public:
 	void SetEnvironmentMap(const std::string& textureFilePath);
 
 private:
+	void CreatePrimitiveMesh(const std::vector<VertexData>& vertices, const std::vector<uint32_t>& indices);
+	void UpdateState(bool advanceAnimation);
 	DirectXCommon* dxCommon_ = nullptr;
 	struct CameraForGPU {
 		Vector3 worldPosition;
 		float environmentMultiplier;
-		// 既存のカメラCBへ大気遠近法もまとめ、RootSignatureを増やさず全Object3dへ共有します。
-		Vector3 horizonColor;
-		float distanceFogDensity;
-		float heightFogDensity;
-		float aerialPerspectiveStrength;
-		int32_t enableAerialPerspective;
-		float paddingAtmosphere;
+		// 既存のカメラCBへ共通GPU型を埋め込み、HLSL上の平坦なフィールド配置を維持します。
+		AerialPerspectiveGpuData atmosphere;
 	};
+	static_assert(sizeof(CameraForGPU) == 48, "CameraForGPU must match the HLSL constant-buffer layout.");
+	static_assert(offsetof(CameraForGPU, atmosphere) == 16,
+		"Object3d atmosphere fields must start at the HLSL cbuffer offset.");
 	CameraForGPU* cameraData = nullptr;
 	/// <summary>
 	/// SkinningPaletteResource を作成し、利用できる状態にします。

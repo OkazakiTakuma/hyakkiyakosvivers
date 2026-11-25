@@ -1,13 +1,13 @@
 #pragma once
-#include "core/Component.h"
-#include "core/GameObject.h"
+#include "core/EntityComponent.h"
+#include "core/Entity.h"
 #include "ParticleEmitter.h"
 #include "ParticleManager.h"
 #include "../../base/GameTime.h"
 #include <memory>
 #include <string>
 
-class ParticleEmitterComponent : public Component {
+class ParticleEmitterComponent : public EntityComponent {
 public:
 	/// <summary>
 	/// 必要なリソースを準備し、オブジェクトを初期化します。
@@ -92,7 +92,7 @@ public:
 
 private:
 	/// <summary>
-	/// GameObject の Transform をパーティクルエミッターの発生位置へ同期します。
+	/// Entity の Transform をパーティクルエミッターの発生位置へ同期します。
 	/// </summary>
 	void SyncOwnerTransformToEmitter() {
 		if (!emitter_ || !GetOwner()) {

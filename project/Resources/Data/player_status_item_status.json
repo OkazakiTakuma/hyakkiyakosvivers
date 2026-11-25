@@ -1,11 +1,12 @@
 {
     "AttackUp": {
+		"displayName": "龍の加護",
         "descriptions": {
-            "1": "",
-            "2": "",
-            "3": "",
-            "4": "",
-            "5": ""
+			"1": "龍の力を宿し、攻撃力が10上昇する",
+			"2": "龍の力が強まり、攻撃力が20上昇する",
+			"3": "龍気をまとい、攻撃力が30上昇する",
+			"4": "荒ぶる龍気により、攻撃力が40上昇する",
+			"5": "龍神の力が満ち、攻撃力が50上昇する"
         },
         "levels": {
             "1": 10.0,
@@ -16,15 +17,23 @@
         },
         "name": "AttackUp",
         "textures": {
-            "1": "",
-            "2": "",
-            "3": "",
-            "4": "",
-            "5": ""
+			"1": "Resources/Texture/StatusItems/dragon_blessing.png",
+			"2": "Resources/Texture/StatusItems/dragon_blessing.png",
+			"3": "Resources/Texture/StatusItems/dragon_blessing.png",
+			"4": "Resources/Texture/StatusItems/dragon_blessing.png",
+			"5": "Resources/Texture/StatusItems/dragon_blessing.png"
         },
         "type": "Attack"
     },
     "DefenceUp": {
+		"displayName": "狐の加護",
+		"descriptions": {
+			"1": "狐火の守りをまとい、防御力が5上昇する",
+			"2": "幻惑の加護が強まり、防御力が10上昇する",
+			"3": "妖狐の結界をまとい、防御力が15上昇する",
+			"4": "九尾の霊気に守られ、防御力が20上昇する",
+			"5": "天狐の大結界により、防御力が25上昇する"
+		},
         "levels": {
             "1": 5.0,
             "2": 10.0,
@@ -33,15 +42,23 @@
             "5": 25.0
         },
         "name": "DefenceUp",
-        "type": "Attack"
+		"textures": {
+			"1": "Resources/Texture/StatusItems/fox_blessing.png",
+			"2": "Resources/Texture/StatusItems/fox_blessing.png",
+			"3": "Resources/Texture/StatusItems/fox_blessing.png",
+			"4": "Resources/Texture/StatusItems/fox_blessing.png",
+			"5": "Resources/Texture/StatusItems/fox_blessing.png"
+		},
+		"type": "Defense"
     },
     "ExperienceBoost": {
+		"displayName": "梟の加護",
         "descriptions": {
-            "1": "",
-            "2": "",
-            "3": "",
-            "4": "",
-            "5": ""
+			"1": "梟の知恵を授かり、獲得経験値が20%増加する",
+			"2": "夜目の導きが強まり、獲得経験値が40%増加する",
+			"3": "賢梟の知恵を得て、獲得経験値が60%増加する",
+			"4": "森の賢者に導かれ、獲得経験値が80%増加する",
+			"5": "叡智のすべてを授かり、獲得経験値が100%増加する"
         },
         "levels": {
             "1": 20.0,
@@ -52,15 +69,23 @@
         },
         "name": "ExperienceBoost",
         "textures": {
-            "1": "",
-            "2": "",
-            "3": "",
-            "4": "",
-            "5": ""
+			"1": "Resources/Texture/StatusItems/owl_blessing.png",
+			"2": "Resources/Texture/StatusItems/owl_blessing.png",
+			"3": "Resources/Texture/StatusItems/owl_blessing.png",
+			"4": "Resources/Texture/StatusItems/owl_blessing.png",
+			"5": "Resources/Texture/StatusItems/owl_blessing.png"
         },
         "type": "Experience"
     },
     "HasteUp": {
+		"displayName": "猫の加護",
+		"descriptions": {
+			"1": "猫の鋭い身ごなしを宿し、攻撃速度が10%上昇する",
+			"2": "しなやかな連撃により、攻撃速度が20%上昇する",
+			"3": "獲物を狩る俊敏さで、攻撃速度が30%上昇する",
+			"4": "猫又の早業を得て、攻撃速度が40%上昇する",
+			"5": "爪閃が影を残すほど、攻撃速度が50%上昇する"
+		},
         "levels": {
             "1": 10.0,
             "2": 20.0,
@@ -69,9 +94,24 @@
             "5": 50.0
         },
         "name": "HasteUp",
-        "type": "Attack"
+		"textures": {
+			"1": "Resources/Texture/StatusItems/cat_blessing.png",
+			"2": "Resources/Texture/StatusItems/cat_blessing.png",
+			"3": "Resources/Texture/StatusItems/cat_blessing.png",
+			"4": "Resources/Texture/StatusItems/cat_blessing.png",
+			"5": "Resources/Texture/StatusItems/cat_blessing.png"
+		},
+		"type": "AttackSpeed"
     },
     "SizeUp": {
+		"displayName": "大蛇の加護",
+		"descriptions": {
+			"1": "大蛇の力を宿し、攻撃の大きさが5%上昇する",
+			"2": "大蛇の力が強まり、攻撃の大きさが10%上昇する",
+			"3": "巨躯の力を得て、攻撃の大きさが15%上昇する",
+			"4": "山を巻く大蛇の力で、攻撃の大きさが20%上昇する",
+			"5": "八岐の威容をまとい、攻撃の大きさが25%上昇する"
+		},
         "levels": {
             "1": 5.0,
             "2": 10.0,
@@ -80,9 +120,24 @@
             "5": 25.0
         },
         "name": "SizeUp",
+		"textures": {
+			"1": "Resources/Texture/StatusItems/serpent_blessing.png",
+			"2": "Resources/Texture/StatusItems/serpent_blessing.png",
+			"3": "Resources/Texture/StatusItems/serpent_blessing.png",
+			"4": "Resources/Texture/StatusItems/serpent_blessing.png",
+			"5": "Resources/Texture/StatusItems/serpent_blessing.png"
+		},
         "type": "AttackSize"
     },
     "SpeedUp": {
+		"displayName": "鴉の加護",
+		"descriptions": {
+			"1": "鴉の翼を宿し、移動速度が10%上昇する",
+			"2": "黒翼の勢いが増し、移動速度が20%上昇する",
+			"3": "疾風に乗る翼を得て、移動速度が30%上昇する",
+			"4": "神鴉の羽ばたきにより、移動速度が40%上昇する",
+			"5": "天を翔ける神速で、移動速度が50%上昇する"
+		},
         "levels": {
             "1": 10.0,
             "2": 20.0,
@@ -91,6 +146,13 @@
             "5": 50.0
         },
         "name": "SpeedUp",
-        "type": "Attack"
+		"textures": {
+			"1": "Resources/Texture/StatusItems/crow_blessing.png",
+			"2": "Resources/Texture/StatusItems/crow_blessing.png",
+			"3": "Resources/Texture/StatusItems/crow_blessing.png",
+			"4": "Resources/Texture/StatusItems/crow_blessing.png",
+			"5": "Resources/Texture/StatusItems/crow_blessing.png"
+		},
+		"type": "Speed"
     }
 }

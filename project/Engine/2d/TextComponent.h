@@ -1,8 +1,9 @@
 #pragma once
-#include "core/Component.h"
+#include "core/EntityComponent.h"
 #include "Sprite.h"
 #include "SpriteCommon.h"
 #include "TextureManager.h"
+#include "FontManager.h"
 #include "Vector.h"
 #include <Windows.h>
 #include <dwrite.h>
@@ -20,7 +21,7 @@
 #pragma comment(lib, "dwrite.lib")
 
 /// <summary>DirectWriteで文字列をRGBAテクスチャへ変換し、Spriteとして2D描画します。</summary>
-class TextComponent : public Component {
+class TextComponent : public EntityComponent {
 public:
 	TextComponent()
 		: runtimeTextureKey_("__runtime_text_component_" + std::to_string(nextRuntimeTextureId_.fetch_add(1, std::memory_order_relaxed))) {}
@@ -61,6 +62,12 @@ public:
 	const std::string& GetText() const { return text_; }
 	void SetFontName(const std::string& fontName) { const std::string value = fontName.empty() ? "Default" : fontName; if (fontName_ != value) { fontName_ = value; isTextureDirty_ = true; } }
 	const std::string& GetFontName() const { return fontName_; }
+	void SetFontWeight(DWRITE_FONT_WEIGHT weight) {
+		if (fontWeight_ != weight) {
+			fontWeight_ = weight;
+			isTextureDirty_ = true;
+		}
+	}
 	void SetFontSize(float fontSize) { const float value = fontSize < 1.0f ? 1.0f : fontSize; if (fontSize_ != value) { fontSize_ = value; isTextureDirty_ = true; } }
 	float GetFontSize() const { return fontSize_; }
 	/// <summary>文字を収める最大領域を指定します。幅を指定すると自動改行し、高さを超える場合はフォントを縮小します。</summary>
@@ -101,7 +108,11 @@ public:
 			return {0.0f, 0.0f};
 		}
 	}
-	void Finalize() override { textSprite_.reset(); }
+	void Finalize() override {
+		// Spriteを先に破棄し、続いて所有ハンドルから文字テクスチャとSRVを返却する。
+		textSprite_.reset();
+		runtimeTexture_.Reset();
+	}
 
 private:
 	/// <summary>DirectWriteの文字描画結果をBitmapRenderTargetへ渡すレンダラーです。</summary>
@@ -194,11 +205,15 @@ private:
 			isTextureDirty_ = false;
 			return;
 		}
-		// DirectWriteはフォント名からフォントフェイスを解決するため、
-		// FontManagerが登録済みのリソースフォントも通常のファミリー名で利用できる。
 		IDWriteFactory* factory = GetDirectWriteFactory();
 		if (!factory) return;
 		const std::wstring requestedFont = fontName_ == "Default" ? L"Meiryo" : ToWideString(fontName_);
+		IDWriteFontCollection* collection = FontManager::GetInstance()->GetCollection();
+		UINT32 familyIndex = 0;
+		BOOL hasFamily = FALSE;
+		if (collection && (FAILED(collection->FindFamilyName(requestedFont.c_str(), &familyIndex, &hasFamily)) || !hasFamily)) {
+			collection = nullptr;
+		}
 		Microsoft::WRL::ComPtr<IDWriteTextLayout> layout;
 		DWRITE_TEXT_METRICS metrics{};
 		// 指定領域がある文字は折り返し、それでも縦に収まらない場合だけ少しずつ縮小する。
@@ -206,7 +221,7 @@ private:
 		const float minimumFontSize = (std::min)(fontSize_, 8.0f);
 		for (float fittedFontSize = fontSize_; fittedFontSize >= minimumFontSize; fittedFontSize -= 1.0f) {
 			Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
-			if (FAILED(factory->CreateTextFormat(requestedFont.c_str(), nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
+			if (FAILED(factory->CreateTextFormat(requestedFont.c_str(), collection, fontWeight_, DWRITE_FONT_STYLE_NORMAL,
 				DWRITE_FONT_STRETCH_NORMAL, fittedFontSize, L"ja-jp", &format))) return;
 			// 日本語や空白を含まない長い名前でも欄外へ出ないよう、領域指定時は文字単位で改行する。
 			format->SetWordWrapping(hasLayoutBounds ? DWRITE_WORD_WRAPPING_CHARACTER : DWRITE_WORD_WRAPPING_NO_WRAP);
@@ -267,7 +282,16 @@ private:
 		DeleteObject(bitmap);
 		DeleteDC(copyDc);
 
-		TextureManager::GetInstance()->CreateTextureFromRGBA(runtimeTextureKey_, static_cast<uint32_t>(width), static_cast<uint32_t>(height), rgbaPixels);
+		TextureManager* textureManager = TextureManager::GetInstance();
+		if (!runtimeTexture_.IsValid()) {
+			runtimeTexture_ = textureManager->CreateOwnedTextureFromRGBA(
+				runtimeTextureKey_, static_cast<uint32_t>(width), static_cast<uint32_t>(height), rgbaPixels);
+		} else {
+			textureManager->CreateTextureFromRGBA(
+				runtimeTextureKey_, static_cast<uint32_t>(width), static_cast<uint32_t>(height), rgbaPixels);
+		}
+		// SRVヒープ満杯などで生成できなかった場合はSpriteを作らず、次回再試行する。
+		if (!runtimeTexture_.IsValid()) return;
 		textSprite_ = std::make_unique<Sprite>();
 		textSprite_->Initialize(runtimeTextureKey_);
 		textSprite_->SetSize({static_cast<float>(width), static_cast<float>(height)});
@@ -277,6 +301,7 @@ private:
 	/// <summary>次回のテクスチャ生成に使用する表示文字列です。</summary>
 	std::string text_ = "Text";
 	std::string fontName_ = "Default";
+	DWRITE_FONT_WEIGHT fontWeight_ = DWRITE_FONT_WEIGHT_NORMAL;
 	float fontSize_ = 32.0f;
 	float layoutMaxWidth_ = 4096.0f;
 	float layoutMaxHeight_ = 4096.0f;
@@ -286,6 +311,7 @@ private:
 	bool isTextureDirty_ = true;
 	/// <summary>生成済み文字テクスチャを表示するSpriteです。</summary>
 	std::unique_ptr<Sprite> textSprite_;
+	TextureManager::RuntimeTextureHandle runtimeTexture_;
 	std::string runtimeTextureKey_;
 	static inline std::atomic<uint64_t> nextRuntimeTextureId_ = 0;
 };

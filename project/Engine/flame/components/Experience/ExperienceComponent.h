@@ -1,15 +1,15 @@
 #pragma once
-#include "core/Component.h"
-#include "core/GameObject.h"
-#include "../../../../Player/Player.h"
+#include "core/EntityComponent.h"
+#include "core/Entity.h"
+#include "../../../../Player/PlayerComponent.h"
 #include <algorithm>
 #include <string>
 
 /// <summary>経験値アイテムをプレイヤーへ吸着させ、接触時に経験値を付与します。</summary>
-class ExperienceComponent : public Component {
+class ExperienceComponent : public EntityComponent {
 public:
 	void Update() override {
-		GameObject* owner = GetOwner();
+		Entity* owner = GetOwner();
 		if (!owner || !target_) {
 			return;
 		}
@@ -19,12 +19,22 @@ public:
 		Vector3 horizontalToTarget = toTarget;
 		horizontalToTarget.y = 0.0f;
 		const float distance = Length(horizontalToTarget);
+		// ボス報酬だけは吸着せず、プレイヤー自身が触れた場合にのみ回収する。
+		if (bossUpgradeReward_) {
+			if (!collectionEnabled_) {
+				return;
+			}
+			if (distance <= collectDistance_ && target_->GetComponent<PlayerComponent>()) {
+				collected_ = true;
+			}
+			return;
+		}
 		if (!isAttracting_ && distance > attractDistance_) {
 			return;
 		}
 		// 一度吸着範囲に入ったら、プレイヤーが移動し続けても回収まで追尾を継続する。
 		isAttracting_ = true;
-		Player* player = target_->GetComponent<Player>();
+		PlayerComponent* player = target_->GetComponent<PlayerComponent>();
 		if (distance <= collectDistance_) {
 			// ボス強化ドロップはシーン側で装備スロットへ反映するため、ここでは経験値を加算しない。
 			if (player) {
@@ -56,11 +66,11 @@ public:
 	int GetExperience() const { return experience_; }
 	void SetModelFilePath(const std::string& modelFilePath) { modelFilePath_ = modelFilePath; }
 	const std::string& GetModelFilePath() const { return modelFilePath_; }
-	void SetTarget(GameObject* target) {
+	void SetTarget(Entity* target) {
 		target_ = target;
 		isAttracting_ = false;
 	}
-	GameObject* GetTarget() const { return target_; }
+	Entity* GetTarget() const { return target_; }
 	void SetAttractDistance(float distance) { attractDistance_ = distance < 0.0f ? 0.0f : distance; }
 	float GetAttractDistance() const { return attractDistance_; }
 	void SetCollectDistance(float distance) { collectDistance_ = distance < 0.0f ? 0.0f : distance; }
@@ -71,6 +81,8 @@ public:
 	/// <summary>通常経験値ではなく、ボス撃破時の装備強化報酬として扱うかを設定します。</summary>
 	void SetBossUpgradeReward(bool enabled) { bossUpgradeReward_ = enabled; }
 	bool IsBossUpgradeReward() const { return bossUpgradeReward_; }
+	/// <summary>ボス撃破アニメーション終了まで報酬の接触回収を待機させます。</summary>
+	void SetCollectionEnabled(bool enabled) { collectionEnabled_ = enabled; }
 	/// <summary>1個の報酬を拾った際に行う強化抽選回数を設定します。</summary>
 	void SetBossUpgradeCount(int count) { bossUpgradeCount_ = count < 1 ? 1 : count; }
 	int GetBossUpgradeCount() const { return bossUpgradeCount_; }
@@ -93,13 +105,14 @@ private:
 	static constexpr float kPlayerSpeedMargin = 0.12f;
 	std::string modelFilePath_ = "enemy_drop.obj";
 	/// <summary>吸着対象となるGameObjectへの非所有参照です。</summary>
-	GameObject* target_ = nullptr;
+	Entity* target_ = nullptr;
 	/// <summary>通常の接触回収が完了したかを表します。</summary>
 	bool collected_ = false;
 	/// <summary>一度吸着範囲に入り、回収まで追尾を継続する状態かを表します。</summary>
 	bool isAttracting_ = false;
 	/// <summary>経験値加算を行わず、シーン側のボス報酬処理へ渡すための識別フラグです。</summary>
 	bool bossUpgradeReward_ = false;
+	bool collectionEnabled_ = true;
 	/// <summary>報酬オブジェクトの個数ではなく、この1個に内包される強化回数です。</summary>
 	int bossUpgradeCount_ = 1;
 	/// <summary>回収後に同じ報酬を複数フレーム適用しないための完了フラグです。</summary>

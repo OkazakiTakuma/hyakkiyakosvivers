@@ -1,14 +1,15 @@
 #pragma once
 #include "base_scene/BaseScene.h"
-#include "core/GameObject.h"
+#include "core/Entity.h"
 #include "object/Object3dComponent.h"
 #include "particle/ParticleEmitterComponent.h"
 #include "sky/AtmosphereSky.h"
 #include "SpriteComponent.h"
 #include "instancing/GrassInstancingModel.h"
+#include "DemoSceneControl.h"
 
 
-class GamePlayScene: public BaseScene {
+class GamePlayScene: public BaseScene, public IDemoGameplayControl {
 public:
 	/// <summary>
 	/// 必要なリソースを準備し、オブジェクトを初期化します。
@@ -36,17 +37,21 @@ public:
 	/// 確保したリソースを解放し、終了処理を行います。
 	/// </summary>
 	void Finalize() override;
-	/// <summary>ゲームプレイ固有処理とBaseScene共通処理の両方へSceneManagerを設定します。</summary>
-	void SetSceneManager(SceneManager* manager) override {
-		BaseScene::SetSceneManager(manager);
-		sceneManager = manager;
-	}
 	/// ゲームプレイ画面の「Show Particles」設定を共通描画処理へ反映します。
 	bool IsParticleRenderingEnabled() const override { return isShowParticles_; }
-	/// <summary>自動デモからプレイヤーを敗北させ、通常と同じゲームオーバー演出を開始します。</summary>
-	bool BeginDemoDefeatPresentation();
+	const char* GetDemoParticleCue() const override { return demoParticleCue_; }
 
 private:
+	void UpdateParticleDemo();
+	void FireDemoMagatama(Entity& player, const Entity& boss, float damage, int colorIndex);
+	std::string demoPlayerName_;
+	std::string demoBomberName_;
+	std::string demoBossName_;
+	const char* demoParticleCue_ = "自爆敵の導火線に注目";
+	float demoPhaseElapsed_ = 0.0f;
+	int demoShownPatterns_ = 0;
+	bool demoShotFired_ = false;
+	Vector3 demoDodgeTarget_{};
 	bool isShowSkyBox_ = false;
 	bool isShowSprite_ = true;
 	bool isShowSprites_ = true;
@@ -60,23 +65,23 @@ private:
 	std::unique_ptr<Sprite> pauseOverlaySprite_;
 	std::unique_ptr<Sprite> pausePanelSprite_;
 	std::unique_ptr<Sprite> pauseSelectionSprite_;
-	std::unique_ptr<GameObject> pauseTitleTextObject_;
-	std::vector<std::unique_ptr<GameObject>> pauseMenuTextObjects_;
-	std::unique_ptr<GameObject> pauseInstructionTextObject_;
+	std::unique_ptr<Entity> pauseTitleTextObject_;
+	std::vector<std::unique_ptr<Entity>> pauseMenuTextObjects_;
+	std::unique_ptr<Entity> pauseInstructionTextObject_;
 	std::unique_ptr<Audio> audio_ = nullptr;
-	std::unique_ptr<GameObject> spriteObject_ = nullptr;
+	std::unique_ptr<Entity> spriteObject_ = nullptr;
 	SpriteComponent* sprite = nullptr;
 
-	std::vector<std::unique_ptr<GameObject>> spriteObjects_;
+	std::vector<std::unique_ptr<Entity>> spriteObjects_;
 	std::vector<SpriteComponent*> sprites;
-	std::unique_ptr<GameObject> object3dObject_ = nullptr;
+	std::unique_ptr<Entity> object3dObject_ = nullptr;
 	Object3dComponent* object3d = nullptr;
-	std::unique_ptr<GameObject> sphereGameObject_ = nullptr;
+	std::unique_ptr<Entity> sphereGameObject_ = nullptr;
 	Object3dComponent* sphereObject = nullptr;
-	std::unique_ptr<GameObject> cylinderGameObject_ = nullptr;
+	std::unique_ptr<Entity> cylinderGameObject_ = nullptr;
 	Object3dComponent* cylinderObject = nullptr;
 
-	std::vector<std::unique_ptr<GameObject>> emitterObjects_;
+	std::vector<std::unique_ptr<Entity>> emitterObjects_;
 	std::vector<ParticleEmitterComponent*> emitters_;
 	int currentParticleIndex_ = 0;
 	std::vector<std::string> availableTextures_;
@@ -119,23 +124,25 @@ private:
 	void UpdatePauseMenu();
 	/// <summary>ポーズ状態を切り替え、ゲーム時間へ反映します。</summary>
 	void SetPauseMenuOpen(bool isOpen);
-	/// <summary>ステージ1の太陽方向と夕方色を全3Dモデルへ反映します。</summary>
-	void ApplyStageOneEveningLight();
+	/// <summary>選択中のステージに合わせた環境光を全3Dモデルへ反映します。</summary>
+	void ApplyStageLighting();
 	bool startPresentationInitialized_ = false;
 	bool startPresentationActive_ = false;
 	float startPresentationElapsed_ = 0.0f;
 	float startFogAlpha_ = 1.0f;
 	float startWhiteAlpha_ = 1.0f;
-	GameObject* startPresentationPlayer_ = nullptr;
+	Entity* startPresentationPlayer_ = nullptr;
 	EulerTransform startPresentationBaseTransform_{};
+	/// <summary>プレイヤー定義から取得したゲーム開始時の移動演出スタイルです。</summary>
+	std::string startPresentationStyle_ = "pop";
 	std::array<std::unique_ptr<Sprite>, 3> startFogSprites_;
 	std::unique_ptr<Sprite> startWhiteSprite_;
 	std::unique_ptr<Sprite> startMessageSprite_;
 	bool defeatPresentationActive_ = false;
 	bool defeatTransitionRequested_ = false;
 	float defeatPresentationElapsed_ = 0.0f;
-	GameObject* defeatPresentationPlayer_ = nullptr;
-	std::unique_ptr<GameObject> defeatMessageTextObject_;
+	Entity* defeatPresentationPlayer_ = nullptr;
+	std::unique_ptr<Entity> defeatMessageTextObject_;
 	/// <summary>
 	/// ImGui によるデバッグ用 UI の表示と編集処理を行います。
 	/// </summary>
@@ -144,7 +151,6 @@ private:
 	Vector3 lightDirection = {0.0f, -1.0f, 0.0f};
 	float lightIntensity = 1.0f;	
 	bool isParticleEmit = false;
-	SceneManager* sceneManager = nullptr;
 	std::unique_ptr<AtmosphereSky> atmosphereSky_ = nullptr;
 	std::unique_ptr<SkyBox> skyBox = nullptr;
 	std::unique_ptr<GrassInstancingModel> instancingModel_ = nullptr;

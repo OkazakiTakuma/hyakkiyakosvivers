@@ -1,6 +1,7 @@
 #include "GamePlayScene.h"
 #include "SceneManager.h"
 #include "helpers/SceneUiUtility.h"
+#include "repositories/PlayerStatusRepository.h"
 #include <cstring>
 #include <model/ModelManager.h>
 #include "GameTime.h"
@@ -27,20 +28,6 @@ float SmoothStep01(float value) {
 float EaseOutCubic(float value) {
 	const float inverse = 1.0f - Saturate(value);
 	return 1.0f - inverse * inverse * inverse;
-}
-
-const char* GetGameStartAnimationName(const std::string& playerType) {
-	if (playerType == "巫女") return "ゲーム開始_巫女";
-	if (playerType == "烏天狗") return "ゲーム開始_烏天狗";
-	if (playerType == "猫") return "ゲーム開始_猫";
-	return "";
-}
-
-const char* GetDefeatAnimationName(const std::string& playerType) {
-	if (playerType == "巫女") return "力尽きる完全_巫女";
-	if (playerType == "烏天狗") return "力尽きる完全_烏天狗";
-	if (playerType == "猫") return "力尽きる完全_猫";
-	return "";
 }
 
 #ifdef USE_IMGUI
@@ -178,10 +165,18 @@ void GamePlayScene::Initialize() {
 /// </summary>
 void GamePlayScene::LoadSceneModels() {
 	ModelManager::GetInstance()->LoadModel("walk.gltf", true, "/human");
-	ModelManager::GetInstance()->LoadModel("miko.gltf", true, "/human");
-	ModelManager::GetInstance()->LoadModel("neko.gltf", true, "/cat");
-	// 烏天狗とステージ2ボスで共有する歩行アニメーション付きモデル。
-	ModelManager::GetInstance()->LoadModel("doppelganger.gltf", true, "/doppelganger");
+	// 全プレイヤー定義を走査し、追加キャラクターの本体と右手装備もコード変更なしで事前読込する。
+	for (const std::string& playerTypeName : LoadPlayerTypeNames()) {
+		const PlayerStats stats = LoadPlayerStats(playerTypeName);
+		if (!stats.modelFilePath.empty() && !ModelManager::GetInstance()->FindModel(stats.modelFilePath)) {
+			ModelManager::GetInstance()->LoadModel(stats.modelFilePath, stats.isAnimationModel, stats.modelDirectory);
+		}
+		if (!stats.rightHandEquipmentModelFilePath.empty() &&
+		    !ModelManager::GetInstance()->FindModel(stats.rightHandEquipmentModelFilePath)) {
+			ModelManager::GetInstance()->LoadModel(
+				stats.rightHandEquipmentModelFilePath, false, stats.rightHandEquipmentModelDirectory);
+		}
+	}
 	ModelManager::GetInstance()->LoadModel("enemy_drop.obj");
 	ModelManager::GetInstance()->LoadModel("sphere.obj");
 	ModelManager::GetInstance()->LoadModel("terrain.obj", false, "/terrain");
@@ -189,8 +184,6 @@ void GamePlayScene::LoadSceneModels() {
 	// ステージ2の和風街並みを構成する軽量な建築用プリミティブ。
 	ModelManager::GetInstance()->LoadModel("japanese_block.obj", false, "/stage2_japanese");
 	ModelManager::GetInstance()->LoadModel("japanese_roof.obj", false, "/stage2_japanese");
-	// 烏天狗の右手へ装備する刀を専用フォルダから事前読み込みする。
-	ModelManager::GetInstance()->LoadModel("brade.obj", false, "/brade");
 	ModelManager::GetInstance()->LoadModel("grass.obj");
 
 	// 草の板ポリゴンをインスタンシング描画用に一度だけ配置する。
@@ -233,11 +226,19 @@ void GamePlayScene::LoadSceneModels() {
 /// 毎フレームの状態更新を行います。
 /// </summary>
 void GamePlayScene::Update() {
+	const bool isDemo = GetSceneManager()->IsDemoPlayActive();
 	// 配置JSONはInitialize後に読み込まれるため、最初の更新でプレイヤーを捕捉して開始演出へ入る。
 	if (!startPresentationInitialized_) {
-		BeginStartPresentation();
+		if (isDemo) {
+			startPresentationInitialized_ = true;
+			startPresentationActive_ = false;
+			UpdateStartFogFade(1.0f);
+			SetGameplayMode(GameplayMode::Playing);
+		} else {
+			BeginStartPresentation();
+		}
 	}
-	ApplyStageOneEveningLight();
+	ApplyStageLighting();
 	if (startPresentationActive_) {
 		UpdateStartPresentation();
 		ImGuiUpdate();
@@ -252,13 +253,20 @@ void GamePlayScene::Update() {
 	if (IsStageCleared()) {
 		SetGameplayMode(GameplayMode::Finished);
 		const StageResultData resultData = GetStageResultData();
-		sceneManager->RecordGameplayStageClear(sceneManager->GetSelectedGameplayStageId());
+		// 自動デモのクリアは進行データへ記録せず、通常プレイの開放状態を変えない。
+		if (!GetSceneManager()->IsDemoPlayActive()) {
+			GetSceneManager()->RecordGameplayStageClear(GetSceneManager()->GetSelectedGameplayStageId());
+		}
 		// Gは取得時点で所持金へ保存済みなので、ここではリザルト表示用の戦績だけを渡す。
 		// 終了時にAddMoneyを呼ばないことで、取得時と終了時の二重加算を防止する。
-		sceneManager->SetStageResultData(resultData);
+		GetSceneManager()->SetStageResultData(resultData);
 		// Finishedで止めたゲーム時間を戻し、SceneManagerの遷移タイマーを進める。
 		GameTime::SetPaused(false);
-		sceneManager->ChangeScene("RESULT");
+		GetSceneManager()->ChangeScene("RESULT");
+		return;
+	}
+	if (isDemo) {
+		UpdateParticleDemo();
 		return;
 	}
 	if (IsPlayerDefeated()) {
@@ -337,13 +345,14 @@ void GamePlayScene::BeginDefeatPresentation() {
 	defeatPresentationPlayer_ = nullptr;
 	SetGameplayMode(GameplayMode::Finished);
 
-	for (GameObject* object : GetMutableSceneObjects()) {
-		if (!object || !object->GetComponent<Player>()) continue;
+	for (Entity* object : GetMutableSceneObjects()) {
+		if (!object || !object->GetComponent<PlayerComponent>()) continue;
 		defeatPresentationPlayer_ = object;
 		if (Object3dComponent* object3d = object->GetComponent<Object3dComponent>()) {
-			const Player* player = object->GetComponent<Player>();
-			const char* animationName = player ? GetDefeatAnimationName(player->GetPlayerTypeName()) : "";
-			if (animationName[0] != '\0' && object3d->SetAnimation(animationName, true)) {
+			const PlayerComponent* player = object->GetComponent<PlayerComponent>();
+			// プレイヤー定義から敗北演出のクリップ名を取得し、タイプ名による分岐をなくす。
+			const std::string animationName = player ? LoadPlayerStats(player->GetPlayerTypeName()).gameplayDefeatAnimationName : "";
+			if (!animationName.empty() && object3d->SetAnimation(animationName, true)) {
 				object3d->SetAnimationLooping(false);
 				// 死亡判定フレームから先頭姿勢を反映し、歩行姿勢が一瞬残るのを防ぐ。
 				object3d->RestartAnimation();
@@ -356,20 +365,167 @@ void GamePlayScene::BeginDefeatPresentation() {
 	}
 }
 
-bool GamePlayScene::BeginDemoDefeatPresentation() {
-	if (defeatPresentationActive_ || IsStageCleared()) {
-		return false;
+void GamePlayScene::UpdateParticleDemo() {
+	Entity* playerObject = demoPlayerName_.empty() ? nullptr : FindObjectByName(demoPlayerName_);
+	if (!playerObject) {
+		for (Entity* object : GetMutableSceneObjects()) {
+			if (auto* attack = object->GetComponent<PlayerAttackComponent>()) attack->SetEnabled(false);
+			if (auto* collider = object->GetComponent<OBBColliderComponent>()) collider->SetDrawDebug(false);
+			if (object->GetComponent<PlayerComponent>()) playerObject = object;
+		}
+		if (!playerObject) return;
+
+		demoPlayerName_ = playerObject->GetName();
+		playerObject->GetTransform().translate = {0.0f, 0.0f, 4.5f};
+		if (auto* model = playerObject->GetComponent<Object3dComponent>()) model->SetDrawSkeleton(false);
+		if (auto* gravity = playerObject->GetComponent<GravityComponent>()) gravity->ResetVelocity();
+		Entity* bomber = CreateRuntimeEnemy("SelfDestruct", {1.8f, 0.0f, 4.5f}, playerObject);
+		bomber->GetComponent<OBBColliderComponent>()->SetDrawDebug(false);
+		demoBomberName_ = bomber->GetName();
 	}
-	for (GameObject* object : GetMutableSceneObjects()) {
-		if (!object) continue;
-		if (Player* player = object->GetComponent<Player>()) {
-			// HPを0にして、リザルトへ渡す結果も通常の敗北と同じ状態に揃える。
-			player->SetCurrentHealth(0.0f);
-			BeginDefeatPresentation();
-			return true;
+
+	auto* player = playerObject->GetComponent<PlayerComponent>();
+	const Vector3 position = playerObject->GetTransform().translate;
+	if (auto* camera = playerObject->GetComponent<CameraComponent>()) {
+		// 巫女に寄りすぎず、足元の爆発や中央のボスを同じ画面に収める。
+		camera->SetLocalOffset({-0.75f * position.x, 18.0f, -4.7f - 0.8f * position.z});
+	}
+	const float dt = GameTime::GetDeltaTime();
+	demoPhaseElapsed_ += dt;
+
+	if (demoBossName_.empty()) {
+		Entity* bomberObject = FindObjectByName(demoBomberName_);
+		auto* bomber = bomberObject ? bomberObject->GetComponent<EnemyComponent>() : nullptr;
+		if (bomber && bomber->GetCurrentHealth() > 0.0f) {
+			// 導火線が点いたら横へ離れる。自爆処理は敵自身が行う。
+			const bool escaping = bomber->GetSelfDestructProgress() >= 0.12f && position.x > -4.0f;
+			player->SetDemoMove(escaping ? Vector3{-0.115f, 0.0f, 0.0f} : Vector3{});
+			demoPhaseElapsed_ = 0.0f;
+			return;
+		}
+		player->SetDemoMove({});
+		demoParticleCue_ = "自爆の閃光・爆炎・火花・衝撃波";
+		if (demoPhaseElapsed_ < 1.0f) return;
+
+		Entity* boss = CreateRuntimeEnemy("Stage2Boss", {0.0f, 0.0f, 0.0f}, playerObject);
+		boss->GetComponent<OBBColliderComponent>()->SetDrawDebug(false);
+		demoBossName_ = boss->GetName();
+		BeginRuntimeBossEncounter(*boss);
+		demoDodgeTarget_ = position;
+		demoParticleCue_ = "ステージ2ボス　拡散竜巻の予兆";
+		return;
+	}
+
+	Entity* bossObject = FindObjectByName(demoBossName_);
+	auto* boss = bossObject ? bossObject->GetComponent<EnemyComponent>() : nullptr;
+	if (!boss) {
+		player->SetDemoMove({});
+		return;
+	}
+	const bool bossDefeated = boss->GetCurrentHealth() <= 0.0f;
+	if (!bossDefeated && demoShownPatterns_ < 3 && boss->GetTornadoPatternIndex() != demoShownPatterns_) {
+		// 実際の発射でパターン番号が進む。3種類目は 2 から 0 に戻る。
+		++demoShownPatterns_;
+		demoPhaseElapsed_ = 0.0f;
+		demoShotFired_ = false;
+		constexpr Vector3 kDodgeTargets[] = {{-6.0f, 0.0f, 7.0f}, {4.0f, 0.0f, 6.0f}, {-4.5f, 0.0f, 4.5f}};
+		demoDodgeTarget_ = kDodgeTargets[demoShownPatterns_ - 1];
+	}
+
+	Vector3 toTarget = demoDodgeTarget_ - position;
+	toTarget.y = 0.0f;
+	constexpr float kDodgeSpeed = 0.12f;
+	const float distance = Length(toTarget);
+	const Vector3 desired = distance > 0.05f
+		? (std::min)(kDodgeSpeed, distance / (std::max)(GameTime::GetFrameScale60(), 1.0f)) * Normalize(toTarget)
+		: Vector3{};
+	Vector3 dodge = desired;
+	if (dt > 0.0f && demoShownPatterns_ > 0) {
+		// 敵弾の軌道を短時間だけ外挿し、進みたい方向に近く、竜巻と距離を取れる方向を選ぶ。
+		const auto objects = GetMutableSceneObjects();
+		constexpr Vector3 kDirections[] = {{1,0,0}, {-1,0,0}, {0,0,1}, {0,0,-1},
+			{0.707f,0,0.707f}, {0.707f,0,-0.707f}, {-0.707f,0,0.707f}, {-0.707f,0,-0.707f}};
+		const auto score = [&](const Vector3& velocity) {
+			float clearance = 1.25f;
+			const Vector3 end = position + 6.0f * velocity;
+			if (std::abs(end.x) > 8.3f || end.z < 2.0f || end.z > 8.3f) return -100.0f;
+			for (const Entity* object : objects) {
+				const auto* projectile = object->GetComponent<EnemyAttackEntityComponent>();
+				if (!projectile || projectile->IsExpired()) continue;
+				const Vector3 current = object->GetTransform().translate;
+				const Vector3 projectileVelocity = (1.0f / (std::max)(dt, 0.001f)) *
+					(current - projectile->GetPreviousPosition());
+				for (const float seconds : {0.10f, 0.25f, 0.45f}) {
+					const Vector3 separation = position + (60.0f * seconds) * velocity -
+						(current + seconds * projectileVelocity);
+					const float gap = std::hypot(separation.x, separation.z) - projectile->GetSize() - 0.8f;
+					clearance = (std::min)(clearance, gap);
+				}
+			}
+			return clearance - 1.3f * Length(velocity - desired);
+		};
+		float bestScore = score(dodge);
+		for (const Vector3& direction : kDirections) {
+			const Vector3 candidate = kDodgeSpeed * direction;
+			const float candidateScore = score(candidate);
+			if (candidateScore > bestScore) {
+				bestScore = candidateScore;
+				dodge = candidate;
+			}
 		}
 	}
-	return false;
+	player->SetDemoMove(dodge);
+	if (bossDefeated) {
+		// 撃破演出中も残っている竜巻の軌道を見て回避を続ける。
+		demoParticleCue_ = "勾玉が命中　ボス撃破の爆散";
+		return;
+	}
+	if (demoShownPatterns_ == 0) return;
+
+	constexpr const char* kPatternCues[] = {
+		"拡散竜巻　外へ広がる竜巻を回避",
+		"包囲収束竜巻　輪が閉じる前に回避",
+		"巨大追尾竜巻　引きつけて横へ回避"
+	};
+	constexpr const char* kAttackCues[] = {
+		"拡散竜巻を回避しながら勾玉で反撃",
+		"包囲収束竜巻を回避しながら勾玉で反撃",
+		"巨大追尾竜巻をかわし、勾玉でとどめ"
+	};
+	const bool finishing = demoShownPatterns_ == 3;
+	const float shotDelay = finishing ? 2.0f : 0.65f;
+	demoParticleCue_ = demoShotFired_ ? kAttackCues[demoShownPatterns_ - 1] : kPatternCues[demoShownPatterns_ - 1];
+	if (demoPhaseElapsed_ >= shotDelay && !demoShotFired_) {
+		const float health = boss->GetCurrentHealth();
+		FireDemoMagatama(*playerObject, *bossObject, finishing ? health : health * 0.18f, demoShownPatterns_ - 1);
+		demoShotFired_ = true;
+	} else if (finishing && demoPhaseElapsed_ >= shotDelay + 3.2f) {
+		demoPhaseElapsed_ = shotDelay;
+		demoShotFired_ = false;
+	}
+}
+
+void GamePlayScene::FireDemoMagatama(Entity& player, const Entity& boss, float damage, int colorIndex) {
+	PlayerAttackShotRequest shot{};
+	shot.attackName = "ArcHoming";
+	shot.level = "1";
+	shot.position = player.GetTransform().translate;
+	shot.position.y = boss.GetTransform().translate.y + 0.30f;
+	const Vector3 toBoss = boss.GetTransform().translate - shot.position;
+	const float yaw = std::atan2(toBoss.x, toBoss.z);
+	const float launchYaw = yaw + (colorIndex == 1 ? -0.48f : 0.48f);
+	shot.direction = {std::sin(launchYaw), 0.0f, std::cos(launchYaw)};
+	shot.attack = damage;
+	shot.speed = 0.24f;
+	shot.size = 0.62f;
+	shot.lifeTime = 3.0f;
+	shot.modelFilePath = "magatama.gltf";
+	shot.homing = true;
+	shot.homingAccuracy = 0.20f;
+	shot.motionType = PlayerAttackEntityMotionType::Magatama;
+	shot.sourceOwner = &player;
+	shot.colorIndex = colorIndex;
+	CreateRuntimePlayerAttackEntity(shot);
 }
 
 void GamePlayScene::UpdateDefeatPresentation() {
@@ -401,34 +557,45 @@ void GamePlayScene::UpdateDefeatPresentation() {
 	if (defeatPresentationElapsed_ < kDefeatPresentationDuration || defeatTransitionRequested_) return;
 
 	const StageResultData resultData = GetStageResultData();
-	if (sceneManager) {
-		sceneManager->SetStageResultData(resultData);
+	if (GetSceneManager()) {
+		GetSceneManager()->SetStageResultData(resultData);
 		// Finishedで止めたゲーム時間を戻し、SceneManagerのフェードを進める。
 		GameTime::SetPaused(false);
-		sceneManager->ChangeScene("RESULT", SceneTransitionType::Fade, 0.35f, 0.35f);
+		GetSceneManager()->ChangeScene("RESULT", SceneTransitionType::Fade, 0.35f, 0.35f);
 		defeatTransitionRequested_ = true;
 	}
 }
 
-void GamePlayScene::ApplyStageOneEveningLight() {
-	if (!sceneManager || sceneManager->GetSelectedGameplayStageId() != "default") {
+void GamePlayScene::ApplyStageLighting() {
+	if (!GetSceneManager()) return;
+
+	const std::string& stageId = GetSceneManager()->GetSelectedGameplayStageId();
+	Vector3 lightDirection{};
+	Vector4 lightColor{};
+	float lightIntensity = 0.0f;
+	if (stageId == "default") {
+		const AtmosphereSettings& atmosphere = AtmosphereSystem::GetInstance()->GetSettings();
+		const Vector3 sunDirection = Normalize(atmosphere.sunDirection);
+		lightDirection = {-sunDirection.x, -sunDirection.y, -sunDirection.z};
+		// 低い夕陽の暖色を残しながら、戦闘中の輪郭と地形の起伏が潰れない明るさにします。
+		lightColor = {1.0f, 0.48f, 0.20f, 1.0f};
+		lightIntensity = 0.92f;
+	} else if (stageId == "stage2") {
+		// 夜の暗さを保ちつつ、青い月明かりで敵と街並みの輪郭を判別できるようにします。
+		lightDirection = Normalize(Vector3{0.35f, -0.80f, 0.25f});
+		lightColor = {0.38f, 0.52f, 0.82f, 1.0f};
+		lightIntensity = 0.48f;
+	} else {
 		return;
 	}
-
-	const AtmosphereSettings& atmosphere = AtmosphereSystem::GetInstance()->GetSettings();
-	const Vector3 sunDirection = Normalize(atmosphere.sunDirection);
-	const Vector3 lightDirection = {-sunDirection.x, -sunDirection.y, -sunDirection.z};
-	// 低い夕陽の暖色を残しながら、戦闘中の輪郭と地形の起伏が潰れない明るさにします。
-	const Vector4 sunlightColor = {1.0f, 0.48f, 0.20f, 1.0f};
-	constexpr float sunlightIntensity = 0.92f;
-	for (GameObject* object : GetMutableSceneObjects()) {
+	for (Entity* object : GetMutableSceneObjects()) {
 		if (!object) continue;
 		if (Object3dComponent* object3d = object->GetComponent<Object3dComponent>()) {
-			object3d->SetDirectionalLight(sunlightColor, lightDirection, sunlightIntensity);
+			object3d->SetDirectionalLight(lightColor, lightDirection, lightIntensity);
 		}
 	}
 	if (instancingModel_) {
-		instancingModel_->SetDirectionalLight(sunlightColor, lightDirection, sunlightIntensity);
+		instancingModel_->SetDirectionalLight(lightColor, lightDirection, lightIntensity);
 	}
 }
 
@@ -437,15 +604,20 @@ void GamePlayScene::BeginStartPresentation() {
 	startPresentationActive_ = true;
 	startPresentationElapsed_ = 0.0f;
 	startPresentationPlayer_ = nullptr;
+	startPresentationStyle_ = "pop";
 
-	for (GameObject* object : GetMutableSceneObjects()) {
-		if (object && object->GetComponent<Player>()) {
+	for (Entity* object : GetMutableSceneObjects()) {
+		if (object && object->GetComponent<PlayerComponent>()) {
 			startPresentationPlayer_ = object;
 			startPresentationBaseTransform_ = object->GetTransform();
-			Player* player = object->GetComponent<Player>();
+			PlayerComponent* player = object->GetComponent<PlayerComponent>();
+			// 同じ定義からクリップ名と移動スタイルを取得し、演出全体をタイプ名から独立させる。
+			const PlayerStats playerStats = LoadPlayerStats(player->GetPlayerTypeName());
+			startPresentationStyle_ = playerStats.entrancePresentationStyle;
 			if (Object3dComponent* object3d = object->GetComponent<Object3dComponent>()) {
-				const char* animationName = GetGameStartAnimationName(player->GetPlayerTypeName());
-				if (animationName[0] != '\0' && object3d->SetAnimation(animationName, true)) {
+				// プレイヤー定義から開始演出のクリップ名を取得し、新規タイプもデータ追加だけで対応する。
+				const std::string& animationName = playerStats.gameplayStartAnimationName;
+				if (!animationName.empty() && object3d->SetAnimation(animationName, true)) {
 					object3d->SetAnimationLooping(false);
 					object3d->SetAnimationPlaying(true);
 				}
@@ -468,22 +640,19 @@ void GamePlayScene::UpdateStartPresentation() {
 
 	if (startPresentationPlayer_) {
 		EulerTransform transform = startPresentationBaseTransform_;
-		const Player* player = startPresentationPlayer_->GetComponent<Player>();
-		const std::string playerType = player ? player->GetPlayerTypeName() : std::string{};
-
-		if (playerType == "巫女") {
+		if (startPresentationStyle_ == "shrine_descent") {
 			// 霧の上から静かに降り、少し回りながら定位置へ着地する。
 			transform.translate.y += remaining * remaining * 3.2f;
 			transform.rotate.y += remaining * 0.65f;
 			const float scale = 0.84f + entranceProgress * 0.16f;
 			transform.scale = scale * startPresentationBaseTransform_.scale;
-		} else if (playerType == "烏天狗") {
+		} else if (startPresentationStyle_ == "aerial_dash") {
 			// 左奥から高速で飛び込み、着地直前に正面へ向き直る。
 			transform.translate.x -= remaining * 4.2f;
 			transform.translate.y += remaining * 1.15f;
 			transform.translate.z += remaining * 1.4f;
 			transform.rotate.y -= remaining * 1.15f;
-		} else if (playerType == "猫") {
+		} else if (startPresentationStyle_ == "cat_jump") {
 			// 右側から弧を描いて跳び込み、着地時に一度だけ身体を縮める。
 			const float jumpArc = std::sin(entranceProgress * 3.14159265f);
 			transform.translate.x += remaining * 2.2f;
@@ -556,15 +725,19 @@ void GamePlayScene::InitializePauseMenu() {
 	SetGameplayMode(GameplayMode::Playing);
 	selectedPauseMenuItem_ = static_cast<int>(PauseMenuItem::Resume);
 	pauseOverlaySprite_ = CreateColorSprite();
-	pausePanelSprite_ = CreateColorSprite();
-	pauseSelectionSprite_ = CreateColorSprite();
-	pauseTitleTextObject_ = CreateTextObject("PAUSE", 52.0f);
+	pausePanelSprite_ = std::make_unique<Sprite>();
+	pausePanelSprite_->Initialize("Resources/UI/World/level_up_ofuda_card.png");
+	pauseSelectionSprite_ = std::make_unique<Sprite>();
+	pauseSelectionSprite_->Initialize("Resources/UI/World/shrine_menu_plaque.png");
+	pauseSelectionSprite_->SetTextureLeftTop({0.0f, 170.0f});
+	pauseSelectionSprite_->SetTextureSize({2172.0f, 380.0f});
+	pauseTitleTextObject_ = CreateTextObject("一時休息", 46.0f);
 	pauseMenuTextObjects_.clear();
 	pauseMenuTextObjects_.push_back(CreateTextObject("ゲームに戻る", 29.0f));
 	pauseMenuTextObjects_.push_back(CreateTextObject("ステージをやり直す", 29.0f));
 	pauseMenuTextObjects_.push_back(CreateTextObject("ステージ選択へ戻る", 29.0f));
 	pauseInstructionTextObject_ = CreateTextObject(
-	    "W / S・上下キー・Pad上下: 選択    Space / Enter・Pad A: 決定    Esc・Pad Start / B: 戻る", 17.0f);
+	    "W / S・上下キー: 選択    Space / Enter・Pad A: 決定    Esc・Pad Start / B: 戻る", 17.0f);
 }
 
 void GamePlayScene::SetPauseMenuOpen(bool isOpen) {
@@ -600,11 +773,11 @@ void GamePlayScene::UpdatePauseMenu() {
 		break;
 	case PauseMenuItem::Retry:
 		SetPauseMenuOpen(false);
-		if (sceneManager) sceneManager->ChangeScene("GAMEPLAY");
+		if (GetSceneManager()) GetSceneManager()->ChangeScene("GAMEPLAY");
 		break;
 	case PauseMenuItem::StageSelect:
 		SetPauseMenuOpen(false);
-		if (sceneManager) sceneManager->ChangeScene("STAGE_SELECT");
+		if (GetSceneManager()) GetSceneManager()->ChangeScene("STAGE_SELECT");
 		break;
 	case PauseMenuItem::Count:
 		break;
@@ -615,7 +788,7 @@ void GamePlayScene::UpdatePauseMenu() {
 /// スカイボックスの描画処理を行います。
 /// </summary>
 void GamePlayScene::DrawSkyBox() {
-	if (sceneManager && sceneManager->GetSelectedGameplayStageId() == "default" && atmosphereSky_) {
+	if (atmosphereSky_) {
 		atmosphereSky_->Draw();
 	}
 	BaseScene::DrawSkyBox();
@@ -660,29 +833,33 @@ void GamePlayScene::DrawOverlay2D() {
 	const float panelX = (screenWidth - panelWidth) * 0.5f;
 	const float panelY = (screenHeight - panelHeight) * 0.5f;
 	const float itemWidth = panelWidth - 80.0f;
-	const float itemHeight = 62.0f;
-	const float firstItemY = panelY + 145.0f;
-	const float itemGap = 18.0f;
+	const float itemHeight = 58.0f;
+	const float firstItemY = panelY + 125.0f;
+	const float itemGap = 14.0f;
 
 	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
-	DrawColorSprite(pauseOverlaySprite_.get(), 0.0f, 0.0f, screenWidth, screenHeight, {0.0f, 0.0f, 0.0f, 0.68f});
-	DrawColorSprite(pausePanelSprite_.get(), panelX, panelY, panelWidth, panelHeight, {0.025f, 0.08f, 0.15f, 0.98f});
+	DrawColorSprite(pauseOverlaySprite_.get(), 0.0f, 0.0f, screenWidth, screenHeight, {0.025f, 0.006f, 0.025f, 0.76f});
+	DrawColorSprite(pausePanelSprite_.get(), panelX, panelY, panelWidth, panelHeight, {1.0f, 0.98f, 0.90f, 1.0f});
 	const float selectedY = firstItemY + selectedPauseMenuItem_ * (itemHeight + itemGap);
 	DrawColorSprite(pauseSelectionSprite_.get(), panelX + 40.0f, selectedY, itemWidth, itemHeight,
-	    {0.08f, 0.48f, 0.62f, 0.98f});
+	    {1.0f, 0.96f, 0.82f, 1.0f});
 
 	pauseTitleTextObject_->GetTransform().translate = {screenWidth * 0.5f, panelY + 72.0f, 0.0f};
-	pauseTitleTextObject_->GetComponent<TextComponent>()->SetColor({0.55f, 0.95f, 1.0f, 1.0f});
+	pauseTitleTextObject_->GetComponent<TextComponent>()->SetColor({0.52f, 0.07f, 0.035f, 1.0f});
 	pauseTitleTextObject_->Draw2D();
 	for (int index = 0; index < static_cast<int>(pauseMenuTextObjects_.size()); ++index) {
-		GameObject* textObject = pauseMenuTextObjects_[index].get();
+		Entity* textObject = pauseMenuTextObjects_[index].get();
 		textObject->GetTransform().translate = {
 		    screenWidth * 0.5f, firstItemY + index * (itemHeight + itemGap) + itemHeight * 0.5f, 0.0f};
-		textObject->GetComponent<TextComponent>()->SetColor(
-		    index == selectedPauseMenuItem_ ? Vector4{0.95f, 1.0f, 1.0f, 1.0f} : Vector4{0.72f, 0.79f, 0.88f, 1.0f});
+		TextComponent* itemText = textObject->GetComponent<TextComponent>();
+		itemText->SetLayoutBounds((std::max)(1.0f, itemWidth - 64.0f), itemHeight - 10.0f);
+		itemText->SetColor(
+		    index == selectedPauseMenuItem_ ? Vector4{0.50f, 0.055f, 0.025f, 1.0f} : Vector4{0.20f, 0.16f, 0.12f, 1.0f});
 		textObject->Draw2D();
 	}
-	pauseInstructionTextObject_->GetTransform().translate = {screenWidth * 0.5f, panelY + panelHeight - 35.0f, 0.0f};
+	// 御札下端の朱模様より上へ操作案内を置き、装飾と文字を重ねない。
+	pauseInstructionTextObject_->GetTransform().translate = {screenWidth * 0.5f, panelY + panelHeight - 76.0f, 0.0f};
+	pauseInstructionTextObject_->GetComponent<TextComponent>()->SetColor({0.24f, 0.19f, 0.14f, 1.0f});
 	pauseInstructionTextObject_->Draw2D();
 }
 

@@ -51,8 +51,8 @@ void ResultScene::Initialize() {
 	// SceneManagerが保持したスナップショットを読み、ゲームプレイシーンへ再アクセスせず表示を構築する。
 	const StageResultData resultData = sceneManager_ ? sceneManager_->GetStageResultData() : StageResultData{};
 	isStageClear_ = resultData.stageCleared;
-	clearTextObject_ = CreateTextObject(
-		isStageClear_ ? "妖異鎮めたり" : "力尽きた……", 58.0f, TextComponent::Anchor::Center, "Yu Mincho");
+	clearTextObject_ = SceneUiUtility::CreateHeadingText(
+		isStageClear_ ? "妖魔鎮めたり" : "力尽きた……", 58.0f, {1.0f, 1.0f, 1.0f, 1.0f}, DWRITE_FONT_WEIGHT_EXTRA_BOLD);
 	subtitleTextObject_ = CreateTextObject(
 		isStageClear_ ? "STAGE CLEAR" : "GAME OVER", 18.0f, TextComponent::Anchor::Center, "Yu Mincho");
 	// 秒数は画面上で読みやすい「分:秒」形式へ丸めて変換する。
@@ -87,7 +87,9 @@ void ResultScene::Initialize() {
 	statusEquipmentTextObject_ = CreateTextObject(
 		makeEquipmentText("身に宿る加護", resultData.statuses), 22.0f, TextComponent::Anchor::TopCenter, "Yu Mincho");
 	instructionTextObject_ = CreateTextObject(
-	    "決定：ステージ選択　　Y / R：再挑戦　　B / Q：タイトル",
+	    sceneManager_ && sceneManager_->IsDemoPlayActive()
+	        ? "まもなく再上映　　F1で終了"
+	        : "決定：ステージ選択　　Y / R：再挑戦　　B / Q：タイトル",
 	    17.0f, TextComponent::Anchor::Center, "Yu Mincho");
 }
 
@@ -96,7 +98,7 @@ void ResultScene::Initialize() {
 /// </summary>
 void ResultScene::Update() {
 	presentationElapsed_ += GameTime::GetUnscaledDeltaTime();
-	if (!sceneManager_) {
+	if (!sceneManager_ || sceneManager_->IsDemoPlayActive()) {
 		return;
 	}
 	// 遷移直前の決定入力が残って、リザルトを即座に飛ばしてしまうのを防ぐ。

@@ -1,5 +1,5 @@
 #include "components/PlayerAttackEntity/PlayerAttackEntityComponent.h"
-#include "core/GameObject.h"
+#include "core/Entity.h"
 #include "MathConstants.h"
 #include "GameTime.h"
 #include <algorithm>
@@ -8,7 +8,7 @@
 void PlayerAttackEntityComponent::Initialize() {}
 
 void PlayerAttackEntityComponent::Update() {
-	GameObject* owner = GetOwner();
+	Entity* owner = GetOwner();
 	if (!owner) {
 		return;
 	}
@@ -121,8 +121,10 @@ PlayerAttackEntityPresentation PlayerAttackEntityComponent::GetMotionPresentatio
 		result.addGlowEmitter = true;
 		break;
 	case PlayerAttackEntityMotionType::Orbit:
-		result.overrideModelColor = true;
-		result.modelColor = {0.35f, 0.75f, 1.0f, 1.0f};
+		// 本体は生成側で陰陽の白黒二層へ塗り分け、青は周回軌跡へ残す。
+		result.scaleMultiplier = {0.96f, 0.96f, 0.96f};
+		result.trailWidthMultiplier = 0.22f;
+		result.minimumTrailWidth = 0.08f;
 		result.overrideTrailColors = true;
 		result.trailHeadColor = {0.45f, 0.90f, 1.0f, 0.9f};
 		result.trailTailColor = {0.10f, 0.30f, 1.0f, 0.0f};
@@ -172,8 +174,11 @@ PlayerAttackEntityPresentation PlayerAttackEntityComponent::GetMotionPresentatio
 		result.expiresOutsideView = false;
 		break;
 	case PlayerAttackEntityMotionType::Ricochet:
-		result.overrideModelColor = true;
-		result.modelColor = {0.45f, 1.0f, 0.30f, 1.0f};
+		// 本体は生成側で生成り紙と朱色の印面へ塗り分ける。
+		result.scaleMultiplier = {0.92f, 0.92f, 0.92f};
+		result.trailWidthMultiplier = 0.24f;
+		result.minimumTrailWidth = 0.08f;
+		result.trailLifeTime = 0.28f;
 		result.overrideTrailColors = true;
 		result.trailHeadColor = {0.65f, 1.0f, 0.30f, 0.95f};
 		result.trailTailColor = {0.05f, 0.80f, 0.15f, 0.0f};
@@ -202,7 +207,7 @@ PlayerAttackEntityPresentation PlayerAttackEntityComponent::GetMotionPresentatio
 	return result;
 }
 
-void PlayerAttackEntityComponent::SetMotionAnchor(GameObject* motionAnchor) { motionAnchor_ = motionAnchor; }
+void PlayerAttackEntityComponent::SetMotionAnchor(Entity* motionAnchor) { motionAnchor_ = motionAnchor; }
 
 void PlayerAttackEntityComponent::SetOrbitAngleRadians(float angle) { orbitAngleRadians_ = angle; }
 
@@ -220,9 +225,9 @@ void PlayerAttackEntityComponent::SetClawSlashIndex(int index) { clawSlashIndex_
 
 void PlayerAttackEntityComponent::SetClawSlashCount(int count) { clawSlashCount_ = (std::max)(1, count); }
 
-void PlayerAttackEntityComponent::SetHomingTarget(GameObject* target) { homingTarget_ = target; }
+void PlayerAttackEntityComponent::SetHomingTarget(Entity* target) { homingTarget_ = target; }
 
-GameObject* PlayerAttackEntityComponent::GetHomingTarget() const { return homingTarget_; }
+Entity* PlayerAttackEntityComponent::GetHomingTarget() const { return homingTarget_; }
 
 void PlayerAttackEntityComponent::SetLifeTime(float lifeTime) { lifeTime_ = lifeTime; initialLifeTime_ = lifeTime; }
 
@@ -234,6 +239,10 @@ void PlayerAttackEntityComponent::SetPierceCount(int pierceCount) { pierceCount_
 
 int PlayerAttackEntityComponent::GetPierceCount() const { return pierceCount_; }
 
+void PlayerAttackEntityComponent::SetKnockback(int knockback) { knockback_ = (std::clamp)(knockback, 0, 3); }
+
+int PlayerAttackEntityComponent::GetKnockback() const { return knockback_; }
+
 void PlayerAttackEntityComponent::SetInfinitePierce(bool infinitePierce) { infinitePierce_ = infinitePierce; }
 
 bool PlayerAttackEntityComponent::IsInfinitePierce() const { return infinitePierce_; }
@@ -242,7 +251,7 @@ void PlayerAttackEntityComponent::SetRepeatHitInterval(float intervalSeconds) { 
 
 float PlayerAttackEntityComponent::GetRepeatHitInterval() const { return repeatHitIntervalSeconds_; }
 
-bool PlayerAttackEntityComponent::HasHitObject(GameObject* object) const {
+bool PlayerAttackEntityComponent::HasHitObject(Entity* object) const {
 		for (const HitRecord& hitRecord : hitRecords_) {
 			if (hitRecord.object == object) {
 				return true;
@@ -251,7 +260,7 @@ bool PlayerAttackEntityComponent::HasHitObject(GameObject* object) const {
 		return false;
 	}
 
-void PlayerAttackEntityComponent::RegisterHitObject(GameObject* object) {
+void PlayerAttackEntityComponent::RegisterHitObject(Entity* object) {
 		if (!object || HasHitObject(object)) {
 			return;
 		}
@@ -282,7 +291,7 @@ void PlayerAttackEntityComponent::UpdateHitCooldowns(float deltaTime) {
 			hitRecords_.end());
 	}
 
-void PlayerAttackEntityComponent::UpdateLinearMotion(GameObject* owner, float deltaTime, float frameScale, bool rampHoming) {
+void PlayerAttackEntityComponent::UpdateLinearMotion(Entity* owner, float deltaTime, float frameScale, bool rampHoming) {
 	if (homingEnabled_ && homingTarget_) {
 		Vector3 toTarget = homingTarget_->GetTransform().translate - owner->GetTransform().translate;
 		toTarget.y = 0.0f;
@@ -305,7 +314,7 @@ void PlayerAttackEntityComponent::UpdateLinearMotion(GameObject* owner, float de
 	lifeTime_ -= deltaTime;
 }
 
-void PlayerAttackEntityComponent::UpdateBoomerang(GameObject* owner, float deltaTime, float frameScale) {
+void PlayerAttackEntityComponent::UpdateBoomerang(Entity* owner, float deltaTime, float frameScale) {
 		if (!motionAnchor_) {
 			lifeTime_ = 0.0f;
 			return;
@@ -341,11 +350,18 @@ void PlayerAttackEntityComponent::UpdateBoomerang(GameObject* owner, float delta
 		}
 
 		position = position + movement * direction_;
-		owner->GetTransform().rotate.y = std::atan2(direction_.x, direction_.z);
+		// 大幣を水平面で回転させながら飛ばす。進行方向とは別に角度を積算することで、
+		// 帰還へ切り替わった瞬間にも回転が巻き戻ったり停止したりしないようにする。
+		constexpr float kBoomerangSpinRadiansPerSecond = MathConstants::kTwoPi * 2.25f;
+		boomerangSpinAngleRadians_ = std::fmod(
+		    boomerangSpinAngleRadians_ + kBoomerangSpinRadiansPerSecond * deltaTime,
+		    MathConstants::kTwoPi);
+		owner->GetTransform().rotate.y =
+		    std::atan2(direction_.x, direction_.z) + boomerangSpinAngleRadians_;
 		lifeTime_ -= deltaTime;
 	}
 
-void PlayerAttackEntityComponent::UpdateClawSlash(GameObject* owner, float deltaTime) {
+void PlayerAttackEntityComponent::UpdateClawSlash(Entity* owner, float deltaTime) {
 		if (!motionAnchor_) {
 			lifeTime_ = 0.0f;
 			return;
