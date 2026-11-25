@@ -7,6 +7,7 @@
 #include "particle/ParticleManager.h"
 #include"LineCommon.h"
 #include "PostEffect.h"
+#include "SpriteCommon.h"
 #include "SceneFactory.h"
 #include "SceneManager.h"
 #include "sky/SkyBoxCommon.h"
@@ -35,7 +36,7 @@ void Game::Initialize() {
 	SkyBoxCommon::GetInstance()->SetDefaultCamera(camera.get());
 
 	// 録画状態は画面上で確認できるようにするが、録画データには含めない画面専用 UI とする。
-	recordingIndicator_ = std::make_unique<GameObject>();
+	recordingIndicator_ = std::make_unique<Entity>();
 	recordingIndicator_->SetName("ScreenRecordingIndicator");
 	TextComponent* recordingText = recordingIndicator_->AddComponent<TextComponent>();
 	recordingText->SetText("● REC");
@@ -58,7 +59,7 @@ void Game::Update() {
 	if (ImGuiManager::GetInstance()->UpdateHotReload(
 		sceneManager ? sceneManager->GetCurrentSceneJsonPath() : std::string(),
 		[this]() { return sceneManager && sceneManager->ReloadCurrentSceneJson(); })) {
-		endRequest = true;
+		RequestEnd();
 		return;
 	}
 	Input::GetInstance()->Update();
@@ -82,7 +83,7 @@ void Game::Update() {
 		float aspectRatio = GetRenderAspectRatio();
 #ifdef USE_IMGUI
 		const float gameViewAspectRatio = ImGuiManager::GetInstance()->GetGameViewAspectRatio();
-		if (gameViewAspectRatio > 0.0f) {
+		if (!sceneManager->IsDemoPlayActive() && gameViewAspectRatio > 0.0f) {
 			aspectRatio = gameViewAspectRatio;
 		}
 #endif
@@ -96,7 +97,7 @@ void Game::Update() {
 	// ゲームプレイ中のEscapeはポーズメニューが使用する。ほかの画面では従来どおり終了する。
 	if (Input::GetInstance()->TriggerKey(DIK_ESCAPE) &&
 	    (!sceneManager || sceneManager->GetCurrentSceneName() != "GAMEPLAY")) {
-		endRequest = true;
+		RequestEnd();
 	}
 }
 
@@ -105,6 +106,7 @@ void Game::Update() {
 /// </summary>
 void Game::Draw() {
 #pragma region Setup
+	const bool isDemo = sceneManager->IsDemoPlayActive();
 
 	const auto drawHdrScene = [this]() {
 		SkyBoxCommon::GetInstance()->SetDraw();
@@ -129,16 +131,16 @@ void Game::Draw() {
 	postEffect->PostDrawScene();
 
 	SkyBoxCommon::GetInstance()->GetDxCommon()->PreDraw();
-	ImGuiManager::GetInstance()->ApplyGameViewRenderArea();
+	if (!isDemo) ImGuiManager::GetInstance()->ApplyGameViewRenderArea();
 	postEffect->Draw();
 
 	// UIはトーンマッピング後に描き、文字やメニューがBloomでにじむことを防ぎます。
 	SpriteCommon::GetInstance()->SetDraw(BlendMode::kBlendModeNone);
 	sceneManager->Draw2D();
 	ImGuiManager::GetInstance()->RestoreFullRenderArea();
-	postEffect->DrawImGui();
+	if (!isDemo) postEffect->DrawImGui();
 	ImGuiManager::GetInstance()->End();
-	ImGuiManager::GetInstance()->Draw();
+	if (!isDemo) ImGuiManager::GetInstance()->Draw();
 
 	DirectXCommon* dxCommon = SpriteCommon::GetInstance()->GetDxCommon();
 	if (dxCommon) {

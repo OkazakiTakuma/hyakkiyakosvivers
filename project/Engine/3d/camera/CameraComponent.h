@@ -1,11 +1,11 @@
 #pragma once
-#include "core/Component.h"
-#include "core/GameObject.h"
+#include "core/EntityComponent.h"
+#include "core/Entity.h"
 #include "Camera.h"
 #include <memory>
 #include <string>
 
-class CameraComponent : public Component {
+class CameraComponent : public EntityComponent {
 public:
 	/// <summary>
 	/// 必要なリソースを準備し、オブジェクトを初期化します。
@@ -45,13 +45,15 @@ public:
 	Camera* GetCamera() { return camera_.get(); }
 	const Camera* GetCamera() const { return camera_.get(); }
 
-	void SetFollowTarget(GameObject* target) {
+	void SetFollowTarget(Entity* target) {
 		followTarget_ = target;
 		followTargetName_ = target ? target->GetName() : "";
 	}
-	GameObject* GetFollowTarget() const { return followTarget_; }
+	/// <summary>保存された対象名を維持したまま、解決済みの非所有参照だけを更新します。</summary>
+	void SetResolvedFollowTarget(Entity* target) { followTarget_ = target; }
+	Entity* GetFollowTarget() const { return followTarget_; }
 	const std::string& GetFollowTargetName() const { return followTargetName_; }
-	void SetFollowTargetName(const std::string& name) { followTargetName_ = name; }
+	void SetFollowTargetName(const std::string& name) { followTargetName_ = name; followTarget_ = nullptr; }
 	void SetFollowOffset(const Vector3& offset) { followOffset_ = offset; }
 	const Vector3& GetFollowOffset() const { return followOffset_; }
 	void SetLocalOffset(const Vector3& offset) { localOffset_ = offset; }
@@ -92,7 +94,7 @@ private:
 	}
 
 	std::unique_ptr<Camera> camera_;
-	GameObject* followTarget_ = nullptr;
+	Entity* followTarget_ = nullptr;
 	std::string followTargetName_;
 	Vector3 followOffset_{0.0f, 0.0f, 0.0f};
 	Vector3 localOffset_{0.0f, 0.0f, 0.0f};

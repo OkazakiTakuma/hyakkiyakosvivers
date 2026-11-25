@@ -1,16 +1,19 @@
 #include "base_scene/BaseScene.h"
+#include "base_scene/serialization/SceneSerializer.h"
+#include "data/ComponentTypeMetadata.h"
 #include "repositories/EnemyStatusRepository.h"
 #include "MathConstants.h"
 #include "model/ModelManager.h"
 #include "repositories/PlayerStatusRepository.h"
+#include "helpers/ParticleEmitParamJson.h"
 #include "helpers/SceneJsonUtility.h"
+#include "services/PlayerAssembler.h"
 #include "SceneManager.h"
 #include "StringUtility.h"
 
 #include <algorithm>
 #include <array>
 #include <filesystem>
-#include <fstream>
 
 using SceneJsonUtility::JsonToVector3;
 using SceneJsonUtility::JsonToVector4;
@@ -19,116 +22,74 @@ using SceneJsonUtility::Vector4ToJson;
 using StringUtility::Utf8ToPath;
 
 namespace {
-bool ApplyObjectOverride(nlohmann::json& objects, const nlohmann::json& objectOverride) {
-	if (!objects.is_array() || !objectOverride.is_object()) {
-		return false;
-	}
-	const std::string targetName = objectOverride.value("name", std::string());
-	if (targetName.empty()) {
-		return false;
-	}
-	for (nlohmann::json& object : objects) {
-		if (object.value("name", std::string()) == targetName) {
-			object.merge_patch(objectOverride);
-			return true;
-		}
-		if (object.contains("children") && ApplyObjectOverride(object["children"], objectOverride)) {
-			return true;
-		}
-	}
-	return false;
-}
-
-bool LoadSceneJsonWithInheritance(const std::filesystem::path& filePath, nlohmann::json& root, int depth = 0) {
-	if (depth > 8) {
-		return false;
-	}
-	std::ifstream input(filePath);
-	if (!input) {
-		return false;
-	}
-	nlohmann::json source;
-	try {
-		input >> source;
-	} catch (const nlohmann::json::exception&) {
-		return false;
-	}
-
-	const std::string extendsFile = source.value("extends", std::string());
-	if (extendsFile.empty()) {
-		root = std::move(source);
-		return true;
-	}
-
-	const std::filesystem::path extendsPath = Utf8ToPath(extendsFile);
-	if (extendsPath.filename() != extendsPath || extendsPath.extension() != ".json") {
-		return false;
-	}
-	if (!LoadSceneJsonWithInheritance(filePath.parent_path() / extendsPath, root, depth + 1)) {
-		return false;
-	}
-
-	nlohmann::json overlay = source;
-	overlay.erase("extends");
-	overlay.erase("objectOverrides");
-	overlay.erase("objectAdditions");
-	root.merge_patch(overlay);
-
-	for (const nlohmann::json& objectOverride : source.value("objectOverrides", nlohmann::json::array())) {
-		ApplyObjectOverride(root["objects"], objectOverride);
-	}
-	for (const nlohmann::json& addition : source.value("objectAdditions", nlohmann::json::array())) {
-		root["objects"].push_back(addition);
-	}
-	return true;
-}
-
-void SaveComponentGravity(nlohmann::json& componentJson, Component* component) {
-	if (!component) {
+void SaveEntityGravity(nlohmann::json& objectJson, Entity* entity) {
+	const GravityComponent* gravity = entity ? entity->GetComponent<GravityComponent>() : nullptr;
+	if (!gravity) {
 		return;
 	}
-	componentJson["gravity"]["enabled"] = component->IsGravityEnabled();
-	componentJson["gravity"]["strength"] = component->GetGravityStrength();
+	objectJson["gravity"]["enabled"] = gravity->IsEnabled();
+	objectJson["gravity"]["strength"] = gravity->GetStrength();
 }
 
-void LoadComponentGravity(const nlohmann::json& componentJson, Component* component) {
-	if (!component) {
+void LoadEntityGravity(const nlohmann::json& objectJson, Entity* entity) {
+	if (!entity) {
 		return;
 	}
-	const nlohmann::json gravityJson = componentJson.value("gravity", nlohmann::json::object());
-	component->SetGravityEnabled(gravityJson.value("enabled", component->IsGravityEnabled()));
-	component->SetGravityStrength(gravityJson.value("strength", component->GetGravityStrength()));
-	component->ResetGravityVelocity();
+
+	nlohmann::json gravityJson;
+	bool hasDedicatedGravity = false;
+	if (objectJson.contains("gravity") && objectJson["gravity"].is_object()) {
+		gravityJson = objectJson["gravity"];
+		hasDedicatedGravity = true;
+	} else {
+		// 旧形式では各Component内に重力設定が保存されていたため、有効な設定を引き継ぐ。
+		for (const auto& [key, value] : objectJson.items()) {
+			if (value.is_object() && value.contains("gravity") && value["gravity"].is_object() &&
+				value["gravity"].value("enabled", false)) {
+				gravityJson = value["gravity"];
+				break;
+			}
+		}
+	}
+	if (!hasDedicatedGravity && gravityJson.empty()) {
+		return;
+	}
+
+	GravityComponent* gravity = entity->GetComponent<GravityComponent>();
+	if (!gravity) {
+		gravity = entity->AddComponent<GravityComponent>();
+	}
+	gravity->SetEnabled(gravityJson.value("enabled", true));
+	gravity->SetStrength(gravityJson.value("strength", gravity->GetStrength()));
+	gravity->ResetVelocity();
 }
 
 /// <summary>独立した追加Componentの保存と復元を型消去して登録するエントリです。</summary>
 struct ComponentSerializationRegistration {
-	const char* jsonKey;
-	void (*save)(GameObject* object, nlohmann::json& objectJson);
-	void (*load)(GameObject* object, const nlohmann::json& componentJson);
+	const ComponentTypeMetadata* metadata;
+	void (*save)(Entity* object, nlohmann::json& objectJson);
+	void (*load)(Entity* object, const nlohmann::json& componentJson);
 	bool loadExistingWithoutJson;
 };
 
-void SaveSpriteComponent(GameObject* object, nlohmann::json& objectJson) {
+void SaveSpriteComponent(Entity* object, nlohmann::json& objectJson) {
 	SpriteComponent* sprite = object->GetComponent<SpriteComponent>();
 	if (!sprite) {
 		return;
 	}
 	nlohmann::json& componentJson = objectJson["sprite"];
 	componentJson["enabled"] = sprite->IsEnabled();
-	SaveComponentGravity(componentJson, sprite);
 	componentJson["textureFilePath"] = sprite->GetTextureFilePath();
 	componentJson["color"] = Vector4ToJson(sprite->GetColor());
 	componentJson["size"] = nlohmann::json::array({sprite->GetSize().x, sprite->GetSize().y});
 }
 
-void LoadSpriteComponent(GameObject* object, const nlohmann::json& componentJson) {
+void LoadSpriteComponent(Entity* object, const nlohmann::json& componentJson) {
 	SpriteComponent* sprite = object->GetComponent<SpriteComponent>();
 	if (!sprite) {
 		return;
 	}
 	sprite->SetEnabled(componentJson.value("enabled", sprite->IsEnabled()));
-	LoadComponentGravity(componentJson, sprite);
 	const std::string textureFilePath = componentJson.value("textureFilePath", sprite->GetTextureFilePath());
 	if (!textureFilePath.empty()) {
 		sprite->SetTexture(textureFilePath);
@@ -142,7 +103,7 @@ void LoadSpriteComponent(GameObject* object, const nlohmann::json& componentJson
 	}
 }
 
-void SaveTextComponent(GameObject* object, nlohmann::json& objectJson) {
+void SaveTextComponent(Entity* object, nlohmann::json& objectJson) {
 	TextComponent* text = object->GetComponent<TextComponent>();
 	if (!text) {
 		return;
@@ -150,7 +111,6 @@ void SaveTextComponent(GameObject* object, nlohmann::json& objectJson) {
 	objectJson["type"] = "Text";
 	nlohmann::json& componentJson = objectJson["text"];
 	componentJson["enabled"] = text->IsEnabled();
-	SaveComponentGravity(componentJson, text);
 	componentJson["value"] = text->GetText();
 	componentJson["fontName"] = text->GetFontName();
 	componentJson["fontSize"] = text->GetFontSize();
@@ -158,13 +118,12 @@ void SaveTextComponent(GameObject* object, nlohmann::json& objectJson) {
 	componentJson["color"] = Vector4ToJson(text->GetColor());
 }
 
-void LoadTextComponent(GameObject* object, const nlohmann::json& componentJson) {
+void LoadTextComponent(Entity* object, const nlohmann::json& componentJson) {
 	TextComponent* text = object->GetComponent<TextComponent>();
 	if (!text) {
 		return;
 	}
 	text->SetEnabled(componentJson.value("enabled", text->IsEnabled()));
-	LoadComponentGravity(componentJson, text);
 	text->SetText(componentJson.value("value", text->GetText()));
 	text->SetFontName(componentJson.value("fontName", text->GetFontName()));
 	text->SetFontSize(componentJson.value("fontSize", text->GetFontSize()));
@@ -172,14 +131,13 @@ void LoadTextComponent(GameObject* object, const nlohmann::json& componentJson) 
 	text->SetColor(JsonToVector4(componentJson.value("color", nlohmann::json::array()), text->GetColor()));
 }
 
-void SaveCameraComponent(GameObject* object, nlohmann::json& objectJson) {
+void SaveCameraComponent(Entity* object, nlohmann::json& objectJson) {
 	CameraComponent* camera = object->GetComponent<CameraComponent>();
 	if (!camera) {
 		return;
 	}
 	nlohmann::json& componentJson = objectJson["camera"];
 	componentJson["enabled"] = camera->IsEnabled();
-	SaveComponentGravity(componentJson, camera);
 	componentJson["fovY"] = camera->GetFovY();
 	componentJson["nearClip"] = camera->GetNearClip();
 	componentJson["farClip"] = camera->GetFarClip();
@@ -190,13 +148,12 @@ void SaveCameraComponent(GameObject* object, nlohmann::json& objectJson) {
 	componentJson["overrideRotation"] = Vector3ToJson(camera->GetOverrideRotation());
 }
 
-void LoadCameraComponent(GameObject* object, const nlohmann::json& componentJson) {
+void LoadCameraComponent(Entity* object, const nlohmann::json& componentJson) {
 	CameraComponent* camera = object->GetComponent<CameraComponent>();
 	if (!camera) {
 		return;
 	}
 	camera->SetEnabled(componentJson.value("enabled", camera->IsEnabled()));
-	LoadComponentGravity(componentJson, camera);
 	camera->SetFovY(componentJson.value("fovY", camera->GetFovY()));
 	camera->SetNearClip(componentJson.value("nearClip", camera->GetNearClip()));
 	camera->SetFarClip(componentJson.value("farClip", camera->GetFarClip()));
@@ -207,14 +164,13 @@ void LoadCameraComponent(GameObject* object, const nlohmann::json& componentJson
 	camera->SetOverrideRotation(JsonToVector3(componentJson.value("overrideRotation", nlohmann::json::array()), camera->GetOverrideRotation()));
 }
 
-void SaveObject3dComponent(GameObject* object, nlohmann::json& objectJson) {
+void SaveObject3dComponent(Entity* object, nlohmann::json& objectJson) {
 	Object3dComponent* object3d = object->GetComponent<Object3dComponent>();
 	if (!object3d) {
 		return;
 	}
 	nlohmann::json& componentJson = objectJson["object3d"];
 	componentJson["enabled"] = object3d->IsEnabled();
-	SaveComponentGravity(componentJson, object3d);
 	componentJson["material"]["color"] = Vector4ToJson(object3d->GetColor());
 	componentJson["material"]["emissionColor"] = Vector3ToJson(object3d->GetEmissionColor());
 	componentJson["material"]["emissionIntensity"] = object3d->GetEmissionIntensity();
@@ -233,13 +189,12 @@ void SaveObject3dComponent(GameObject* object, nlohmann::json& objectJson) {
 	componentJson["pointLight"]["decay"] = object3d->GetPointLightDecay();
 }
 
-void LoadObject3dComponent(GameObject* object, const nlohmann::json& componentJson) {
+void LoadObject3dComponent(Entity* object, const nlohmann::json& componentJson) {
 	Object3dComponent* object3d = object->GetComponent<Object3dComponent>();
 	if (!object3d) {
 		return;
 	}
 	object3d->SetEnabled(componentJson.value("enabled", object3d->IsEnabled()));
-	LoadComponentGravity(componentJson, object3d);
 	const nlohmann::json materialJson = componentJson.value("material", nlohmann::json::object());
 	object3d->SetColor(JsonToVector4(materialJson.value("color", nlohmann::json::array()), object3d->GetColor()));
 	object3d->SetEmission(
@@ -268,7 +223,7 @@ void LoadObject3dComponent(GameObject* object, const nlohmann::json& componentJs
 		pointLightJson.value("decay", object3d->GetPointLightDecay()));
 }
 
-void SaveParticleEmitterComponent(GameObject* object, nlohmann::json& objectJson) {
+void SaveParticleEmitterComponent(Entity* object, nlohmann::json& objectJson) {
 	ParticleEmitterComponent* emitter = object->GetComponent<ParticleEmitterComponent>();
 	if (!emitter) {
 		return;
@@ -276,42 +231,22 @@ void SaveParticleEmitterComponent(GameObject* object, nlohmann::json& objectJson
 	const ParticleEmitParam param = emitter->GetParam();
 	nlohmann::json& componentJson = objectJson["particleEmitter"];
 	componentJson["enabled"] = emitter->IsEnabled();
-	SaveComponentGravity(componentJson, emitter);
 	componentJson["groupName"] = emitter->GetGroupName();
 	componentJson["textureFilePath"] = emitter->GetTextureFilePath();
 	componentJson["isActive"] = emitter->GetIsActive();
 	componentJson["frequency"] = emitter->GetFrequency();
 	componentJson["blendMode"] = static_cast<int>(emitter->GetBlendMode());
 	componentJson["meshType"] = static_cast<int>(emitter->GetMeshType());
-	componentJson["param"]["count"] = param.count;
-	componentJson["param"]["lifeTime"] = param.lifeTime;
-	componentJson["param"]["scale"] = Vector3ToJson(param.scale);
-	componentJson["param"]["endScale"] = Vector3ToJson(param.endScale);
-	componentJson["param"]["baseVelocity"] = Vector3ToJson(param.baseVelocity);
-	componentJson["param"]["randomVelocityRange"] = Vector3ToJson(param.randomVelocityRange);
-	componentJson["param"]["acceleration"] = Vector3ToJson(param.acceleration);
-	componentJson["param"]["randomPositionRange"] = Vector3ToJson(param.randomPositionRange);
-	componentJson["param"]["baseRotate"] = Vector3ToJson(param.baseRotate);
-	componentJson["param"]["isRandomRotate"] = param.isRandomRotate;
-	componentJson["param"]["randomRotateRange"] = Vector3ToJson(param.randomRotateRange);
-	componentJson["param"]["color"] = Vector4ToJson(param.color);
-	componentJson["param"]["endColor"] = Vector4ToJson(param.endColor);
-	componentJson["param"]["randomScaleRange"] = Vector3ToJson(param.randomScaleRange);
-	componentJson["param"]["isBillboard"] = param.isBillboard;
-	componentJson["param"]["isVortex"] = param.isVortex;
-	componentJson["param"]["vortexAngularSpeed"] = param.vortexAngularSpeed;
-	componentJson["param"]["vortexBaseRadius"] = param.vortexBaseRadius;
-	componentJson["param"]["vortexTopRadius"] = param.vortexTopRadius;
-	componentJson["param"]["vortexHeight"] = param.vortexHeight;
+	// パラメータの項目一覧は共通Codecだけに持たせ、フィールド追加時の更新漏れを防ぐ。
+	componentJson["param"] = ParticleEmitParamJson::ToJson(param);
 }
 
-void LoadParticleEmitterComponent(GameObject* object, const nlohmann::json& componentJson) {
+void LoadParticleEmitterComponent(Entity* object, const nlohmann::json& componentJson) {
 	ParticleEmitterComponent* emitter = object->GetComponent<ParticleEmitterComponent>();
 	if (!emitter) {
 		return;
 	}
 	emitter->SetEnabled(componentJson.value("enabled", emitter->IsEnabled()));
-	LoadComponentGravity(componentJson, emitter);
 	const std::string groupName = componentJson.value("groupName", object->GetName());
 	const std::string textureFilePath = componentJson.value("textureFilePath", std::string("Resources/circle.png"));
 	const ParticleMeshType meshType =
@@ -328,36 +263,12 @@ void LoadParticleEmitterComponent(GameObject* object, const nlohmann::json& comp
 	emitter->SetBlendMode(static_cast<BlendMode>(componentJson.value("blendMode", static_cast<int>(emitter->GetBlendMode()))));
 	emitter->SetMeshType(meshType);
 
-	const nlohmann::json paramJson = componentJson.value("param", nlohmann::json::object());
-	ParticleEmitParam param = emitter->GetParam();
-	param.count = paramJson.value("count", param.count);
-	param.lifeTime = paramJson.value("lifeTime", param.lifeTime);
-	param.scale = JsonToVector3(paramJson.value("scale", nlohmann::json::array()), param.scale);
-	param.endScale = JsonToVector3(paramJson.value("endScale", nlohmann::json::array()), param.endScale);
-	param.baseVelocity = JsonToVector3(paramJson.value("baseVelocity", nlohmann::json::array()), param.baseVelocity);
-	param.randomVelocityRange =
-		JsonToVector3(paramJson.value("randomVelocityRange", nlohmann::json::array()), param.randomVelocityRange);
-	param.acceleration = JsonToVector3(paramJson.value("acceleration", nlohmann::json::array()), param.acceleration);
-	param.randomPositionRange =
-		JsonToVector3(paramJson.value("randomPositionRange", nlohmann::json::array()), param.randomPositionRange);
-	param.baseRotate = JsonToVector3(paramJson.value("baseRotate", nlohmann::json::array()), param.baseRotate);
-	param.isRandomRotate = paramJson.value("isRandomRotate", param.isRandomRotate);
-	param.randomRotateRange =
-		JsonToVector3(paramJson.value("randomRotateRange", nlohmann::json::array()), param.randomRotateRange);
-	param.color = JsonToVector4(paramJson.value("color", nlohmann::json::array()), param.color);
-	param.endColor = JsonToVector4(paramJson.value("endColor", nlohmann::json::array()), param.endColor);
-	param.randomScaleRange =
-		JsonToVector3(paramJson.value("randomScaleRange", nlohmann::json::array()), param.randomScaleRange);
-	param.isBillboard = paramJson.value("isBillboard", param.isBillboard);
-	param.isVortex = paramJson.value("isVortex", param.isVortex);
-	param.vortexAngularSpeed = paramJson.value("vortexAngularSpeed", param.vortexAngularSpeed);
-	param.vortexBaseRadius = paramJson.value("vortexBaseRadius", param.vortexBaseRadius);
-	param.vortexTopRadius = paramJson.value("vortexTopRadius", param.vortexTopRadius);
-	param.vortexHeight = paramJson.value("vortexHeight", param.vortexHeight);
+	const ParticleEmitParam param = ParticleEmitParamJson::FromJson(
+		componentJson.value("param", nlohmann::json::object()), emitter->GetParam());
 	emitter->SetParam(param);
 }
 
-void SaveEnemySpawnPointComponent(GameObject* object, nlohmann::json& objectJson) {
+void SaveEnemySpawnPointComponent(Entity* object, nlohmann::json& objectJson) {
 	EnemySpawnPointComponent* spawnPoint = object->GetComponent<EnemySpawnPointComponent>();
 	if (!spawnPoint) {
 		return;
@@ -365,7 +276,6 @@ void SaveEnemySpawnPointComponent(GameObject* object, nlohmann::json& objectJson
 	objectJson["type"] = "EnemySpawnPoint";
 	nlohmann::json& componentJson = objectJson["enemySpawnPoint"];
 	componentJson["enabled"] = spawnPoint->IsEnabled();
-	SaveComponentGravity(componentJson, spawnPoint);
 	componentJson["targetName"] = spawnPoint->GetTargetName();
 	componentJson["cameraName"] = spawnPoint->GetCameraName();
 	componentJson["enemyTypeName"] = spawnPoint->GetEnemyTypeName();
@@ -385,7 +295,11 @@ void SaveEnemySpawnPointComponent(GameObject* object, nlohmann::json& objectJson
 		{"triggerTime", bossSettings.triggerTimeSeconds},
 		{"enemyTypeName", bossSettings.enemyTypeName},
 		{"bossPosition", Vector3ToJson(bossSettings.bossPosition)},
-		{"playerWarpPosition", Vector3ToJson(bossSettings.playerWarpPosition)}};
+		{"playerWarpPosition", Vector3ToJson(bossSettings.playerWarpPosition)},
+		{"arenaWallsEnabled", bossSettings.arenaWallsEnabled},
+		{"arenaHalfExtent", bossSettings.arenaHalfExtent},
+		{"arenaWallHeight", bossSettings.arenaWallHeight},
+		{"arenaWallThickness", bossSettings.arenaWallThickness}};
 
 	componentJson["schedules"] = nlohmann::json::array();
 	for (const EnemySpawnPointComponent::SpawnSchedule& schedule : spawnPoint->GetSpawnSchedules()) {
@@ -410,13 +324,12 @@ void SaveEnemySpawnPointComponent(GameObject* object, nlohmann::json& objectJson
 	}
 }
 
-void LoadEnemySpawnPointComponent(GameObject* object, const nlohmann::json& componentJson) {
+void LoadEnemySpawnPointComponent(Entity* object, const nlohmann::json& componentJson) {
 	EnemySpawnPointComponent* spawnPoint = object->GetComponent<EnemySpawnPointComponent>();
 	if (!spawnPoint) {
 		spawnPoint = object->AddComponent<EnemySpawnPointComponent>();
 	}
 	spawnPoint->SetEnabled(componentJson.value("enabled", spawnPoint->IsEnabled()));
-	LoadComponentGravity(componentJson, spawnPoint);
 	spawnPoint->SetTargetName(componentJson.value("targetName", std::string()));
 	spawnPoint->SetCameraName(componentJson.value("cameraName", std::string()));
 	spawnPoint->SetEnemyTypeName(componentJson.value("enemyTypeName", spawnPoint->GetEnemyTypeName()));
@@ -440,6 +353,10 @@ void LoadEnemySpawnPointComponent(GameObject* object, const nlohmann::json& comp
 			JsonToVector3(bossJson.value("bossPosition", nlohmann::json::array()), bossSettings.bossPosition);
 		bossSettings.playerWarpPosition =
 			JsonToVector3(bossJson.value("playerWarpPosition", nlohmann::json::array()), bossSettings.playerWarpPosition);
+		bossSettings.arenaWallsEnabled = bossJson.value("arenaWallsEnabled", bossSettings.arenaWallsEnabled);
+		bossSettings.arenaHalfExtent = bossJson.value("arenaHalfExtent", bossSettings.arenaHalfExtent);
+		bossSettings.arenaWallHeight = bossJson.value("arenaWallHeight", bossSettings.arenaWallHeight);
+		bossSettings.arenaWallThickness = bossJson.value("arenaWallThickness", bossSettings.arenaWallThickness);
 		spawnPoint->SetBossEncounterSettings(bossSettings);
 	}
 
@@ -484,7 +401,7 @@ void LoadEnemySpawnPointComponent(GameObject* object, const nlohmann::json& comp
 	spawnPoint->SetSpawnSchedules(schedules);
 }
 
-void SavePointLightComponent(GameObject* object, nlohmann::json& objectJson) {
+void SavePointLightComponent(Entity* object, nlohmann::json& objectJson) {
 	PointLightComponent* pointLight = object->GetComponent<PointLightComponent>();
 	if (!pointLight) {
 		return;
@@ -499,7 +416,7 @@ void SavePointLightComponent(GameObject* object, nlohmann::json& objectJson) {
 	componentJson["useMaterialEmissionColor"] = pointLight->GetUseMaterialEmissionColor();
 }
 
-void LoadPointLightComponent(GameObject* object, const nlohmann::json& componentJson) {
+void LoadPointLightComponent(Entity* object, const nlohmann::json& componentJson) {
 	PointLightComponent* pointLight = object->GetComponent<PointLightComponent>();
 	if (!pointLight) {
 		pointLight = object->AddComponent<PointLightComponent>();
@@ -515,7 +432,7 @@ void LoadPointLightComponent(GameObject* object, const nlohmann::json& component
 		componentJson.value("useMaterialEmissionColor", pointLight->GetUseMaterialEmissionColor()));
 }
 
-void SaveGlowBillboardComponent(GameObject* object, nlohmann::json& objectJson) {
+void SaveGlowBillboardComponent(Entity* object, nlohmann::json& objectJson) {
 	GlowBillboardComponent* glow = object->GetComponent<GlowBillboardComponent>();
 	if (!glow) {
 		return;
@@ -534,7 +451,7 @@ void SaveGlowBillboardComponent(GameObject* object, nlohmann::json& objectJson) 
 	componentJson["positionOffset"] = Vector3ToJson(glow->GetPositionOffset());
 }
 
-void LoadGlowBillboardComponent(GameObject* object, const nlohmann::json& componentJson) {
+void LoadGlowBillboardComponent(Entity* object, const nlohmann::json& componentJson) {
 	GlowBillboardComponent* glow = object->GetComponent<GlowBillboardComponent>();
 	if (!glow) {
 		glow = object->AddComponent<GlowBillboardComponent>();
@@ -553,54 +470,52 @@ void LoadGlowBillboardComponent(GameObject* object, const nlohmann::json& compon
 		JsonToVector3(componentJson.value("positionOffset", nlohmann::json::array()), glow->GetPositionOffset()));
 }
 
-void SaveOBBColliderComponent(GameObject* object, nlohmann::json& objectJson) {
+void SaveOBBColliderComponent(Entity* object, nlohmann::json& objectJson) {
 	OBBColliderComponent* collider = object->GetComponent<OBBColliderComponent>();
 	if (!collider) {
 		return;
 	}
 	nlohmann::json& componentJson = objectJson["obbCollider"];
 	componentJson["enabled"] = collider->IsEnabled();
-	SaveComponentGravity(componentJson, collider);
 	componentJson["centerOffset"] = Vector3ToJson(collider->GetCenterOffset());
 	componentJson["halfSize"] = Vector3ToJson(collider->GetHalfSize());
 	componentJson["drawDebug"] = collider->GetDrawDebug();
 	componentJson["pushBack"] = collider->GetPushBackEnabled();
+	componentJson["playerOnly"] = collider->GetPlayerOnly();
 }
 
-void LoadOBBColliderComponent(GameObject* object, const nlohmann::json& componentJson) {
+void LoadOBBColliderComponent(Entity* object, const nlohmann::json& componentJson) {
 	OBBColliderComponent* collider = object->GetComponent<OBBColliderComponent>();
 	if (!collider) {
 		collider = object->AddComponent<OBBColliderComponent>();
 	}
 	collider->SetEnabled(componentJson.value("enabled", collider->IsEnabled()));
-	LoadComponentGravity(componentJson, collider);
 	collider->SetCenterOffset(JsonToVector3(componentJson.value("centerOffset", nlohmann::json::array()), collider->GetCenterOffset()));
 	collider->SetHalfSize(JsonToVector3(componentJson.value("halfSize", nlohmann::json::array()), collider->GetHalfSize()));
 	collider->SetDrawDebug(componentJson.value("drawDebug", collider->GetDrawDebug()));
 	collider->SetPushBackEnabled(componentJson.value("pushBack", collider->GetPushBackEnabled()));
+	collider->SetPlayerOnly(componentJson.value("playerOnly", collider->GetPlayerOnly()));
 }
 
-void SaveSphereColliderComponent(GameObject* object, nlohmann::json& objectJson) {
+void SaveSphereColliderComponent(Entity* object, nlohmann::json& objectJson) {
 	SphereColliderComponent* collider = object->GetComponent<SphereColliderComponent>();
 	if (!collider) {
 		return;
 	}
 	nlohmann::json& componentJson = objectJson["sphereCollider"];
 	componentJson["enabled"] = collider->IsEnabled();
-	SaveComponentGravity(componentJson, collider);
 	componentJson["centerOffset"] = Vector3ToJson(collider->GetCenterOffset());
 	componentJson["radius"] = collider->GetRadius();
 	componentJson["drawDebug"] = collider->GetDrawDebug();
 	componentJson["pushBack"] = collider->GetPushBackEnabled();
 }
 
-void LoadSphereColliderComponent(GameObject* object, const nlohmann::json& componentJson) {
+void LoadSphereColliderComponent(Entity* object, const nlohmann::json& componentJson) {
 	SphereColliderComponent* collider = object->GetComponent<SphereColliderComponent>();
 	if (!collider) {
 		collider = object->AddComponent<SphereColliderComponent>();
 	}
 	collider->SetEnabled(componentJson.value("enabled", collider->IsEnabled()));
-	LoadComponentGravity(componentJson, collider);
 	collider->SetCenterOffset(JsonToVector3(componentJson.value("centerOffset", nlohmann::json::array()), collider->GetCenterOffset()));
 	collider->SetRadius(componentJson.value("radius", collider->GetRadius()));
 	collider->SetDrawDebug(componentJson.value("drawDebug", collider->GetDrawDebug()));
@@ -611,16 +526,16 @@ const std::array<ComponentSerializationRegistration, 10>& GetComponentSerializat
 	// 独立Componentを追加するときは、保存キーと一対のコールバックをここへ登録する。
 	static const std::array<ComponentSerializationRegistration, 10> registrations = {{
 		// 生成時に付与される基本Componentは、古いJSONにキーがなくても既定値の復元処理を通す。
-		{"sprite", &SaveSpriteComponent, &LoadSpriteComponent, true},
-		{"text", &SaveTextComponent, &LoadTextComponent, true},
-		{"camera", &SaveCameraComponent, &LoadCameraComponent, true},
-		{"object3d", &SaveObject3dComponent, &LoadObject3dComponent, true},
-		{"particleEmitter", &SaveParticleEmitterComponent, &LoadParticleEmitterComponent, true},
-		{"enemySpawnPoint", &SaveEnemySpawnPointComponent, &LoadEnemySpawnPointComponent, false},
-		{"pointLightComponent", &SavePointLightComponent, &LoadPointLightComponent, false},
-		{"glowBillboard", &SaveGlowBillboardComponent, &LoadGlowBillboardComponent, false},
-		{"obbCollider", &SaveOBBColliderComponent, &LoadOBBColliderComponent, false},
-		{"sphereCollider", &SaveSphereColliderComponent, &LoadSphereColliderComponent, false}
+		{&ComponentTypes::Sprite, &SaveSpriteComponent, &LoadSpriteComponent, true},
+		{&ComponentTypes::Text, &SaveTextComponent, &LoadTextComponent, true},
+		{&ComponentTypes::Camera, &SaveCameraComponent, &LoadCameraComponent, true},
+		{&ComponentTypes::Object3d, &SaveObject3dComponent, &LoadObject3dComponent, true},
+		{&ComponentTypes::ParticleEmitter, &SaveParticleEmitterComponent, &LoadParticleEmitterComponent, true},
+		{&ComponentTypes::EnemySpawnPoint, &SaveEnemySpawnPointComponent, &LoadEnemySpawnPointComponent, false},
+		{&ComponentTypes::PointLight, &SavePointLightComponent, &LoadPointLightComponent, false},
+		{&ComponentTypes::GlowBillboard, &SaveGlowBillboardComponent, &LoadGlowBillboardComponent, false},
+		{&ComponentTypes::OBBCollider, &SaveOBBColliderComponent, &LoadOBBColliderComponent, false},
+		{&ComponentTypes::SphereCollider, &SaveSphereColliderComponent, &LoadSphereColliderComponent, false}
 	}};
 	return registrations;
 }
@@ -630,9 +545,9 @@ void BaseScene::SaveEditorObjects() {
 	nlohmann::json root;
 	root["scene"] = sceneName_;
 	root["nextObjectId"] = nextObjectId_;
-	root["activeCamera"] = activeCameraObjectName_;
-	root["skyBox"]["enabled"] = isEditorSkyBoxEnabled_;
-	root["skyBox"]["textureFilePath"] = skyBoxTextureFilePath_;
+	root["activeCamera"] = sceneEditorState_.GetActiveCameraName();
+	root["skyBox"]["enabled"] = sceneEditorSkyBox_.IsEnabled();
+	root["skyBox"]["textureFilePath"] = sceneEditorSkyBox_.GetTextureFilePath();
 	const AtmosphereSettings& atmosphere = AtmosphereSystem::GetInstance()->GetSettings();
 	root["atmosphere"]["enabled"] = atmosphere.enabled;
 	root["atmosphere"]["sunDirection"] = Vector3ToJson(atmosphere.sunDirection);
@@ -650,7 +565,7 @@ void BaseScene::SaveEditorObjects() {
 	root["atmosphere"]["aerialPerspectiveStrength"] = atmosphere.aerialPerspectiveStrength;
 	root["objects"] = nlohmann::json::array();
 
-	std::function<nlohmann::json(GameObject*)> makeObjectJson = [&](GameObject* object) {
+	std::function<nlohmann::json(Entity*)> makeObjectJson = [&](Entity* object) {
 		const EulerTransform& transform = object->GetTransform();
 
 		nlohmann::json objectJson;
@@ -665,10 +580,9 @@ void BaseScene::SaveEditorObjects() {
 			objectJson["model"] = object->GetEditorType().substr(std::string("AnimatedModel:").size());
 		}
 		objectJson["parent"] = object->GetParentName();
-		if (Player* player = object->GetComponent<Player>()) {
+		if (PlayerComponent* player = object->GetComponent<PlayerComponent>()) {
 			objectJson["type"] = "Player";
 			objectJson["player"]["enabled"] = player->IsEnabled();
-			SaveComponentGravity(objectJson["player"], player);
 			objectJson["player"]["typeName"] = player->GetPlayerTypeName();
 			objectJson["player"]["spawnPoint"] = Vector3ToJson(player->GetSpawnPoint());
 			objectJson["player"]["currentHealth"] = player->GetMaxHealth();
@@ -679,13 +593,11 @@ void BaseScene::SaveEditorObjects() {
 			objectJson["player"]["isAnimationModel"] = player->GetIsAnimationModel();
 			if (PlayerAttackComponent* attack = object->GetComponent<PlayerAttackComponent>()) {
 				objectJson["playerAttack"]["enabled"] = attack->IsEnabled();
-				SaveComponentGravity(objectJson["playerAttack"], attack);
 			}
 		}
 		if (EnemyComponent* enemy = object->GetComponent<EnemyComponent>()) {
 			objectJson["type"] = "Enemy";
 			objectJson["enemy"]["enabled"] = enemy->IsEnabled();
-			SaveComponentGravity(objectJson["enemy"], enemy);
 			objectJson["enemy"]["typeName"] = enemy->GetEnemyTypeName();
 			objectJson["enemy"]["currentHealth"] = enemy->GetCurrentHealth();
 			objectJson["enemy"]["targetName"] = enemy->GetTargetName();
@@ -693,6 +605,7 @@ void BaseScene::SaveEditorObjects() {
 		for (const ComponentSerializationRegistration& registration : GetComponentSerializationRegistrations()) {
 			registration.save(object, objectJson);
 		}
+		SaveEntityGravity(objectJson, object);
 		objectJson["transform"]["scale"] = Vector3ToJson(transform.scale);
 		objectJson["transform"]["rotate"] = Vector3ToJson(transform.rotate);
 		objectJson["transform"]["translate"] = Vector3ToJson(transform.translate);
@@ -723,13 +636,7 @@ void BaseScene::SaveEditorObjects() {
 
 	const std::string filePath = GetSceneObjectFilePath();
 	const std::filesystem::path nativeFilePath = Utf8ToPath(filePath);
-	std::filesystem::create_directories(nativeFilePath.parent_path());
-
-	std::ofstream ofs(nativeFilePath);
-	if (!ofs) {
-		return;
-	}
-	ofs << root.dump(4);
+	SceneSerializer::Save(nativeFilePath, root);
 }
 
 /// <summary>
@@ -738,30 +645,25 @@ void BaseScene::SaveEditorObjects() {
 void BaseScene::LoadEditorObjects() {
 	const std::string filePath = GetSceneObjectFilePath();
 	nlohmann::json root;
-	if (!LoadSceneJsonWithInheritance(Utf8ToPath(filePath), root)) {
+	if (!SceneSerializer::Load(Utf8ToPath(filePath), root).Succeeded()) {
 		return;
 	}
 
 	sceneObjects_.clear();
-	activeBossEncounterObjectName_.clear();
+	enemySpawnSystem_.Reset();
 	// ステージ再読み込みを新しい挑戦として扱い、前回の戦績をすべて破棄する。
-	isStageCleared_ = false;
-	defeatedEnemyCount_ = 0;
+	gameplaySession_.Reset();
 	// シーン再読み込み時に前回挑戦の獲得額が引き継がれないよう初期化する。
-	challengeMoneyEarned_ = 0;
-	survivalTimeSeconds_ = 0.0f;
-	editorSkyBox_.reset();
-	selectedObjectIndex_ = -1;
+	sceneEditorSkyBox_.Reset();
+	sceneEditorState_.ClearSelection();
 	nextObjectId_ = root.value("nextObjectId", 1);
 	const bool hasSavedActiveCamera = root.contains("activeCamera");
-	activeCameraObjectName_ = root.value("activeCamera", "");
-	const std::string requestedActiveCameraName = activeCameraObjectName_;
+	const std::string requestedActiveCameraName = root.value("activeCamera", "");
+	sceneEditorState_.SetActiveCameraName(requestedActiveCameraName);
 	const nlohmann::json skyBoxJson = root.value("skyBox", nlohmann::json::object());
-	isEditorSkyBoxEnabled_ = skyBoxJson.value("enabled", false);
-	skyBoxTextureFilePath_ = skyBoxJson.value("textureFilePath", std::string());
-	if (!skyBoxTextureFilePath_.empty()) {
-		CreateOrReloadEditorSkyBox(skyBoxTextureFilePath_);
-	}
+	sceneEditorSkyBox_.Restore(
+		skyBoxJson.value("enabled", false),
+		skyBoxJson.value("textureFilePath", std::string()));
 
 	// 大気設定がない旧シーンJSONでは、シーン側で用意した既定値をそのまま使用します。
 	if (root.contains("atmosphere")) {
@@ -809,7 +711,7 @@ void BaseScene::LoadEditorObjects() {
 	// ステージ2の街並みは中央タイルだけをJSONで管理し、実行時に左右2タイルの
 	// 描画専用コピーを作る。ステージ2はX方向だけをループするため、Z方向へ複製すると
 	// 壁の後ろに置いた建物が中央の戦闘エリアへ現れてしまう。
-	if (sceneManager && sceneManager->GetSelectedGameplayStageId() == "stage2" && !playerTypeOverride_.empty()) {
+	if (sceneManager_ && sceneManager_->GetSelectedGameplayStageId() == "stage2" && !playerTypeOverride_.empty()) {
 		constexpr float kStage2TileSize = 20.0f;
 		const std::vector<nlohmann::json> centerTileObjects = flatObjects;
 		for (const nlohmann::json& centerObject : centerTileObjects) {
@@ -867,7 +769,7 @@ void BaseScene::LoadEditorObjects() {
 			const nlohmann::json enemyJson = objectJson.value("enemy", nlohmann::json::object());
 			modelFilePath = enemyJson.value("typeName", std::string("Default"));
 		}
-		GameObject* object = CreateEditorObject(EditorCreateTypeFromName(typeName), modelFilePath);
+		Entity* object = CreateEditorObject(EditorCreateTypeFromName(typeName), modelFilePath);
 		if (!object) {
 			continue;
 		}
@@ -880,27 +782,27 @@ void BaseScene::LoadEditorObjects() {
 		} else {
 			object->SetEditorType(typeName);
 		}
-		object->SetParentName(objectJson.value("parent", ""));
+		// 破損データの自己参照・循環・存在しない親は、親なしへフォールバックする。
+		if (!TrySetObjectParent(object, objectJson.value("parent", ""))) {
+			TrySetObjectParent(object, "");
+		}
 
 		const nlohmann::json transformJson = objectJson.value("transform", nlohmann::json::object());
 		EulerTransform& transform = object->GetTransform();
 		transform.scale = JsonToVector3(transformJson.value("scale", nlohmann::json::array()), transform.scale);
 		transform.rotate = JsonToVector3(transformJson.value("rotate", nlohmann::json::array()), transform.rotate);
 		transform.translate = JsonToVector3(transformJson.value("translate", nlohmann::json::array()), transform.translate);
-		if (Player* player = object->GetComponent<Player>()) {
+		if (PlayerComponent* player = object->GetComponent<PlayerComponent>()) {
 			const nlohmann::json playerJson = objectJson.value("player", nlohmann::json::object());
 			player->SetEnabled(playerJson.value("enabled", player->IsEnabled()));
-			LoadComponentGravity(playerJson, player);
 			// 通常のエディタ読み込みではJSONを尊重し、ゲーム開始時だけ選択タイプで差し替える。
 			const std::string playerTypeName = playerTypeOverride_.empty()
 			    ? playerJson.value("typeName", player->GetPlayerTypeName())
 			    : playerTypeOverride_;
-			player->SetPlayerTypeName(playerTypeName);
 			PlayerStats playerStats = LoadPlayerStats(playerTypeName);
 			// 全体経験値強化はキャラクター能力JSONへ混ぜず、実行時のPlayerへ独立して設定する。
 			player->SetGlobalExperienceBonusPercent(
-			    sceneManager ? sceneManager->GetGlobalExperienceBonusPercent() : 0.0f);
-			player->ApplyStats(playerStats, ApplyPlayerStatusItems(playerStats));
+			    sceneManager_ ? sceneManager_->GetGlobalExperienceBonusPercent() : 0.0f);
 			// ゲーム開始時に選択したプレイヤータイプ固有のサイズを、表示と当たり判定へ反映する。
 			if (!playerTypeOverride_.empty()) {
 				transform.scale = {playerStats.sizeScale, playerStats.sizeScale, playerStats.sizeScale};
@@ -909,10 +811,19 @@ void BaseScene::LoadEditorObjects() {
 			if (!attack) {
 				attack = object->AddComponent<PlayerAttackComponent>();
 			}
-			ApplyPlayerAttackSlots(attack, playerStats);
+			// 新規生成と同じAssemblerを通し、能力と初期攻撃が別々に更新される状態を避ける。
+			ApplyPlayerDefinition(
+				player,
+				attack,
+				playerTypeName,
+				playerStats,
+				(sceneManager_ && !playerTypeOverride_.empty())
+					? sceneManager_->ApplyGlobalShopStatUpgrades(
+						ApplyPlayerStatusItems(playerStats, LoadPlayerStatusItemDefinitions()))
+					: ApplyPlayerStatusItems(playerStats, LoadPlayerStatusItemDefinitions()),
+				LoadPlayerAttackDefinitions());
 			const nlohmann::json attackJson = objectJson.value("playerAttack", nlohmann::json::object());
 			attack->SetEnabled(attackJson.value("enabled", attack->IsEnabled()));
-			LoadComponentGravity(attackJson, attack);
 			const Vector3 spawnPoint = JsonToVector3(playerJson.value("spawnPoint", nlohmann::json::array()), transform.translate);
 			player->SetSpawnPoint(spawnPoint);
 			// タイプ固有モデルを使う場合は、配置時に保存された旧モデル情報を引き継がない。
@@ -947,12 +858,11 @@ void BaseScene::LoadEditorObjects() {
 			playerCamera->SetOverrideRotation({MathConstants::kPi * 0.5f, 0.0f, 0.0f});
 			playerCamera->SetFovY(0.75f);
 			playerCamera->SetFarClip(1000.0f);
-			activeCameraObjectName_ = object->GetName();
+			sceneEditorState_.SetActiveCameraName(object->GetName());
 		}
 		if (EnemyComponent* enemy = object->GetComponent<EnemyComponent>()) {
 			const nlohmann::json enemyJson = objectJson.value("enemy", nlohmann::json::object());
 			enemy->SetEnabled(enemyJson.value("enabled", enemy->IsEnabled()));
-			LoadComponentGravity(enemyJson, enemy);
 			const std::string enemyTypeName = enemyJson.value("typeName", enemy->GetEnemyTypeName());
 			enemy->SetEnemyTypeName(enemyTypeName);
 			enemy->ApplyStats(LoadEnemyStats(enemyTypeName));
@@ -962,44 +872,46 @@ void BaseScene::LoadEditorObjects() {
 		}
 
 		for (const ComponentSerializationRegistration& registration : GetComponentSerializationRegistrations()) {
-			if (objectJson.contains(registration.jsonKey) || registration.loadExistingWithoutJson) {
-				nlohmann::json componentJson = objectJson.value(registration.jsonKey, nlohmann::json::object());
+			const char* jsonKey = registration.metadata->jsonKey;
+			if (objectJson.contains(jsonKey) || registration.loadExistingWithoutJson) {
+				nlohmann::json componentJson = objectJson.value(jsonKey, nlohmann::json::object());
 				// ゲーム開始時に選択キャラクターへ差し替えたPlayerでは、配置時のモデルに
 				// 保存されたテクスチャを引き継がない。たとえば巫女のテクスチャを
 				// ドッペルゲンガーへ貼るとUVが一致せず、頭頂部が地肌のように見える。
 				if (typeName == "Player" && !playerTypeOverride_.empty() &&
-					std::string(registration.jsonKey) == "object3d") {
+					registration.metadata == &ComponentTypes::Object3d) {
 					componentJson.erase("modelTextureFilePath");
 				}
 				registration.load(object, componentJson);
 			}
 		}
+		LoadEntityGravity(objectJson, object);
 	}
 
 	ResolveCameraLinks();
 	ResolveEnemySpawnPointLinks();
 	ResolveEnemyLinks();
 	if (!requestedActiveCameraName.empty()) {
-		GameObject* requestedCameraObject = FindObjectByName(requestedActiveCameraName);
+		Entity* requestedCameraObject = FindObjectByName(requestedActiveCameraName);
 		CameraComponent* requestedCameraComponent =
 		    requestedCameraObject ? requestedCameraObject->GetComponent<CameraComponent>() : nullptr;
 		if (requestedCameraComponent && requestedCameraComponent->IsEnabled()) {
-			activeCameraObjectName_ = requestedActiveCameraName;
+			sceneEditorState_.SetActiveCameraName(requestedActiveCameraName);
 		} else {
-			activeCameraObjectName_.clear();
+			sceneEditorState_.ClearActiveCamera();
 		}
 	} else if (hasSavedActiveCamera) {
-		activeCameraObjectName_.clear();
+		sceneEditorState_.ClearActiveCamera();
 	}
-	if (activeCameraObjectName_.empty() && !hasSavedActiveCamera) {
-		if (GameObject* firstCamera = FindFirstCameraObject()) {
-			activeCameraObjectName_ = firstCamera->GetName();
+	if (!sceneEditorState_.HasActiveCamera() && !hasSavedActiveCamera) {
+		if (Entity* firstCamera = FindFirstCameraObject()) {
+			sceneEditorState_.SetActiveCameraName(firstCamera->GetName());
 		}
 	}
 	ApplyActiveCamera();
 
 	if (!sceneObjects_.empty()) {
-		selectedObjectIndex_ = 0;
+		sceneEditorState_.SelectObject(0);
 	}
 	nextObjectId_ = root.value("nextObjectId", nextObjectId_);
 }

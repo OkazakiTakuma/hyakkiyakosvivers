@@ -3,6 +3,7 @@
 #include "particle/ParticleManager.h"
 #include "collision/OBBColliderComponent.h"
 #include "collision/SphereColliderComponent.h"
+#include "PostEffect.h"
 
 namespace {
 
@@ -16,7 +17,7 @@ EnemyBehaviorPresentation MakeColoredPresentation(const char* modelFilePath, con
 
 /// <summary>プレイヤーの実コライダー中心へ向く射撃方向を返します。</summary>
 Vector3 MakeProjectileDirection(
-	const Vector3& shotPosition, GameObject* target, const Vector3& fallbackDirection) {
+	const Vector3& shotPosition, Entity* target, const Vector3& fallbackDirection) {
 	if (!target) {
 		return fallbackDirection;
 	}
@@ -36,119 +37,207 @@ Vector3 MakeProjectileDirection(
 		: fallbackDirection;
 }
 
+/// <summary>頭上カウントダウン用の数字を、カメラ側を向く7セグメント線として描画します。</summary>
+void DrawCountdownDigit(int digit, const Vector3& center, const Vector3& right, float scale, const Vector4& color) {
+	static constexpr unsigned char kDigitMasks[10] = {
+		0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f};
+	static constexpr float kSegments[7][4] = {
+		{-0.5f, 1.0f, 0.5f, 1.0f}, {0.5f, 1.0f, 0.5f, 0.0f},
+		{0.5f, 0.0f, 0.5f, -1.0f}, {-0.5f, -1.0f, 0.5f, -1.0f},
+		{-0.5f, 0.0f, -0.5f, -1.0f}, {-0.5f, 1.0f, -0.5f, 0.0f},
+		{-0.5f, 0.0f, 0.5f, 0.0f}};
+	if (digit < 0 || digit > 9) {
+		return;
+	}
+	const Vector3 up{0.0f, 1.0f, 0.0f};
+	for (int segment = 0; segment < 7; ++segment) {
+		if ((kDigitMasks[digit] & (1u << segment)) == 0) {
+			continue;
+		}
+		const float* points = kSegments[segment];
+		const Vector3 start = center + scale * (points[0] * right + points[1] * up);
+		const Vector3 end = center + scale * (points[2] * right + points[3] * up);
+		// 線を3本重ね、背景が明るい場所でも残り時間を読み取れる太さにする。
+		const Vector3 thickness = 0.025f * scale * right;
+		LineDrawer::GetInstance()->DrawLine(start - thickness, end - thickness, color, true);
+		LineDrawer::GetInstance()->DrawLine(start, end, color, true);
+		LineDrawer::GetInstance()->DrawLine(start + thickness, end + thickness, color, true);
+	}
+}
+
+void DrawCountdownNumber(int value, const Vector3& center, const Vector3& right, float scale, const Vector4& color) {
+	value = (std::clamp)(value, 0, 99);
+	if (value < 10) {
+		DrawCountdownDigit(value, center, right, scale, color);
+		return;
+	}
+	DrawCountdownDigit(value / 10, center - 0.65f * scale * right, right, scale, color);
+	DrawCountdownDigit(value % 10, center + 0.65f * scale * right, right, scale, color);
+}
+
 }
 
 /// <summary>
-/// 夜叉ボスの1状態が実行する処理です。
-/// ContextであるEnemyComponentは状態判定のswitchを持たず、現在Stateへ更新を委譲します。
+/// Stateへ渡す、そのフレームの夜叉ボス情報です。
+/// EnemyComponent自体を公開せず、状態判断に必要な値だけへ依存を限定します。
 /// </summary>
+struct NightSlashStateContext {
+	const EnemyStats& stats;
+	EulerTransform& transform;
+	const Vector3& direction;
+	float distance = 0.0f;
+	float frameScale = 0.0f;
+	float stateTimer = 0.0f;
+	Vector3 dashDirection{};
+	int comboDashIndex = 0;
+	int bossPatternIndex = 0;
+	int rangedWaveIndex = 0;
+};
+
+/// <summary>StateがComponentへ返す状態値と、遷移・攻撃の要求です。</summary>
+struct NightSlashStateUpdate {
+	bool hasTransition = false;
+	NightSlashState nextState = NightSlashState::Approach;
+	bool beginDash = false;
+	bool emitRangedWave = false;
+	bool resetStateTimer = false;
+	int comboDashIndex = 0;
+	int bossPatternIndex = 0;
+	int rangedWaveIndex = 0;
+};
+
+NightSlashStateUpdate MakeNightSlashUpdate(const NightSlashStateContext& context) {
+	NightSlashStateUpdate update;
+	update.comboDashIndex = context.comboDashIndex;
+	update.bossPatternIndex = context.bossPatternIndex;
+	update.rangedWaveIndex = context.rangedWaveIndex;
+	return update;
+}
+
+/// <summary>夜叉ボスの1状態が移動と次の操作要求を計算します。</summary>
 class INightSlashState {
 public:
 	virtual ~INightSlashState() = default;
-	virtual void Update(
-		EnemyComponent& enemy,
-		EulerTransform& transform,
-		const Vector3& direction,
-		float distance,
-		float frameScale) const = 0;
+	virtual NightSlashStateUpdate Update(const NightSlashStateContext& context) const = 0;
 };
 
 class NightSlashApproachState final : public INightSlashState {
 public:
-	void Update(EnemyComponent& enemy, EulerTransform& transform, const Vector3& direction, float distance, float frameScale) const override {
+	NightSlashStateUpdate Update(const NightSlashStateContext& context) const override {
+		NightSlashStateUpdate update = MakeNightSlashUpdate(context);
 		// 攻撃範囲までは追跡し、現在の攻撃パターンに対応する予兆Stateへ遷移する。
-		if (distance > enemy.stats_.comboTriggerDistance) {
-			transform.translate = transform.translate + (enemy.stats_.speed * frameScale) * direction;
-			return;
+		if (context.distance > context.stats.comboTriggerDistance) {
+			context.transform.translate = context.transform.translate +
+				(context.stats.speed * context.frameScale) * context.direction;
+			return update;
 		}
-		enemy.comboDashIndex_ = 0;
-		enemy.rangedWaveIndex_ = 0;
-		enemy.ChangeNightSlashState(
-			enemy.bossPatternIndex_ == 0
-				? EnemyComponent::NightSlashState::Windup
-				: EnemyComponent::NightSlashState::RangedWindup);
+		update.comboDashIndex = 0;
+		update.rangedWaveIndex = 0;
+		update.hasTransition = true;
+		update.nextState = context.bossPatternIndex == 0
+			? NightSlashState::Windup
+			: NightSlashState::RangedWindup;
+		return update;
 	}
 };
 
 class NightSlashWindupState final : public INightSlashState {
 public:
-	void Update(EnemyComponent& enemy, EulerTransform& transform, const Vector3&, float, float) const override {
+	NightSlashStateUpdate Update(const NightSlashStateContext& context) const override {
+		NightSlashStateUpdate update = MakeNightSlashUpdate(context);
 		// 予兆完了時点の標的位置を使い、回避可能な固定ダッシュ方向を決める。
-		if (enemy.stateTimer_ >= enemy.stats_.comboWindup) {
-			enemy.BeginNightSlashDash(transform);
+		if (context.stateTimer >= context.stats.comboWindup) {
+			update.beginDash = true;
 		}
+		return update;
 	}
 };
 
 class NightSlashDashingState final : public INightSlashState {
 public:
-	void Update(EnemyComponent& enemy, EulerTransform& transform, const Vector3&, float, float frameScale) const override {
-		const bool isFinisher = enemy.comboDashIndex_ + 1 >= (std::max)(1, enemy.stats_.comboDashCount);
-		const float speedMultiplier = isFinisher ? enemy.stats_.finisherSpeedMultiplier : 1.0f;
-		transform.translate = transform.translate +
-			(enemy.stats_.comboDashSpeed * speedMultiplier * frameScale) * enemy.dashDirection_;
-		transform.rotate.y = std::atan2(enemy.dashDirection_.x, enemy.dashDirection_.z);
-		if (enemy.stateTimer_ >= enemy.stats_.comboDashDuration) {
-			enemy.ChangeNightSlashState(EnemyComponent::NightSlashState::Slashing);
+	NightSlashStateUpdate Update(const NightSlashStateContext& context) const override {
+		NightSlashStateUpdate update = MakeNightSlashUpdate(context);
+		const bool isFinisher = context.comboDashIndex + 1 >=
+			(std::max)(1, context.stats.comboDashCount);
+		const float speedMultiplier = isFinisher ? context.stats.finisherSpeedMultiplier : 1.0f;
+		context.transform.translate = context.transform.translate +
+			(context.stats.comboDashSpeed * speedMultiplier * context.frameScale) * context.dashDirection;
+		context.transform.rotate.y = std::atan2(context.dashDirection.x, context.dashDirection.z);
+		if (context.stateTimer >= context.stats.comboDashDuration) {
+			update.hasTransition = true;
+			update.nextState = NightSlashState::Slashing;
 		}
+		return update;
 	}
 };
 
 class NightSlashSlashingState final : public INightSlashState {
 public:
-	void Update(EnemyComponent& enemy, EulerTransform& transform, const Vector3&, float, float) const override {
-		if (enemy.stateTimer_ < enemy.stats_.comboSlashPause) {
-			return;
+	NightSlashStateUpdate Update(const NightSlashStateContext& context) const override {
+		NightSlashStateUpdate update = MakeNightSlashUpdate(context);
+		if (context.stateTimer < context.stats.comboSlashPause) {
+			return update;
 		}
-		++enemy.comboDashIndex_;
-		if (enemy.comboDashIndex_ >= (std::max)(1, enemy.stats_.comboDashCount)) {
-			enemy.ChangeNightSlashState(EnemyComponent::NightSlashState::Recovering);
+		++update.comboDashIndex;
+		if (update.comboDashIndex >= (std::max)(1, context.stats.comboDashCount)) {
+			update.hasTransition = true;
+			update.nextState = NightSlashState::Recovering;
 		} else {
 			// 次の斬撃ごとに標的位置を取り直し、左右交互のダッシュを開始する。
-			enemy.BeginNightSlashDash(transform);
+			update.beginDash = true;
 		}
+		return update;
 	}
 };
 
 class NightSlashRangedWindupState final : public INightSlashState {
 public:
-	void Update(EnemyComponent& enemy, EulerTransform& transform, const Vector3&, float, float) const override {
-		if (enemy.stateTimer_ < enemy.stats_.bossRangedWindup) {
-			return;
+	NightSlashStateUpdate Update(const NightSlashStateContext& context) const override {
+		NightSlashStateUpdate update = MakeNightSlashUpdate(context);
+		if (context.stateTimer < context.stats.bossRangedWindup) {
+			return update;
 		}
-		enemy.rangedWaveIndex_ = 0;
-		enemy.ChangeNightSlashState(EnemyComponent::NightSlashState::RangedFiring);
+		update.rangedWaveIndex = 0;
+		update.hasTransition = true;
+		update.nextState = NightSlashState::RangedFiring;
 		// 1ウェーブ目は射撃Stateへ入った瞬間に発射する。
-		enemy.EmitBossRangedWave(transform);
+		update.emitRangedWave = true;
+		return update;
 	}
 };
 
 class NightSlashRangedFiringState final : public INightSlashState {
 public:
-	void Update(EnemyComponent& enemy, EulerTransform& transform, const Vector3&, float, float) const override {
-		if (enemy.stateTimer_ < enemy.stats_.bossRangedInterval) {
-			return;
+	NightSlashStateUpdate Update(const NightSlashStateContext& context) const override {
+		NightSlashStateUpdate update = MakeNightSlashUpdate(context);
+		if (context.stateTimer < context.stats.bossRangedInterval) {
+			return update;
 		}
-		++enemy.rangedWaveIndex_;
-		if (enemy.rangedWaveIndex_ >= (std::max)(1, enemy.stats_.bossRangedWaves)) {
-			enemy.ChangeNightSlashState(EnemyComponent::NightSlashState::Recovering);
-			return;
+		++update.rangedWaveIndex;
+		if (update.rangedWaveIndex >= (std::max)(1, context.stats.bossRangedWaves)) {
+			update.hasTransition = true;
+			update.nextState = NightSlashState::Recovering;
+			return update;
 		}
 		// 同じState内で次のウェーブを待つため、経過時間だけをリセットする。
-		enemy.stateTimer_ = 0.0f;
-		enemy.EmitBossRangedWave(transform);
+		update.resetStateTimer = true;
+		update.emitRangedWave = true;
+		return update;
 	}
 };
 
 class NightSlashRecoveringState final : public INightSlashState {
 public:
-	void Update(EnemyComponent& enemy, EulerTransform&, const Vector3&, float, float) const override {
-		if (enemy.stateTimer_ < enemy.stats_.comboRecovery) {
-			return;
+	NightSlashStateUpdate Update(const NightSlashStateContext& context) const override {
+		NightSlashStateUpdate update = MakeNightSlashUpdate(context);
+		if (context.stateTimer < context.stats.comboRecovery) {
+			return update;
 		}
 		// 0=連続斬り、1=全方位弾幕、2=扇状連射を固定順で循環する。
-		enemy.bossPatternIndex_ = (enemy.bossPatternIndex_ + 1) % 3;
-		enemy.ChangeNightSlashState(EnemyComponent::NightSlashState::Approach);
+		update.bossPatternIndex = (context.bossPatternIndex + 1) % 3;
+		update.hasTransition = true;
+		update.nextState = NightSlashState::Approach;
+		return update;
 	}
 };
 
@@ -156,6 +245,10 @@ void EnemyComponent::Initialize() {
 	currentHealth_ = stats_.health;
 	deathEffectTimer_ = 0.0f;
 	deathEffectStarted_ = false;
+	usesAuthoredDeathAnimation_ = false;
+	bossDefeatPresentationTimer_ = 0.0f;
+	knockbackElapsedSeconds_ = 0.0f;
+	knockbackActive_ = false;
 }
 
 void EnemyComponent::Update() {
@@ -163,7 +256,7 @@ void EnemyComponent::Update() {
 
 	// 敵タイプは実行中に頻繁に変わらないため、薄いStrategyを介さず直接ディスパッチする。
 	// 複雑な時間遷移を持つ夜叉ボスだけは、この先でState Patternへ委譲する。
-	GameObject* owner = GetOwner();
+	Entity* owner = GetOwner();
 	if (!owner) {
 		return;
 	}
@@ -174,6 +267,11 @@ void EnemyComponent::Update() {
 			BeginDeathEffect(transform);
 		}
 		UpdateDeathEffect(transform);
+		return;
+	}
+	if (knockbackActive_) {
+		UpdateKnockback(transform, GameTime::GetDeltaTime());
+		// 補間中は追跡や突進による移動を止め、ノックバックの軌道を維持する。
 		return;
 	}
 	if (!target_) {
@@ -206,6 +304,9 @@ void EnemyComponent::Update() {
 	case EnemyBehaviorType::BurstShooter:
 		UpdateBurstShooter(transform, normalized, distance);
 		break;
+	case EnemyBehaviorType::BarrierBoss:
+		UpdateBarrierBoss(transform, normalized, distance);
+		break;
 	case EnemyBehaviorType::Chase:
 	default:
 		if (distance > MathConstants::kDirectionEpsilon) {
@@ -219,7 +320,7 @@ void EnemyComponent::Update() {
 void EnemyComponent::Draw3D() {
 		if (IsDying() && GetOwner()) {
 			// 消滅点から二重の光輪を広げ、モデルが小さくなっても撃破位置を読み取れるようにする。
-			const float progress = (std::clamp)(deathEffectTimer_ / kDeathEffectDuration, 0.0f, 1.0f);
+			const float progress = (std::clamp)(deathEffectTimer_ / GetDeathEffectDuration(), 0.0f, 1.0f);
 			const float alpha = (1.0f - progress) * (1.0f - progress);
 			const Vector3 center = deathStartPosition_ + Vector3{0.0f, 0.18f, 0.0f};
 			constexpr int kSegments = 28;
@@ -242,7 +343,7 @@ void EnemyComponent::Draw3D() {
 			return;
 		}
 		// 攻撃予兆または攻撃中だけ、地面の警告円と照準線を描画する。
-		if ((!IsChargeWarningActive() && !IsSelfDestructArmed() && !IsTornadoWarningActive() &&
+		if ((!IsChargeWarningActive() && !IsSelfDestructArmed() && !IsTornadoWarningActive() && !IsBarrierWarningActive() &&
 		     !IsNightSlashWarningActive() && !IsNightSlashAttacking() &&
 		     !IsBossRangedWarningActive() && !IsBossRangedAttacking()) ||
 		    !GetOwner()) {
@@ -252,7 +353,28 @@ void EnemyComponent::Draw3D() {
 		const bool isNightSlash = stats_.behavior == EnemyBehaviorType::NightSlashBoss;
 		const bool isSelfDestruct = stats_.behavior == EnemyBehaviorType::SelfDestruct;
 		const bool isTornadoBoss = stats_.behavior == EnemyBehaviorType::TornadoBoss;
+		const bool isBarrierBoss = stats_.behavior == EnemyBehaviorType::BarrierBoss;
+		if (isSelfDestruct && IsSelfDestructArmed()) {
+			Vector3 toTarget = target_
+				? target_->GetTransform().translate - GetOwner()->GetTransform().translate
+				: Vector3{0.0f, 0.0f, -1.0f};
+			toTarget.y = 0.0f;
+			const Vector3 facing = Length(toTarget) > MathConstants::kDirectionEpsilon
+				? Normalize(toTarget) : Vector3{0.0f, 0.0f, -1.0f};
+			const Vector3 right{facing.z, 0.0f, -facing.x};
+			const float remainingSeconds = (std::max)(0.0f, stats_.selfDestructFuseDuration - stateTimer_);
+			const int displayedSeconds = static_cast<int>(std::ceil(remainingSeconds));
+			const Vector3 timerCenter = GetOwner()->GetTransform().translate +
+				Vector3{0.0f, 1.35f * stats_.sizeScale, 0.0f};
+			const float warningPulse = 0.65f + 0.35f * std::sin(GetSelfDestructProgress() * 20.0f * MathConstants::kPi);
+			DrawCountdownNumber(
+				displayedSeconds, timerCenter, right, 0.34f * stats_.sizeScale,
+				{1.0f, 0.12f + 0.62f * (1.0f - warningPulse), 0.02f, 1.0f});
+		}
 		if (isTornadoBoss && tornadoPatternIndex_ == 1 && target_) {
+			center = target_->GetTransform().translate + Vector3{0.0f, 0.06f, 0.0f};
+		}
+		if (isBarrierBoss && target_) {
 			center = target_->GetTransform().translate + Vector3{0.0f, 0.06f, 0.0f};
 		}
 		const bool isRangedPattern = IsBossRangedWarningActive() || IsBossRangedAttacking();
@@ -260,10 +382,12 @@ void EnemyComponent::Draw3D() {
 		    ? GetBossRangedProgress()
 		    : isNightSlash ? GetNightSlashProgress()
 		    : isSelfDestruct ? GetSelfDestructProgress()
+		    : isBarrierBoss ? GetBarrierWarningProgress()
 		    : isTornadoBoss ? GetTornadoWarningProgress() : GetChargeProgress();
 		const float radius = isNightSlash
 		    ? 1.35f + 0.45f * progress
 		    : isSelfDestruct ? stats_.selfDestructRadius * (0.75f + 0.25f * progress)
+		    : isBarrierBoss ? stats_.bossConvergingTornadoInitialRadius
 		    : isTornadoBoss ? (tornadoPatternIndex_ == 0
 		        ? stats_.bossTornadoInitialRadius + 0.6f * progress
 		        : tornadoPatternIndex_ == 1
@@ -274,6 +398,7 @@ void EnemyComponent::Draw3D() {
 			? Vector4{0.12f, 0.45f + 0.45f * progress, 1.0f, 1.0f}
 			: isNightSlash ? Vector4{0.82f, 0.08f + 0.30f * progress, 1.0f, 1.0f}
 			: isSelfDestruct ? Vector4{1.0f, 0.85f * (1.0f - progress), 0.02f, 1.0f}
+			: isBarrierBoss ? Vector4{0.72f + 0.25f * progress, 0.10f, 1.0f, 1.0f}
 			: isTornadoBoss ? (tornadoPatternIndex_ == 0
 			    ? Vector4{0.20f, 0.75f + 0.25f * progress, 1.0f, 1.0f}
 			    : tornadoPatternIndex_ == 1
@@ -320,6 +445,7 @@ void EnemyComponent::ApplyStats(const EnemyStats& stats) {
 		const bool isFirstStatsApplication = !hasAppliedStats_;
 		const bool behaviorChanged = hasAppliedStats_ && stats_.behavior != stats.behavior;
 		stats_ = stats;
+		stats_.knockbackResistance = (std::clamp)(stats_.knockbackResistance, 0, 3);
 		hasAppliedStats_ = true;
 		if (behaviorChanged) {
 			shootTimer_ = 0.0f;
@@ -332,6 +458,7 @@ void EnemyComponent::ApplyStats(const EnemyStats& stats) {
 			nightSlashMotionInitialized_ = false;
 			nightSlashMotionTime_ = 0.0f;
 			tornadoBossState_ = TornadoBossState::Approach;
+			barrierBossState_ = BarrierBossState::Approach;
 			tornadoPatternIndex_ = 0;
 			comboDashIndex_ = 0;
 			bossPatternIndex_ = 0;
@@ -351,11 +478,19 @@ void EnemyComponent::SetEnemyTypeName(const std::string& enemyTypeName) { enemyT
 
 const std::string& EnemyComponent::GetEnemyTypeName() const { return enemyTypeName_; }
 
-void EnemyComponent::SetTarget(GameObject* target) { target_ = target; }
+void EnemyComponent::SetTarget(Entity* target) { target_ = target; }
 
-GameObject* EnemyComponent::GetTarget() const { return target_; }
+Entity* EnemyComponent::GetTarget() const { return target_; }
 
-void EnemyComponent::SetTargetName(const std::string& targetName) { targetName_ = targetName; }
+void EnemyComponent::SetTargetName(const std::string& targetName) {
+	if (targetName_ != targetName) {
+		targetName_ = targetName;
+		// 設定名変更後に以前のEntityを使い続けず、次回のリンク解決へ委ねる。
+		if (!target_ || (!targetName.empty() && target_->GetName() != targetName)) {
+			target_ = nullptr;
+		}
+	}
+}
 
 const std::string& EnemyComponent::GetTargetName() const { return targetName_; }
 
@@ -371,12 +506,60 @@ void EnemyComponent::TakeDamage(float damage) {
 	damageFlashTimer_ = kDamageFlashDuration;
 }
 
+void EnemyComponent::ApplyKnockback(const Vector3& direction, int level) {
+	Entity* owner = GetOwner();
+	const int effectiveLevel = (std::clamp)(level - stats_.knockbackResistance, 0, 3);
+	if (!owner || currentHealth_ <= 0.0f || effectiveLevel == 0) {
+		return;
+	}
+
+	Vector3 horizontalDirection = direction;
+	horizontalDirection.y = 0.0f;
+	if (Length(horizontalDirection) <= MathConstants::kDirectionEpsilon) {
+		return;
+	}
+
+	// 段階差を視認しやすくしつつ、1回の命中で敵が画面外まで飛ばない距離に抑える。
+	constexpr float kKnockbackDistances[] = {0.0f, 0.45f, 0.90f, 1.50f};
+	knockbackStartPosition_ = owner->GetTransform().translate;
+	knockbackTargetPosition_ = knockbackStartPosition_ +
+		kKnockbackDistances[effectiveLevel] * Normalize(horizontalDirection);
+	knockbackElapsedSeconds_ = 0.0f;
+	knockbackActive_ = true;
+}
+
+void EnemyComponent::UpdateKnockback(EulerTransform& transform, float deltaTime) {
+	knockbackElapsedSeconds_ += (std::max)(0.0f, deltaTime);
+	const float progress = (std::clamp)(knockbackElapsedSeconds_ / kKnockbackDuration, 0.0f, 1.0f);
+	transform.translate = Leap(knockbackStartPosition_, knockbackTargetPosition_, progress);
+	if (progress >= 1.0f) {
+		transform.translate = knockbackTargetPosition_;
+		knockbackActive_ = false;
+	}
+}
+
 bool EnemyComponent::IsDamageFlashActive() const { return damageFlashTimer_ > 0.0f; }
 
 bool EnemyComponent::IsDying() const { return currentHealth_ <= 0.0f && deathEffectStarted_; }
 
 bool EnemyComponent::IsDeathEffectFinished() const {
-	return deathEffectStarted_ && deathEffectTimer_ >= kDeathEffectDuration;
+	return deathEffectStarted_ && deathEffectTimer_ >= GetDeathEffectDuration();
+}
+
+bool EnemyComponent::IsBoss() const {
+	return stats_.dropsBossUpgrade ||
+		stats_.behavior == EnemyBehaviorType::NightSlashBoss ||
+		stats_.behavior == EnemyBehaviorType::TornadoBoss;
+}
+
+float EnemyComponent::GetDeathEffectDuration() const {
+	return IsBoss() ? kBossDeathEffectDuration : kDeathEffectDuration;
+}
+
+bool EnemyComponent::UsesDefeatCinematic() const {
+	// dropsBossUpgradeだけを持つ中ボスは、倒れ込みを等速再生して戦闘テンポを維持する。
+	return stats_.behavior == EnemyBehaviorType::NightSlashBoss ||
+		stats_.behavior == EnemyBehaviorType::TornadoBoss;
 }
 
 void EnemyComponent::BeginDeathEffect(EulerTransform& transform) {
@@ -386,6 +569,24 @@ void EnemyComponent::BeginDeathEffect(EulerTransform& transform) {
 	deathStartRotation_ = transform.rotate;
 	deathStartScale_ = transform.scale;
 	pendingShotRequests_.clear();
+	usesAuthoredDeathAnimation_ = false;
+	if (IsBoss()) {
+		if (!stats_.defeatAnimationName.empty()) {
+			if (Object3dComponent* object3d = GetOwner()->GetComponent<Object3dComponent>()) {
+				usesAuthoredDeathAnimation_ = object3d->SetAnimation(stats_.defeatAnimationName, true);
+				if (usesAuthoredDeathAnimation_) {
+					object3d->SetAnimationLooping(false);
+					object3d->RestartAnimation();
+				}
+			}
+		}
+		if (UsesDefeatCinematic()) {
+			// 最終打撃を画面へ刻み、次フレーム以降は実時間タイマーでスローへつなげる。
+			bossDefeatPresentationTimer_ = 0.0f;
+			GameTime::SetTimeScale(0.0f);
+			PostEffect::GetInstance()->SetCinematicRadialBlur(0.24f);
+		}
+	}
 
 	// エミッター自体をシーンへ残さず、ParticleManagerへ一度だけ破片を登録する。
 	constexpr const char* kDeathParticleGroup = "EnemyDeathBurst";
@@ -415,9 +616,86 @@ void EnemyComponent::BeginDeathEffect(EulerTransform& transform) {
 }
 
 void EnemyComponent::UpdateDeathEffect(EulerTransform& transform) {
-	deathEffectTimer_ = (std::min)(kDeathEffectDuration, deathEffectTimer_ + GameTime::GetDeltaTime());
-	const float progress = (std::clamp)(deathEffectTimer_ / kDeathEffectDuration, 0.0f, 1.0f);
+	if (UsesDefeatCinematic()) {
+		constexpr float kHitStopEnd = 0.12f;
+		constexpr float kSlowMotionEnd = 1.15f;
+		constexpr float kRecoveryEnd = 1.55f;
+		bossDefeatPresentationTimer_ += GameTime::GetUnscaledDeltaTime();
+
+		if (bossDefeatPresentationTimer_ < kHitStopEnd) {
+			GameTime::SetTimeScale(0.0f);
+			PostEffect::GetInstance()->SetCinematicRadialBlur(0.24f);
+		} else if (bossDefeatPresentationTimer_ < kSlowMotionEnd) {
+			const float phase = (bossDefeatPresentationTimer_ - kHitStopEnd) /
+				(kSlowMotionEnd - kHitStopEnd);
+			const float eased = phase * phase * (3.0f - 2.0f * phase);
+			GameTime::SetTimeScale(0.12f + 0.18f * eased);
+			PostEffect::GetInstance()->SetCinematicRadialBlur(0.22f - 0.165f * eased);
+		} else if (bossDefeatPresentationTimer_ < kRecoveryEnd) {
+			const float phase = (bossDefeatPresentationTimer_ - kSlowMotionEnd) /
+				(kRecoveryEnd - kSlowMotionEnd);
+			const float eased = phase * phase * (3.0f - 2.0f * phase);
+			GameTime::SetTimeScale(0.30f + 0.70f * eased);
+			PostEffect::GetInstance()->SetCinematicRadialBlur(0.055f * (1.0f - eased));
+		} else {
+			GameTime::SetTimeScale(1.0f);
+			PostEffect::GetInstance()->SetCinematicRadialBlur(0.0f);
+		}
+	}
+
+	const float deathDuration = GetDeathEffectDuration();
+	deathEffectTimer_ = (std::min)(deathDuration, deathEffectTimer_ + GameTime::GetDeltaTime());
+	const float progress = (std::clamp)(deathEffectTimer_ / deathDuration, 0.0f, 1.0f);
 	const float smoothProgress = progress * progress * (3.0f - 2.0f * progress);
+
+	if (IsBoss()) {
+		// ボスは即座に回転消滅せず、衝撃でのけぞってから横へ重く倒れ、最後だけ消滅する。
+		const float recoilProgress = (std::clamp)(progress / 0.16f, 0.0f, 1.0f);
+		const float fallProgress = (std::clamp)((progress - 0.12f) / 0.58f, 0.0f, 1.0f);
+		const float smoothFall = fallProgress * fallProgress * (3.0f - 2.0f * fallProgress);
+		const float vanishProgress = (std::clamp)((progress - 0.68f) / 0.32f, 0.0f, 1.0f);
+		const float smoothVanish = vanishProgress * vanishProgress * (3.0f - 2.0f * vanishProgress);
+		const float recoilScale = 1.0f + 0.10f * std::sin(MathConstants::kPi * recoilProgress);
+		const float remainScale = (std::max)(0.015f, 1.0f - smoothVanish);
+
+		if (usesAuthoredDeathAnimation_) {
+			// 倒れ込み自体はbin内のボーンアニメーションへ任せ、終端の消滅だけEntity側で加える。
+			transform.scale = {
+				deathStartScale_.x * remainScale,
+				deathStartScale_.y * remainScale,
+				deathStartScale_.z * remainScale};
+			transform.rotate = deathStartRotation_;
+			transform.translate = deathStartPosition_;
+		} else {
+			// 専用クリップを持たない中ボスでも、同じ演出シーケンスを破綻させないフォールバックです。
+			transform.scale = {
+				deathStartScale_.x * recoilScale * remainScale,
+				deathStartScale_.y * recoilScale * remainScale * (1.0f - 0.28f * smoothFall),
+				deathStartScale_.z * recoilScale * remainScale};
+			transform.rotate = deathStartRotation_ + Vector3{
+				-0.18f * recoilProgress + 0.34f * smoothFall,
+				0.30f * smoothFall,
+				1.32f * smoothFall};
+			transform.translate = deathStartPosition_ + Vector3{
+				0.18f * stats_.sizeScale * smoothFall,
+				0.20f * std::sin(MathConstants::kPi * recoilProgress) - 0.48f * smoothFall,
+				-0.12f * stats_.sizeScale * recoilProgress};
+		}
+
+		if (Object3dComponent* object3d = GetOwner()->GetComponent<Object3dComponent>()) {
+			const float impactFlash = 1.0f - recoilProgress;
+			object3d->SetColor({
+				1.0f,
+				0.24f + 0.76f * impactFlash,
+				0.08f + 0.92f * impactFlash,
+				1.0f - smoothVanish});
+			object3d->SetEmission(
+				{1.0f, 0.16f + 0.74f * impactFlash, 0.02f},
+				2.4f * (1.0f - smoothProgress));
+		}
+		return;
+	}
+
 	const float flashScale = 1.0f + 0.12f * std::sin(MathConstants::kPi * (std::min)(progress / 0.22f, 1.0f));
 	const float disappearScale = (std::max)(0.015f, 1.0f - smoothProgress);
 
@@ -474,6 +752,14 @@ float EnemyComponent::GetTornadoWarningProgress() const {
 		    : 1.0f;
 	}
 
+bool EnemyComponent::IsBarrierWarningActive() const { return barrierBossState_ == BarrierBossState::Windup; }
+
+float EnemyComponent::GetBarrierWarningProgress() const {
+	return stats_.bossTornadoWindup > 0.0f
+		? (std::min)(1.0f, stateTimer_ / stats_.bossTornadoWindup)
+		: 1.0f;
+}
+
 bool EnemyComponent::ConsumeSelfDestructRequest() {
 		if (!selfDestructRequested_) {
 			return false;
@@ -513,7 +799,8 @@ float EnemyComponent::GetNightSlashProgress() const {
 	}
 
 bool EnemyComponent::CanDealContactDamage() const {
-	if (stats_.behavior == EnemyBehaviorType::SelfDestruct || stats_.behavior == EnemyBehaviorType::TornadoBoss) {
+	if (stats_.behavior == EnemyBehaviorType::SelfDestruct || stats_.behavior == EnemyBehaviorType::TornadoBoss ||
+		stats_.behavior == EnemyBehaviorType::BarrierBoss) {
 		return false;
 	}
 	return stats_.behavior != EnemyBehaviorType::NightSlashBoss || IsNightSlashAttacking();
@@ -539,6 +826,12 @@ EnemyBehaviorPresentation EnemyComponent::GetBehaviorPresentation() {
 	}
 	case EnemyBehaviorType::BurstShooter:
 		return MakeColoredPresentation("enemy_shooter.gltf", {0.08f, 0.86f, 0.62f, 1.0f});
+	case EnemyBehaviorType::BarrierBoss: {
+		const float pulse = IsBarrierWarningActive()
+			? 0.45f + 0.55f * std::sin(GetBarrierWarningProgress() * 14.0f * MathConstants::kPi)
+			: 0.0f;
+		return MakeColoredPresentation("enemy_shooter.gltf", {0.62f + 0.30f * pulse, 0.08f, 0.92f, 1.0f});
+	}
 	case EnemyBehaviorType::SelfDestruct: {
 		const float pulse = IsSelfDestructArmed()
 			? 0.45f + 0.55f * std::sin(GetSelfDestructProgress() * 20.0f * MathConstants::kPi)
@@ -757,13 +1050,78 @@ void EnemyComponent::UpdateTornadoBoss(EulerTransform& transform, const Vector3&
 		}
 	}
 
+void EnemyComponent::UpdateBarrierBoss(EulerTransform& transform, const Vector3& direction, float distance) {
+	stateTimer_ += GameTime::GetDeltaTime();
+	switch (barrierBossState_) {
+	case BarrierBossState::Approach:
+		if (distance <= stats_.bossTornadoTriggerDistance) {
+			barrierBossState_ = BarrierBossState::Windup;
+			stateTimer_ = 0.0f;
+			shootTimer_ = 0.0f;
+		} else {
+			transform.translate = transform.translate + (stats_.speed * GameTime::GetFrameScale60()) * direction;
+		}
+		break;
+	case BarrierBossState::Windup:
+		if (stateTimer_ >= stats_.bossTornadoWindup) {
+			// 発動時のプレイヤー位置を収束弾で囲み、徐々に狭くなる戦闘領域を作る。
+			EmitBossConvergingTornadoPattern(transform);
+			barrierBossState_ = BarrierBossState::Active;
+			stateTimer_ = 0.0f;
+			shootTimer_ = 0.0f;
+		}
+		break;
+	case BarrierBossState::Active:
+		// 結界が縮む間は距離を保ち、内側へ扇状弾を撃って回避経路を制限する。
+		UpdateBurstShooter(transform, direction, distance);
+		if (stateTimer_ >= stats_.bossConvergingTornadoLifeTime) {
+			barrierBossState_ = BarrierBossState::Recovering;
+			stateTimer_ = 0.0f;
+		}
+		break;
+	case BarrierBossState::Recovering:
+		if (stateTimer_ >= stats_.bossTornadoRecovery) {
+			barrierBossState_ = BarrierBossState::Approach;
+			stateTimer_ = 0.0f;
+		}
+		break;
+	}
+}
+
 void EnemyComponent::UpdateNightSlashBoss(EulerTransform& transform, const Vector3& direction, float distance) {
 	// 夜叉ボスだけは状態数と責務が多いため、状態固有処理をStateオブジェクトへ委譲する。
 	if (!nightSlashStateObject_) {
 		ChangeNightSlashState(NightSlashState::Approach);
 	}
 	stateTimer_ += GameTime::GetDeltaTime();
-	nightSlashStateObject_->Update(*this, transform, direction, distance, GameTime::GetFrameScale60());
+	const NightSlashStateContext context{
+		stats_,
+		transform,
+		direction,
+		distance,
+		GameTime::GetFrameScale60(),
+		stateTimer_,
+		dashDirection_,
+		comboDashIndex_,
+		bossPatternIndex_,
+		rangedWaveIndex_};
+	const NightSlashStateUpdate update = nightSlashStateObject_->Update(context);
+	comboDashIndex_ = update.comboDashIndex;
+	bossPatternIndex_ = update.bossPatternIndex;
+	rangedWaveIndex_ = update.rangedWaveIndex;
+
+	// Stateはprivate関数を直接呼ばず、要求だけを返す。副作用の適用順はComponentが管理する。
+	if (update.resetStateTimer) {
+		stateTimer_ = 0.0f;
+	}
+	if (update.beginDash) {
+		BeginNightSlashDash(transform);
+	} else if (update.hasTransition) {
+		ChangeNightSlashState(update.nextState);
+	}
+	if (update.emitRangedWave) {
+		EmitBossRangedWave(transform);
+	}
 }
 
 void EnemyComponent::ChangeNightSlashState(NightSlashState state) {

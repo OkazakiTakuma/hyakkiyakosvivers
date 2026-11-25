@@ -46,7 +46,9 @@ float4 main(PixelShaderInput input) : SV_TARGET
     const float horizonAmount = pow(1.0f - saturate(viewDirection.y), 2.2f);
     const float opticalDepth = 0.16f + horizonAmount * max(gAtmosphere.atmosphereDensity, 0.0f);
     // 太陽が地平線へ近づくほど青を減らし、橙から赤の成分を強くします。
-    const float sunsetAmount = 1.0f - smoothstep(-0.08f, 0.25f, sunDirection.y);
+    // 地平線より十分下では夕焼けを終え、夜空へ切り替えます。
+    const float nightAmount = 1.0f - smoothstep(-0.24f, -0.04f, sunDirection.y);
+    const float sunsetAmount = (1.0f - smoothstep(-0.08f, 0.25f, sunDirection.y)) * (1.0f - nightAmount);
     const float3 sunsetRayleigh = float3(1.0f, 0.16f, 0.028f);
     const float3 rayleighTint = lerp(gAtmosphere.rayleighColor, sunsetRayleigh, sunsetAmount);
 
@@ -60,7 +62,10 @@ float4 main(PixelShaderInput input) : SV_TARGET
         float3(0.055f, 0.025f, 0.16f), sunsetAmount);
     const float3 horizonColor = lerp(float3(0.34f, 0.47f, 0.64f),
         float3(0.88f, 0.14f, 0.025f), sunsetAmount);
-    const float3 skyBase = lerp(zenithColor, horizonColor, saturate(horizonAmount));
+    const float3 daytimeSkyBase = lerp(zenithColor, horizonColor, saturate(horizonAmount));
+    const float3 nightSkyBase = lerp(float3(0.006f, 0.012f, 0.045f),
+        float3(0.018f, 0.032f, 0.080f), saturate(horizonAmount));
+    const float3 skyBase = lerp(daytimeSkyBase, nightSkyBase, nightAmount);
 
     // 球体モデルを使わず、視線と太陽方向の角度だけから輪郭の柔らかい円盤を作ります。
     const float diskInner = cos(max(gAtmosphere.sunAngularRadius, 0.001f));
@@ -69,6 +74,8 @@ float4 main(PixelShaderInput input) : SV_TARGET
     const float3 sunColor = lerp(float3(1.0f, 0.94f, 0.78f),
         float3(1.0f, 0.40f, 0.08f), sunsetAmount);
 
-    const float3 result = skyBase + rayleigh + mie + sunColor * sunDisk * gAtmosphere.sunIntensity;
+    const float daylight = 1.0f - nightAmount;
+    const float3 result = skyBase + (rayleigh + mie) * daylight +
+        sunColor * sunDisk * gAtmosphere.sunIntensity * daylight;
     return float4(result, 1.0f);
 }

@@ -119,7 +119,7 @@ inline bool IntersectRayToOBB(const Vector3& rayOrigin, const Vector3& rayDirect
 	return true;
 }
 
-inline OBBColliderShape MakePickOBB(GameObject* object) {
+inline OBBColliderShape MakePickOBB(Entity* object) {
 	if (OBBColliderComponent* collider = object->GetComponent<OBBColliderComponent>()) {
 		return collider->GetWorldOBB();
 	}

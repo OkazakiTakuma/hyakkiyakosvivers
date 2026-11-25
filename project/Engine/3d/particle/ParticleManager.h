@@ -9,6 +9,7 @@
 #include <random>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 #include <list>
 #include "../camera/Camera.h"
@@ -68,6 +69,8 @@ public:
 	/// <param name="blendMode">描画時に使用するブレンドモードを指定します。</param>
 	void SetGroupBlendMode(const std::string& groupName, BlendMode blendMode);
 	bool HasGroup(const std::string& groupName) const;
+	/// <summary>現在1個以上の粒子を保持しているグループ名と粒子数を返します。</summary>
+	std::vector<std::pair<std::string, uint32_t>> GetActiveParticleGroups() const;
 	void SetGroupParticles(const std::string& groupName, std::span<const Particle> particles);
 	void ClearGroupParticles(const std::string& groupName);
 

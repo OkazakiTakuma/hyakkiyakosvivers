@@ -1,11 +1,11 @@
 #pragma once
-#include "core/Component.h"
+#include "core/EntityComponent.h"
 #include "Sprite.h"
 #include "SpriteCommon.h"
 #include <memory>
 #include <string>
 
-class SpriteComponent : public Component {
+class SpriteComponent : public EntityComponent {
 public:
 	/// <summary>
 	/// 必要なリソースを準備し、オブジェクトを初期化します。

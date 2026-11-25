@@ -1,4 +1,5 @@
 #include "PlayerStatusRepository.h"
+#include "../data/PlayerAttackLevel.h"
 #include "../helpers/SceneJsonUtility.h"
 #include "../../base/StringUtility.h"
 #include "../../math/MathConstants.h"
@@ -12,6 +13,7 @@
 #include <json.hpp>
 #pragma warning(pop)
 #include <iomanip>
+#include <utility>
 
 std::vector<std::string> GetPlayerStatusItemLevels() {
 	// ステータスアップアイテムは固定でLv1～Lv5を扱う。
@@ -68,6 +70,7 @@ PlayerStatusItemStats MakeDefaultPlayerStatusItemStats() {
 nlohmann::json PlayerStatusItemStatsToJson(const PlayerStatusItemStats& stats) {
 	nlohmann::json json;
 	json["name"] = stats.name;
+	json["displayName"] = stats.displayName;
 	json["type"] = PlayerStatusItemTypeToName(stats.type);
 	// 効果量・説明・画像を同じレベル文字列で保存し、配列番号との対応を明確にする。
 	for (int index = 0; index < static_cast<int>(stats.levelAmounts.size()); ++index) {
@@ -85,6 +88,7 @@ PlayerStatusItemStats JsonToPlayerStatusItemStats(const nlohmann::json& json, co
 		return stats;
 	}
 	stats.name = json.value("name", stats.name);
+	stats.displayName = json.value("displayName", stats.name);
 	stats.type = PlayerStatusItemTypeFromName(json.value("type", std::string(PlayerStatusItemTypeToName(stats.type))));
 	// descriptions/texturesがない旧JSONも、空の既定値で互換性を保って読み込む。
 	const nlohmann::json levelsJson = json.value("levels", nlohmann::json::object());
@@ -147,6 +151,27 @@ PlayerStatusItemStats LoadPlayerStatusItemStats(const std::string& itemName) {
 	return stats;
 }
 
+std::string LoadPlayerStatusItemDisplayName(const std::string& itemName) {
+	const std::string targetName = itemName.empty() ? "AttackUp" : itemName;
+	const PlayerStatusItemStats stats = LoadPlayerStatusItemStats(targetName);
+	return stats.name == targetName ? stats.GetDisplayName() : targetName;
+}
+
+PlayerStatusItemDefinitions LoadPlayerStatusItemDefinitions() {
+	PlayerStatusItemDefinitions definitions;
+	const nlohmann::json root = LoadPlayerStatusItemRoot();
+	const PlayerStatusItemStats fallback = MakeDefaultPlayerStatusItemStats();
+	for (auto it = root.begin(); it != root.end(); ++it) {
+		if (!it.value().is_object()) {
+			continue;
+		}
+		PlayerStatusItemStats stats = JsonToPlayerStatusItemStats(it.value(), fallback);
+		stats.name = it.key();
+		definitions.emplace(it.key(), std::move(stats));
+	}
+	return definitions;
+}
+
 void SavePlayerStatusItemStats(const std::string& itemName, const PlayerStatusItemStats& stats) {
 	// 既存JSONを読み込んだうえで対象アイテムだけ更新し、他アイテムを消さない。
 	const std::string name = itemName.empty() ? "AttackUp" : itemName;
@@ -168,42 +193,6 @@ int PlayerStatusSlotLevelToIndex(const std::string& level) {
 	return (std::min)(4, parsedLevel - 1);
 }
 
-PlayerStats ApplyPlayerStatusItems(const PlayerStats& baseStats) {
-	// 基礎能力へ現在保存されている各強化アイテムの効果を順番に合成する。
-	PlayerStats effectiveStats = baseStats;
-	for (const PlayerStatusSlot& slot : baseStats.statusSlots) {
-		if (!slot.enabled || slot.statusName.empty()) {
-			continue;
-		}
-		const PlayerStatusItemStats itemStats = LoadPlayerStatusItemStats(slot.statusName);
-		const float amount = itemStats.levelAmounts[PlayerStatusSlotLevelToIndex(slot.level)];
-		switch (itemStats.type) {
-		case PlayerStatusItemType::Attack:
-			effectiveStats.attack += amount;
-			break;
-		case PlayerStatusItemType::Health:
-			effectiveStats.health += amount;
-			break;
-		case PlayerStatusItemType::AttackSpeed:
-			effectiveStats.attackSpeed += amount;
-			break;
-		case PlayerStatusItemType::Speed:
-			effectiveStats.speed += amount;
-			break;
-		case PlayerStatusItemType::Defense:
-			effectiveStats.defense += amount;
-			break;
-		case PlayerStatusItemType::AttackSize:
-			effectiveStats.attackSize += amount;
-			break;
-		case PlayerStatusItemType::Experience:
-			effectiveStats.experienceCorrection += amount;
-			break;
-		}
-	}
-	return effectiveStats;
-}
-
 PlayerStats MakeDefaultPlayerStats() {
 	// 新規プレイヤータイプは球モデルと1枠目のStraight攻撃を持つ状態から始める。
 	PlayerStats stats;
@@ -215,28 +204,30 @@ PlayerStats MakeDefaultPlayerStats() {
 }
 
 std::vector<std::string> GetPlayerAttackLevels() {
-	// 通常Lv1～Lv5に加え、条件達成時だけ使うsuperを同じ配列で扱う。
-	return {"1", "2", "3", "4", "5", "super"};
+	// エディタ向けの既存APIも、共通のレベル定義から一覧を生成する。
+	return PlayerAttackLevel::GetValues();
 }
 
 PlayerAttackLevelStats MakeDefaultPlayerAttackLevelStats(const std::string& level) {
 	// 攻撃JSONが存在しない場合でも各Lvが操作可能になるよう、レベルに応じた仮値を作る。
 	PlayerAttackLevelStats stats;
 	stats.level = level;
-	const float levelScale = level == "super" ? 6.0f : static_cast<float>((std::max)(1, std::atoi(level.c_str())));
+	const bool isSuper = PlayerAttackLevel::IsSuper(level);
+	const float levelScale = static_cast<float>(PlayerAttackLevel::ToPowerRank(level));
 	stats.attack = 100.0f * levelScale;
 	stats.speed = 0.3f + levelScale * 0.02f;
 	stats.size = 100.0f + levelScale * 10.0f;
-	stats.shotCount = level == "super" ? 5 : 1;
+	stats.shotCount = isSuper ? 5 : 1;
 	stats.angles = stats.shotCount > 1 ? std::vector<float>{-30.0f, -15.0f, 0.0f, 15.0f, 30.0f} : std::vector<float>{0.0f};
 	stats.spawnOffsets.assign(stats.shotCount, {0.0f, 0.5f, 1.2f});
 	stats.modelFilePath = "sphere.obj";
 	stats.homing = false;
 	stats.homingAccuracy = 1.0f;
-	stats.attackInterval = level == "super" ? 0.25f : 0.5f;
+	stats.attackInterval = isSuper ? 0.25f : 0.5f;
 	stats.lifeTime = 3.0f;
 	stats.travelDistance = 6.0f;
-	stats.pierceCount = level == "super" ? 3 : 0;
+	stats.pierceCount = isSuper ? 3 : 0;
+	stats.knockback = 0;
 	stats.infinitePierce = false;
 	return stats;
 }
@@ -254,7 +245,7 @@ nlohmann::json PlayerAttackLevelStatsToJson(const PlayerAttackLevelStats& stats)
 	nlohmann::json json;
 	json["level"] = stats.level;
 	json["description"] = stats.choiceDescription;
-	if (stats.level == "super") {
+	if (PlayerAttackLevel::IsSuper(stats.level)) {
 		json["texture"] = stats.choiceTextureFilePath;
 	}
 	json["attack"] = stats.attack;
@@ -275,6 +266,7 @@ nlohmann::json PlayerAttackLevelStatsToJson(const PlayerAttackLevelStats& stats)
 	json["lifeTime"] = stats.lifeTime;
 	json["travelDistance"] = stats.travelDistance;
 	json["pierceCount"] = stats.pierceCount;
+	json["knockback"] = stats.knockback;
 	json["infinitePierce"] = stats.infinitePierce;
 	return json;
 }
@@ -315,6 +307,7 @@ PlayerAttackLevelStats JsonToPlayerAttackLevelStats(const nlohmann::json& json, 
 	stats.lifeTime = (std::max)(0.01f, json.value("lifeTime", stats.lifeTime));
 	stats.travelDistance = (std::max)(0.1f, json.value("travelDistance", stats.travelDistance));
 	stats.pierceCount = (std::max)(0, json.value("pierceCount", stats.pierceCount));
+	stats.knockback = (std::clamp)(json.value("knockback", stats.knockback), 0, 3);
 	stats.infinitePierce = json.value("infinitePierce", stats.infinitePierce);
 	if (json.contains("angles") && json.at("angles").is_array()) {
 		stats.angles.clear();
@@ -331,6 +324,10 @@ PlayerAttackLevelStats JsonToPlayerAttackLevelStats(const nlohmann::json& json, 
 nlohmann::json PlayerAttackStatsToJson(const PlayerAttackStats& stats) {
 	nlohmann::json json;
 	json["name"] = stats.name;
+	json["displayName"] = stats.displayName;
+	json["superDisplayName"] = stats.superDisplayName;
+	json["patternId"] = stats.patternId;
+	json["visualId"] = stats.visualId;
 	json["texture"] = stats.choiceTextureFilePath;
 	json["superCondition"]["status"] = stats.superConditionStatusName;
 	json["superCondition"]["level"] = stats.superConditionStatusLevel;
@@ -346,6 +343,10 @@ PlayerAttackStats JsonToPlayerAttackStats(const nlohmann::json& json, const Play
 		return stats;
 	}
 	stats.name = json.value("name", stats.name);
+	stats.displayName = json.value("displayName", stats.displayName);
+	stats.superDisplayName = json.value("superDisplayName", stats.superDisplayName);
+	stats.patternId = json.value("patternId", stats.patternId);
+	stats.visualId = json.value("visualId", stats.visualId);
 	stats.choiceTextureFilePath = json.value("texture", stats.choiceTextureFilePath);
 	const nlohmann::json superConditionJson = json.value("superCondition", nlohmann::json::object());
 	stats.superConditionStatusName = superConditionJson.value("status", stats.superConditionStatusName);
@@ -386,7 +387,7 @@ PlayerAttackStats JsonToPlayerAttackStats(const nlohmann::json& json, const Play
 	}
 	if (stats.choiceTextureFilePath.empty()) {
 		for (const PlayerAttackLevelStats& levelStats : stats.levels) {
-			if (levelStats.level != "super" && !levelStats.choiceTextureFilePath.empty()) {
+			if (!PlayerAttackLevel::IsSuper(levelStats.level) && !levelStats.choiceTextureFilePath.empty()) {
 				stats.choiceTextureFilePath = levelStats.choiceTextureFilePath;
 				break;
 			}
@@ -442,18 +443,25 @@ PlayerAttackStats LoadPlayerAttackStats(const std::string& attackName) {
 	return stats;
 }
 
-void ApplyPlayerAttackSlots(PlayerAttackComponent* attack, const PlayerStats& playerStats) {
-	// プレイヤー設定のスロット内容を実行時攻撃コンポーネントへ反映する。
-	if (!attack) {
-		return;
-	}
-	attack->ClearAttackSlots();
-	for (const PlayerAttackSlot& slot : playerStats.attackSlots) {
-		if (slot.attackName.empty()) {
+std::string LoadPlayerAttackDisplayName(const std::string& attackName, bool isSuper) {
+	const std::string targetName = attackName.empty() ? "Straight" : attackName;
+	const PlayerAttackStats stats = LoadPlayerAttackStats(targetName);
+	return stats.name == targetName ? stats.GetDisplayName(isSuper) : targetName;
+}
+
+PlayerAttackDefinitions LoadPlayerAttackDefinitions() {
+	PlayerAttackDefinitions definitions;
+	const nlohmann::json root = LoadPlayerAttackStatusRoot();
+	const PlayerAttackStats fallback = MakeDefaultPlayerAttackStats();
+	for (auto it = root.begin(); it != root.end(); ++it) {
+		if (!it.value().is_object()) {
 			continue;
 		}
-		attack->AddAttackSlot(LoadPlayerAttackStats(slot.attackName), slot.attackLevel, slot.enabled);
+		PlayerAttackStats stats = JsonToPlayerAttackStats(it.value(), fallback);
+		stats.name = it.key();
+		definitions.emplace(it.key(), std::move(stats));
 	}
+	return definitions;
 }
 
 void SavePlayerAttackStats(const std::string& attackName, const PlayerAttackStats& stats) {
@@ -489,7 +497,16 @@ nlohmann::json PlayerStatsToJson(const PlayerStats& stats) {
 	json["experience"] = stats.experience;
 	json["experienceCorrection"] = stats.experienceCorrection;
 	json["model"] = stats.modelFilePath;
+	json["modelDirectory"] = stats.modelDirectory;
 	json["isAnimationModel"] = stats.isAnimationModel;
+	json["rightHandEquipmentModel"] = stats.rightHandEquipmentModelFilePath;
+	json["rightHandEquipmentDirectory"] = stats.rightHandEquipmentModelDirectory;
+	// プレイヤー名に依存せず、定義ごとに各演出のクリップを差し替えられるよう保存する。
+	json["gameplayStartAnimation"] = stats.gameplayStartAnimationName;
+	json["gameplayDefeatAnimation"] = stats.gameplayDefeatAnimationName;
+	json["selectionEntranceAnimation"] = stats.selectionEntranceAnimationName;
+	json["entrancePresentationStyle"] = stats.entrancePresentationStyle;
+	json["selectionEntranceDuration"] = stats.selectionEntranceDuration;
 	json["attackSlots"] = nlohmann::json::array();
 	for (const PlayerAttackSlot& slot : stats.attackSlots) {
 		nlohmann::json slotJson;
@@ -531,7 +548,18 @@ PlayerStats JsonToPlayerStats(const nlohmann::json& json, const PlayerStats& fal
 	stats.experience = json.value("experience", stats.experience);
 	stats.experienceCorrection = json.value("experienceCorrection", stats.experienceCorrection);
 	stats.modelFilePath = json.value("model", stats.modelFilePath);
+	stats.modelDirectory = json.value("modelDirectory", stats.modelDirectory);
 	stats.isAnimationModel = json.value("isAnimationModel", stats.isAnimationModel);
+	// 装備モデルが未設定の旧データでは空のままにし、追加オブジェクトを生成しない。
+	stats.rightHandEquipmentModelFilePath = json.value("rightHandEquipmentModel", stats.rightHandEquipmentModelFilePath);
+	stats.rightHandEquipmentModelDirectory = json.value("rightHandEquipmentDirectory", stats.rightHandEquipmentModelDirectory);
+	// 旧データに項目がない場合は空文字を引き継ぎ、従来どおり専用クリップを再生しない。
+	stats.gameplayStartAnimationName = json.value("gameplayStartAnimation", stats.gameplayStartAnimationName);
+	stats.gameplayDefeatAnimationName = json.value("gameplayDefeatAnimation", stats.gameplayDefeatAnimationName);
+	stats.selectionEntranceAnimationName = json.value("selectionEntranceAnimation", stats.selectionEntranceAnimationName);
+	stats.entrancePresentationStyle = json.value("entrancePresentationStyle", stats.entrancePresentationStyle);
+	stats.selectionEntranceDuration = json.value("selectionEntranceDuration", stats.selectionEntranceDuration);
+	stats.selectionEntranceDuration = (std::max)(0.01f, stats.selectionEntranceDuration);
 	for (PlayerAttackSlot& slot : stats.attackSlots) {
 		slot.enabled = false;
 		slot.attackName.clear();

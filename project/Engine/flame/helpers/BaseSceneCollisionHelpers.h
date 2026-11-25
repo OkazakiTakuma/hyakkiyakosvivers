@@ -1,6 +1,7 @@
 #pragma once
 
 #include "base_scene/BaseScene.h"
+#include "components/Gravity/GravityComponent.h"
 #include "../../math/MathConstants.h"
 
 #include <cmath>
@@ -9,6 +10,13 @@
 /// BaseSceneの衝突押し戻し計算を提供します。
 /// </summary>
 namespace BaseSceneCollisionHelpers {
+
+inline void ApplyGravityCollisionResponse(Entity* entity, const Vector3& collisionNormal) {
+	GravityComponent* gravity = entity ? entity->GetComponent<GravityComponent>() : nullptr;
+	if (gravity && gravity->IsEnabled()) {
+		gravity->ApplyCollisionResponse(collisionNormal);
+	}
+}
 
 /// <summary>
 /// 値を指定範囲内に収めます。
@@ -190,7 +198,7 @@ inline bool CalculateOBBOBBPushBack(const OBBColliderShape& a, const OBBCollider
 /// <param name="isPushBackB">B 側の押し戻し有効状態を指定します。</param>
 /// <param name="directionAToB">A から B へ向かう押し戻し方向を指定します。</param>
 /// <param name="penetration">重なっている距離を指定します。</param>
-inline void ApplyColliderPushBack(GameObject* objectA, bool isPushBackA, GameObject* objectB, bool isPushBackB, const Vector3& directionAToB, float penetration) {
+inline void ApplyColliderPushBack(Entity* objectA, bool isPushBackA, Entity* objectB, bool isPushBackB, const Vector3& directionAToB, float penetration) {
 	if (!objectA || !objectB || objectA == objectB || penetration <= 0.0f || (!isPushBackA && !isPushBackB)) {
 		return;
 	}
@@ -198,17 +206,17 @@ inline void ApplyColliderPushBack(GameObject* objectA, bool isPushBackA, GameObj
 	if (isPushBackA && isPushBackB) {
 		objectA->GetTransform().translate = objectA->GetTransform().translate + (-0.5f * penetration) * directionAToB;
 		objectB->GetTransform().translate = objectB->GetTransform().translate + (0.5f * penetration) * directionAToB;
-		objectA->ApplyCollisionResponse(-1.0f * directionAToB);
-		objectB->ApplyCollisionResponse(directionAToB);
+		ApplyGravityCollisionResponse(objectA, -1.0f * directionAToB);
+		ApplyGravityCollisionResponse(objectB, directionAToB);
 		return;
 	}
 	if (isPushBackA) {
 		objectA->GetTransform().translate = objectA->GetTransform().translate + (-penetration) * directionAToB;
-		objectA->ApplyCollisionResponse(-1.0f * directionAToB);
+		ApplyGravityCollisionResponse(objectA, -1.0f * directionAToB);
 		return;
 	}
 	objectB->GetTransform().translate = objectB->GetTransform().translate + penetration * directionAToB;
-	objectB->ApplyCollisionResponse(directionAToB);
+	ApplyGravityCollisionResponse(objectB, directionAToB);
 }
 
 } // 名前空間 BaseSceneCollisionHelpers

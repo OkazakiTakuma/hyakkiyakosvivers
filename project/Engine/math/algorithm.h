@@ -1,5 +1,8 @@
 #pragma once
 #include "Vector.h"
+#include <cmath>
+#include <cstdint>
+#include <numbers>
 #include <vector>
 #include <random>
 

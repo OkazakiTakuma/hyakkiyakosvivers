@@ -34,11 +34,25 @@ x86/
 
 # Native C/C++ and MSBuild intermediate files
 *.obj
+# Wavefront models loaded by the game
+!/project/Resources/brade/brade.obj
 !/project/Resources/enemy_drop.obj
 !/project/Resources/grass.obj
 !/project/Resources/oonusa_handle.obj
 !/project/Resources/oonusa_shide.obj
 !/project/Resources/oonusa_tie.obj
+!/project/Resources/ricochet_ofuda_paper.obj
+!/project/Resources/ricochet_ofuda_mark.obj
+!/project/Resources/orbit_yinyang_base.obj
+!/project/Resources/orbit_yinyang_dark.obj
+!/project/Resources/sand/sand.obj
+!/project/Resources/shop_shrine/shop_shrine_hall.obj
+!/project/Resources/shop_shrine/shop_shrine_roof.obj
+!/project/Resources/shop_shrine/shop_torii_ornate.obj
+!/project/Resources/sphere.obj
+!/project/Resources/stage2_japanese/japanese_block.obj
+!/project/Resources/stage2_japanese/japanese_roof.obj
+!/project/Resources/terrain/terrain.obj
 *.idb
 *.ilk
 *.exp
@@ -376,6 +390,21 @@ FodyWeavers.xsd
 /generated/
 /project/externals/generated/
 
+# Vendor variants outside the CG2_DirectX solution
+/imgui/imgui_impl_glfw.cpp
+/imgui/imgui_impl_glfw.h
+/project/externals/DirectXTex/DirectXTex_*.vcxproj*
+!/project/externals/DirectXTex/DirectXTex_Desktop_2019_Win10.vcxproj
+!/project/externals/DirectXTex/DirectXTex_Desktop_2019_Win10.vcxproj.filters
+
+# Keep only the Assimp libraries selected by the solution configurations
+!/project/externals/assimp/lib/Debug/
+!/project/externals/assimp/lib/Release/
+/project/externals/assimp/lib/Debug/*
+/project/externals/assimp/lib/Release/*
+!/project/externals/assimp/lib/Debug/assimp-vc143-mdd.lib
+!/project/externals/assimp/lib/Release/assimp-vc143-mt.lib
+
 # Generated screenshots and screen recordings
 **/CaptureFiles/
 Screenshot_*.png
@@ -393,3 +422,6 @@ Recording_*.mp4
 /portfolio-site/
 /WeeklyReport_*.md
 /*週間報告*.txt
+
+# Local presentation deliverables
+/deliverables/

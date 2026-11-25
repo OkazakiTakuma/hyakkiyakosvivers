@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Logger.h"
+#include "struct.h"
 #include <cassert>
 #include <d3d12.h>
 #include <wrl.h>
@@ -26,6 +27,26 @@ inline D3D12_BLEND_DESC MakeBlendDesc(
 	target.BlendOpAlpha = D3D12_BLEND_OP_ADD;
 	target.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 	return description;
+}
+
+/// <summary>共通BlendModeをD3D12のブレンド設定へ変換します。</summary>
+inline D3D12_BLEND_DESC MakeBlendDesc(BlendMode mode) {
+	// 合成方式とD3D12係数の対応を一か所に置き、各描画パイプラインの設定差を防ぐ。
+	switch (mode) {
+	case kBlendModeNormal:
+		return MakeBlendDesc(TRUE, D3D12_BLEND_SRC_ALPHA, D3D12_BLEND_INV_SRC_ALPHA);
+	case kBlendModeAdd:
+		return MakeBlendDesc(TRUE, D3D12_BLEND_SRC_ALPHA, D3D12_BLEND_ONE);
+	case kBlendModeSubtract:
+		return MakeBlendDesc(TRUE, D3D12_BLEND_SRC_ALPHA, D3D12_BLEND_ONE, D3D12_BLEND_OP_REV_SUBTRACT);
+	case kBlendModeMultiply:
+		return MakeBlendDesc(TRUE, D3D12_BLEND_ZERO, D3D12_BLEND_SRC_COLOR);
+	case kBlendModeScreen:
+		return MakeBlendDesc(TRUE, D3D12_BLEND_INV_DEST_COLOR, D3D12_BLEND_ONE);
+	case kBlendModeNone:
+	default:
+		return MakeBlendDesc();
+	}
 }
 
 inline D3D12_RASTERIZER_DESC MakeRasterizerDesc(

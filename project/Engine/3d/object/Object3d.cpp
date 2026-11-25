@@ -125,12 +125,8 @@ void Object3d::CreateCombinedBufferResource() {
 
 	cameraData->worldPosition = {0.0f, 0.0f, 0.0f};
 	cameraData->environmentMultiplier = environmentMultiplier;
-	cameraData->horizonColor = {0.0f, 0.0f, 0.0f};
-	cameraData->distanceFogDensity = 0.0f;
-	cameraData->heightFogDensity = 0.0f;
-	cameraData->aerialPerspectiveStrength = 0.0f;
-	cameraData->enableAerialPerspective = 0;
-	cameraData->paddingAtmosphere = 0.0f;
+	// 共通GPU型を値初期化し、未設定時は大気遠近法を無効にする。
+	cameraData->atmosphere = {};
 
 	directionallightData->color = {1.0f, 1.0f, 1.0f, 1.0f};
 	directionallightData->direction = Normalize(Vector3(0.0f, -1.0f, 0.0f));
@@ -209,12 +205,21 @@ void Object3d::UpdateSkinningPaletteResource() {
 void Object3d::CreateCylinder(float radius, float height, uint32_t subdivision, bool createTopCap, bool createBottomCap) {
 	PrimitiveMeshGenerator::MeshData mesh = PrimitiveMeshGenerator::GenerateCylinder(
 	    radius, height, subdivision, createTopCap, createBottomCap);
-	if (mesh.vertices.empty() || mesh.indices.empty()) {
+	CreatePrimitiveMesh(mesh.vertices, mesh.indices);
+}
+
+void Object3d::CreatePlane(float width, float height) {
+	PrimitiveMeshGenerator::MeshData mesh = PrimitiveMeshGenerator::GeneratePlane(width, height);
+	CreatePrimitiveMesh(mesh.vertices, mesh.indices);
+}
+
+void Object3d::CreatePrimitiveMesh(
+	const std::vector<VertexData>& vertices,
+	const std::vector<uint32_t>& indices) {
+	if (vertices.empty() || indices.empty()) {
 		cylinderIndexCount = 0;
 		return;
 	}
-	const std::vector<VertexData>& vertices = mesh.vertices;
-	const std::vector<uint32_t>& indices = mesh.indices;
 
 	cylinderIndexCount = (uint32_t)indices.size();
 
@@ -302,6 +307,15 @@ std::string Object3d::GetModelTextureFilePath() const {
 /// 毎フレームの状態更新を行います。
 /// </summary>
 void Object3d::Update() {
+	UpdateState(true);
+}
+
+void Object3d::SyncRenderState() {
+	// カメラ切替や再配置では同じフレームのアニメーション時間を再加算しない。
+	UpdateState(false);
+}
+
+void Object3d::UpdateState(bool advanceAnimation) {
 	if (!transformationMatrix || !cameraData) {
 		return;
 	}
@@ -314,8 +328,10 @@ void Object3d::Update() {
 	if (model) {
 		if (HasAnimation()) {
 			const float targetBlendWeight = isAnimationPlaying_ ? 1.0f : 0.0f;
-			animationBlendWeight_ = MoveTowards(animationBlendWeight_, targetBlendWeight, animationBlendSpeed_ * GameTime::GetFrameScale60());
-			if (isAnimationPlaying_) {
+			if (advanceAnimation) {
+				animationBlendWeight_ = MoveTowards(animationBlendWeight_, targetBlendWeight, animationBlendSpeed_ * GameTime::GetFrameScale60());
+			}
+			if (advanceAnimation && isAnimationPlaying_) {
 				animationTime += GameTime::GetDeltaTime();
 				animationTime = isAnimationLooping_
 				                    ? std::fmod(animationTime, animation.duration)
@@ -362,11 +378,7 @@ void Object3d::Update() {
 	cameraData->environmentMultiplier = environmentMultiplier;
 	// 空と3Dモデルが同じ地平線色を参照することで、遠景が背景へ自然に溶けます。
 	const AtmosphereSettings& atmosphere = AtmosphereSystem::GetInstance()->GetSettings();
-	cameraData->horizonColor = atmosphere.horizonColor;
-	cameraData->distanceFogDensity = atmosphere.distanceFogDensity;
-	cameraData->heightFogDensity = atmosphere.heightFogDensity;
-	cameraData->aerialPerspectiveStrength = atmosphere.aerialPerspectiveStrength;
-	cameraData->enableAerialPerspective = atmosphere.enabled ? 1 : 0;
+	cameraData->atmosphere = MakeAerialPerspectiveGpuData(atmosphere);
 }
 
 bool Object3d::GetJointSkeletonSpaceMatrix(const std::string& jointName, Matrix4x4& jointMatrix) const {

@@ -1,11 +1,11 @@
 #pragma once
-#include "core/Component.h"
-#include "core/GameObject.h"
+#include "core/EntityComponent.h"
+#include "core/Entity.h"
 #include "Object3d.h"
 #include "Object3dCommon.h"
 #include <memory>
 
-class Object3dComponent : public Component {
+class Object3dComponent : public EntityComponent {
 public:
 	/// <summary>
 	/// 必要なリソースを準備し、オブジェクトを初期化します。
@@ -34,6 +34,18 @@ public:
 			);
 		}
 		object3d_->Update();
+	}
+
+	/// <summary>時間更新を行わず、所有EntityのTransformと現在のカメラを描画情報へ同期します。</summary>
+	void SyncRenderState() {
+		if (!object3d_) return;
+		SyncOwnerTransformToObject();
+		if (object3d_->GetIsPointLightSet()) {
+			object3d_->SetPointLight(
+				object3d_->GetPointLightColor(), GetOwner()->GetTransform().translate,
+				object3d_->GetPointLightIntensity(), object3d_->GetPointLightRadius(), object3d_->GetPointLightDecay());
+		}
+		object3d_->SyncRenderState();
 	}
 
 	/// <summary>
@@ -67,6 +79,10 @@ public:
 	/// <param name="height">高さを指定します。</param>
 	void CreateCylinder(float radius = 1.0f, float height = 2.0f, uint32_t subdivision = 16, bool createTopCap = true, bool createBottomCap = true) {
 		object3d_->CreateCylinder(radius, height, subdivision, createTopCap, createBottomCap);
+	}
+	/// <summary>テクスチャ付き壁面などに使う、両面表示の板ポリゴンを作成します。</summary>
+	void CreatePlane(float width = 2.0f, float height = 2.0f) {
+		object3d_->CreatePlane(width, height);
 	}
 	void SetTexture(const std::string& textureFilePath) { object3d_->SetTexture(textureFilePath); }
 	void SetModelTexture(const std::string& textureFilePath) { object3d_->SetModelTexture(textureFilePath); }

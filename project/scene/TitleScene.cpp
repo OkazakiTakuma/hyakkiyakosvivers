@@ -32,7 +32,7 @@ float SmoothStep(float start, float end, float value) {
 	return rate * rate * (3.0f - 2.0f * rate);
 }
 
-std::unique_ptr<GameObject> CreateTextObject(
+std::unique_ptr<Entity> CreateTextObject(
 	const std::string& text, float fontSize, const Vector4& color, const char* fontName = kUiFontName) {
 	return SceneUiUtility::CreateTextObject(text, fontSize, color, fontName);
 }
@@ -143,27 +143,36 @@ void TitleScene::CreateUi() {
 	slashSprite_ = CreateColorSprite();
 	accentSprite_ = CreateColorSprite();
 	menuPanelSprite_ = CreateColorSprite();
-	startButtonSprite_ = CreateColorSprite();
-	newGameButtonSprite_ = CreateColorSprite();
-	shopButtonSprite_ = CreateColorSprite();
+	auto createMenuPlaque = []() {
+		auto sprite = std::make_unique<Sprite>();
+		sprite->Initialize("Resources/UI/World/shrine_menu_plaque.png");
+		// 生成素材の上下の透明余白をUVで除き、漆札本体だけをボタン領域へ合わせる。
+		sprite->SetTextureLeftTop({0.0f, 170.0f});
+		sprite->SetTextureSize({2172.0f, 380.0f});
+		return sprite;
+	};
+	startButtonSprite_ = createMenuPlaque();
+	newGameButtonSprite_ = createMenuPlaque();
+	shopButtonSprite_ = createMenuPlaque();
 	confirmationBackdropSprite_ = CreateColorSprite();
-	confirmationPanelSprite_ = CreateColorSprite();
+	confirmationPanelSprite_ = std::make_unique<Sprite>();
+	confirmationPanelSprite_->Initialize("Resources/UI/World/stage_ema_card.png");
 	titleLogoSprite_ = std::make_unique<Sprite>();
 	titleLogoSprite_->Initialize(kTitleLogoTexturePath);
 	titleLogoSprite_->SetAnchorPoint({0.5f, 0.5f});
 
 	// 表示文字と基本色はここへ集約し、Draw2Dでは配置と選択状態だけを更新する。
-	startTextObject_ = CreateTextObject("GAME START", 30.0f, {1.0f, 1.0f, 1.0f, 1.0f});
-	newGameTextObject_ = CreateTextObject("初めから", 30.0f, {0.82f, 0.87f, 0.94f, 1.0f});
-	shopTextObject_ = CreateTextObject("SHOP", 30.0f, {0.82f, 0.87f, 0.94f, 1.0f});
+	startTextObject_ = SceneUiUtility::CreateHeadingText("討伐開始", 28.0f, {0.18f, 0.10f, 0.07f, 1.0f});
+	newGameTextObject_ = SceneUiUtility::CreateHeadingText("初めから", 28.0f, {0.18f, 0.10f, 0.07f, 1.0f});
+	shopTextObject_ = SceneUiUtility::CreateHeadingText("奉納", 28.0f, {0.18f, 0.10f, 0.07f, 1.0f});
 	moneyTextObject_ = CreateTextObject("", 21.0f, {1.0f, 0.80f, 0.22f, 1.0f});
 	instructionTextObject_ = CreateTextObject(
 	    "W/S・上下キー・Pad上下: 選択    Space・Pad A: 決定    F1: デモ開始 / 停止", 18.0f,
-	    {0.68f, 0.75f, 0.86f, 1.0f});
+	    {0.86f, 0.78f, 0.64f, 1.0f});
 	versionTextObject_ = CreateTextObject("PRESS SPACE / A BUTTON", 17.0f, {0.45f, 0.63f, 0.76f, 1.0f});
-	confirmationTextObject_ = CreateTextObject("本当にゲームデータを初期化しますか？", 27.0f, {1.0f, 0.92f, 0.82f, 1.0f});
+	confirmationTextObject_ = CreateTextObject("これまでの歩みを白紙へ戻しますか？", 27.0f, {0.25f, 0.07f, 0.04f, 1.0f});
 	confirmationInstructionTextObject_ = CreateTextObject(
-	    "Space・Pad A: 初期化する    Esc・Pad B: キャンセル", 18.0f, {0.76f, 0.84f, 0.94f, 1.0f});
+	    "Space・Pad A: 白紙へ戻す    Esc・Pad B: 思い留まる", 18.0f, {0.18f, 0.13f, 0.10f, 1.0f});
 }
 
 
@@ -192,7 +201,7 @@ void TitleScene::Update() {
 			return;
 		}
 		if (input->TriggerKey(DIK_SPACE) || input->TriggerGamepadButton(XINPUT_GAMEPAD_A)) {
-			sceneManager->ResetGameProgress();
+			GetSceneManager()->ResetGameProgress();
 			BeginExitTransition("STAGE_SELECT");
 		}
 		return;
@@ -243,7 +252,7 @@ void TitleScene::BeginExitTransition(const std::string& sceneName) {
 	exitEnemyStartScales_.clear();
 
 	// JSONの列挙順ではなく名前順へ揃え、配置の保存順が変わっても同じ撃破順を保つ。
-	for (GameObject* object : GetMutableSceneObjects()) {
+	for (Entity* object : GetMutableSceneObjects()) {
 		if (!object) continue;
 		if (object->GetName().starts_with("TitleMagatama")) {
 			exitMagatamas_.push_back(object);
@@ -251,12 +260,12 @@ void TitleScene::BeginExitTransition(const std::string& sceneName) {
 			exitEnemies_.push_back(object);
 		}
 	}
-	auto compareByName = [](const GameObject* lhs, const GameObject* rhs) {
+	auto compareByName = [](const Entity* lhs, const Entity* rhs) {
 		return lhs->GetName() < rhs->GetName();
 	};
 	std::sort(exitMagatamas_.begin(), exitMagatamas_.end(), compareByName);
 	std::sort(exitEnemies_.begin(), exitEnemies_.end(), compareByName);
-	for (GameObject* magatama : exitMagatamas_) {
+	for (Entity* magatama : exitMagatamas_) {
 		exitMagatamaStartPositions_.push_back(magatama->GetTransform().translate);
 		if (TrailRendererComponent* trail = magatama->GetComponent<TrailRendererComponent>()) {
 			trail->Clear();
@@ -265,7 +274,7 @@ void TitleScene::BeginExitTransition(const std::string& sceneName) {
 			trail->SetMinSegmentLength(0.025f);
 		}
 	}
-	for (GameObject* enemy : exitEnemies_) {
+	for (Entity* enemy : exitEnemies_) {
 		exitEnemyStartScales_.push_back(enemy->GetTransform().scale);
 	}
 	titlePhase_ = TitlePhase::Exit;
@@ -273,16 +282,16 @@ void TitleScene::BeginExitTransition(const std::string& sceneName) {
 
 void TitleScene::UpdateExitPresentation() {
 	if (exitMagatamas_.empty() || exitEnemies_.empty()) {
-		if (!exitSceneChangeRequested_ && sceneManager && !exitSceneName_.empty()) {
+		if (!exitSceneChangeRequested_ && GetSceneManager() && !exitSceneName_.empty()) {
 			exitSceneChangeRequested_ = true;
-			sceneManager->ChangeScene(exitSceneName_, SceneTransitionType::FadeWhite);
+			GetSceneManager()->ChangeScene(exitSceneName_, SceneTransitionType::FadeWhite);
 		}
 		return;
 	}
 
 	// 各勾玉は自分が担当する敵だけを巡回する。二巡目も直前の命中地点から飛び立つ。
 	for (size_t magatamaIndex = 0; magatamaIndex < exitMagatamas_.size(); ++magatamaIndex) {
-		GameObject* magatama = exitMagatamas_[magatamaIndex];
+		Entity* magatama = exitMagatamas_[magatamaIndex];
 		Vector3 position = exitMagatamaStartPositions_[magatamaIndex];
 		for (size_t enemyIndex = magatamaIndex; enemyIndex < exitEnemies_.size(); enemyIndex += exitMagatamas_.size()) {
 			const float hitTime = kExitFirstHitSeconds + static_cast<float>(enemyIndex) * kExitHitIntervalSeconds;
@@ -309,7 +318,7 @@ void TitleScene::UpdateExitPresentation() {
 	}
 
 	for (size_t enemyIndex = 0; enemyIndex < exitEnemies_.size(); ++enemyIndex) {
-		GameObject* enemy = exitEnemies_[enemyIndex];
+		Entity* enemy = exitEnemies_[enemyIndex];
 		Object3dComponent* object3d = enemy->GetComponent<Object3dComponent>();
 		const float hitTime = kExitFirstHitSeconds + static_cast<float>(enemyIndex) * kExitHitIntervalSeconds;
 		if (exitElapsed_ < hitTime) continue;
@@ -337,10 +346,10 @@ void TitleScene::UpdateExitPresentation() {
 	// 粒状霧が増え始める時点からFadeWhiteへ渡し、濃霧化・白被覆・復帰を一括管理する。
 	if (!exitSceneChangeRequested_ &&
 		exitElapsed_ >= fogStartTime &&
-		sceneManager && !exitSceneName_.empty()) {
+		GetSceneManager() && !exitSceneName_.empty()) {
 		exitSceneChangeRequested_ = true;
 		const float fogTransitionDuration = fogEndTime - fogStartTime;
-		sceneManager->ChangeScene(
+		GetSceneManager()->ChangeScene(
 			exitSceneName_, SceneTransitionType::FadeWhite,
 			fogTransitionDuration, fogTransitionDuration);
 	}
@@ -371,13 +380,13 @@ void TitleScene::UpdateTitlePresentation() {
 
 	// 戦闘ロジックを持たない配置モデルだけを、名前に応じて静かに動かす。
 	Vector3 playerPosition{};
-	for (GameObject* object : GetMutableSceneObjects()) {
+	for (Entity* object : GetMutableSceneObjects()) {
 		if (object && object->GetName() == "TitleMiko") {
 			playerPosition = object->GetTransform().translate;
 			break;
 		}
 	}
-	for (GameObject* object : GetMutableSceneObjects()) {
+	for (Entity* object : GetMutableSceneObjects()) {
 		if (!object) continue;
 		const std::string& name = object->GetName();
 		if (Object3dComponent* object3d = object->GetComponent<Object3dComponent>()) {
@@ -535,7 +544,7 @@ void TitleScene::UpdateTitlePhase() {
 
 void TitleScene::Draw2D() {
 	DirectXCommon* dxCommon = SpriteCommon::GetInstance()->GetDxCommon();
-	if (!sceneManager || !dxCommon || !backgroundSprite_) return;
+	if (!GetSceneManager() || !dxCommon || !backgroundSprite_) return;
 	const float width = static_cast<float>(dxCommon->GetRenderWidth());
 	const float height = static_cast<float>(dxCommon->GetRenderHeight());
 	const float logoAlpha = SmoothStep(kLogoStartSeconds, 3.15f, presentationTime_);
@@ -602,10 +611,10 @@ void TitleScene::Draw2D() {
 	const float buttonInterval = 50.0f;
 	const float pulse = 0.78f + std::sin(pulseTime_ * 4.0f) * 0.12f;
 
-	DrawColorSprite(menuPanelSprite_.get(), panelX, panelY, panelWidth, panelHeight, {0.012f, 0.020f, 0.055f, 0.70f});
+	DrawColorSprite(menuPanelSprite_.get(), panelX, panelY, panelWidth, panelHeight, {0.035f, 0.012f, 0.025f, 0.58f});
 
-	const Vector4 selectedColor = {0.42f, 0.045f, 0.025f, pulse * 0.88f};
-	const Vector4 idleColor = {0.025f, 0.030f, 0.065f, 0.62f};
+	const Vector4 selectedColor = {1.0f, 0.96f, 0.82f, pulse};
+	const Vector4 idleColor = {0.62f, 0.58f, 0.52f, 0.90f};
 	// 選択項目だけ背景色を明るくして、現在のフォーカスを視覚化する。
 	DrawColorSprite(startButtonSprite_.get(), buttonX, panelY + 16.0f, buttonWidth, buttonHeight,
 	    selectedMenuIndex_ == 0 ? selectedColor : idleColor);
@@ -614,8 +623,8 @@ void TitleScene::Draw2D() {
 	DrawColorSprite(shopButtonSprite_.get(), buttonX, panelY + 16.0f + buttonInterval * 2.0f, buttonWidth, buttonHeight,
 	    selectedMenuIndex_ == 2 ? selectedColor : idleColor);
 	// 選択項目の左端へ朱色の細線を置き、塗りだけに頼らず現在位置を示す。
-	DrawColorSprite(accentSprite_.get(), buttonX, panelY + 16.0f + buttonInterval * selectedMenuIndex_,
-		4.0f, buttonHeight, {0.92f, 0.16f, 0.055f, 0.95f});
+	DrawColorSprite(accentSprite_.get(), buttonX + 16.0f, panelY + 16.0f + buttonInterval * selectedMenuIndex_ + buttonHeight - 4.0f,
+		buttonWidth - 32.0f, 3.0f, {0.95f, 0.58f, 0.12f, 0.95f});
 
 	const float menuCenterX = panelX + panelWidth * 0.5f;
 	startTextObject_->GetTransform().translate = {menuCenterX, panelY + 37.0f, 0.0f};
@@ -623,14 +632,15 @@ void TitleScene::Draw2D() {
 	shopTextObject_->GetTransform().translate = {menuCenterX, panelY + 37.0f + buttonInterval * 2.0f, 0.0f};
 	// ボタン背景だけでなく文字色も変え、選択状態を読み取りやすくする。
 	startTextObject_->GetComponent<TextComponent>()->SetColor(
-	    selectedMenuIndex_ == 0 ? Vector4{1.0f, 0.91f, 0.72f, 1.0f} : Vector4{0.72f, 0.76f, 0.84f, 1.0f});
+	    selectedMenuIndex_ == 0 ? Vector4{0.48f, 0.06f, 0.03f, 1.0f} : Vector4{0.20f, 0.15f, 0.11f, 1.0f});
 	newGameTextObject_->GetComponent<TextComponent>()->SetColor(
-	    selectedMenuIndex_ == 1 ? Vector4{1.0f, 0.91f, 0.72f, 1.0f} : Vector4{0.72f, 0.76f, 0.84f, 1.0f});
+	    selectedMenuIndex_ == 1 ? Vector4{0.48f, 0.06f, 0.03f, 1.0f} : Vector4{0.20f, 0.15f, 0.11f, 1.0f});
 	shopTextObject_->GetComponent<TextComponent>()->SetColor(
-	    selectedMenuIndex_ == 2 ? Vector4{1.0f, 0.91f, 0.72f, 1.0f} : Vector4{0.72f, 0.76f, 0.84f, 1.0f});
+	    selectedMenuIndex_ == 2 ? Vector4{0.48f, 0.06f, 0.03f, 1.0f} : Vector4{0.20f, 0.15f, 0.11f, 1.0f});
 
 	// ショップへ入る前に現在の共有所持金を確認できるよう、毎フレーム最新値を表示する。
-	moneyTextObject_->GetComponent<TextComponent>()->SetText("所持金: " + std::to_string(sceneManager->GetMoney()) + " G");
+	moneyTextObject_->GetComponent<TextComponent>()->SetText(
+		"所持金: " + std::to_string(GetSceneManager()->GetMoney()) + " G");
 	moneyTextObject_->GetTransform().translate = {menuCenterX, panelY + panelHeight + 28.0f, 0.0f};
 	versionTextObject_->GetTransform().translate = {width * 0.5f, height - 74.0f, 0.0f};
 	instructionTextObject_->GetTransform().translate = {width * 0.5f, height - 38.0f, 0.0f};
@@ -650,7 +660,7 @@ void TitleScene::Draw2D() {
 		SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
 		DrawColorSprite(confirmationBackdropSprite_.get(), 0.0f, 0.0f, width, height, {0.0f, 0.0f, 0.0f, 0.72f});
 		DrawColorSprite(confirmationPanelSprite_.get(), confirmationX, confirmationY,
-		    confirmationWidth, confirmationHeight, {0.018f, 0.026f, 0.065f, 0.98f});
+		    confirmationWidth, confirmationHeight, {1.0f, 0.96f, 0.86f, 1.0f});
 		confirmationTextObject_->GetTransform().translate = {width * 0.5f, confirmationY + 56.0f, 0.0f};
 		confirmationInstructionTextObject_->GetTransform().translate = {width * 0.5f, confirmationY + 112.0f, 0.0f};
 		confirmationTextObject_->Draw2D();

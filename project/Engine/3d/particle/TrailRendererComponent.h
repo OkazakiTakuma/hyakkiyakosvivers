@@ -2,14 +2,14 @@
 
 #include "TrailRenderer.h"
 #include "../../base/GameTime.h"
-#include "core/Component.h"
-#include "core/GameObject.h"
+#include "core/EntityComponent.h"
+#include "core/Entity.h"
 #include <algorithm>
 #include <deque>
 #include <vector>
 
 /// <summary>GameObjectの移動履歴を収集し、時間とともに消える軌跡を生成します。</summary>
-class TrailRendererComponent : public Component {
+class TrailRendererComponent : public EntityComponent {
 public:
 	void Initialize() override {
 		// 再初期化時に古い軌跡を残さず、現在位置を軌跡の始点にする。
@@ -88,7 +88,7 @@ public:
 	/// <summary>所有オブジェクトの中心から履歴を記録する位置をずらします。</summary>
 	void SetOffset(const Vector3& offset) { offset_ = offset; }
 	/// <summary>履歴を指定オブジェクト基準の相対座標で保持し、基準の移動へ追従させます。</summary>
-	void SetPositionReference(GameObject* referenceObject) {
+	void SetPositionReference(Entity* referenceObject) {
 		// 基準を切り替えてもワールド上の軌跡位置が飛ばないよう、保存座標を補正する。
 		const Vector3 oldOrigin = GetReferenceOrigin();
 		const Vector3 newOrigin = referenceObject ? referenceObject->GetTransform().translate : Vector3{};
@@ -97,7 +97,7 @@ public:
 		}
 		referenceObject_ = referenceObject;
 	}
-	GameObject* GetPositionReference() const { return referenceObject_; }
+	Entity* GetPositionReference() const { return referenceObject_; }
 
 private:
 	static constexpr float kPositionEpsilon = 0.00001f;
@@ -127,7 +127,7 @@ private:
 	Vector4 tailColor_{0.05f, 0.20f, 1.0f, 0.0f};
 	Vector3 offset_{};
 	/// <summary>軌跡座標の原点として使用する、所有権を持たない参照です。</summary>
-	GameObject* referenceObject_ = nullptr;
+	Entity* referenceObject_ = nullptr;
 	/// <summary>新しい軌跡点を追加するかを表します。</summary>
 	bool emitting_ = true;
 };

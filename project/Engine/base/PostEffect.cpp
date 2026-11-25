@@ -591,7 +591,8 @@ void PostEffect::ApplySettingsToBuffer() {
 	colorData_->enableVignetting = isActive_ && enableVignetting_ ? 1 : 0;
 	colorData_->enableSmoothing = isActive_ && enableSmoothing_ ? 1 : 0;
 	colorData_->enableGaussianFilter = isActive_ && enableGaussianFilter_ ? 1 : 0;
-	colorData_->enableRadialBlur = isActive_ && enableRadialBlur_ ? 1 : 0;
+	colorData_->enableRadialBlur =
+		isActive_ && (enableRadialBlur_ || cinematicRadialBlurStrength_ > 0.0001f) ? 1 : 0;
 	colorData_->enableRandom = isActive_ && enableRandom_ ? 1 : 0;
 	colorData_->radialBlurSamples = radialBlurSamples_;
 	colorData_->enableOutline = isActive_ && enableOutline_ ? 1 : 0;
@@ -599,7 +600,9 @@ void PostEffect::ApplySettingsToBuffer() {
 	colorData_->vignetteIntensity = vignetteIntensity_;
 	colorData_->vignetteRadius = vignetteRadius_;
 	colorData_->vignetteSoftness = vignetteSoftness_;
-	colorData_->radialBlurStrength = radialBlurStrength_;
+	const float configuredRadialBlurStrength = enableRadialBlur_ ? radialBlurStrength_ : 0.0f;
+	colorData_->radialBlurStrength =
+		(std::max)(configuredRadialBlurStrength, cinematicRadialBlurStrength_);
 	colorData_->randomStrength = randomStrength_;
 	colorData_->outlineStrength = outlineStrength_;
 	colorData_->outlineThreshold = outlineThreshold_;
@@ -769,6 +772,11 @@ void PostEffect::TriggerDamageVignette() {
 	// 連続被弾時も現在値へ加算せず、常に同じ最大強度から再生する。
 	damageVignetteTimer_ = damageVignetteDuration_;
 	damageVignetteCurrentIntensity_ = damageVignetteMaxIntensity_;
+	ApplySettingsToBuffer();
+}
+
+void PostEffect::SetCinematicRadialBlur(float strength) {
+	cinematicRadialBlurStrength_ = std::clamp(strength, 0.0f, 0.3f);
 	ApplySettingsToBuffer();
 }
 void PostEffect::PreDrawScene() {

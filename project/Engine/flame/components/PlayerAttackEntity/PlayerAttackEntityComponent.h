@@ -1,5 +1,5 @@
 #pragma once
-#include "core/Component.h"
+#include "core/EntityComponent.h"
 #include "Vector.h"
 #include "components/PlayerAttack/PlayerAttackComponent.h"
 #include <string>
@@ -31,7 +31,7 @@ struct PlayerAttackEntityPresentation {
 };
 
 /// <summary>プレイヤー弾の移動方式、追尾、寿命、貫通・再ヒット制御を管理します。</summary>
-class PlayerAttackEntityComponent : public Component {
+class PlayerAttackEntityComponent : public EntityComponent {
 public:
 	void Initialize() override;
 	void Update() override;
@@ -55,7 +55,10 @@ public:
 	void SetMotionType(PlayerAttackEntityMotionType motionType);
 	PlayerAttackEntityMotionType GetMotionType() const;
 	PlayerAttackEntityPresentation GetMotionPresentation() const;
-	void SetMotionAnchor(GameObject* motionAnchor);
+	void SetMotionAnchor(Entity* motionAnchor);
+	Entity* GetMotionAnchor() const { return motionAnchor_; }
+	void SetSourceOwner(Entity* sourceOwner) { sourceOwner_ = sourceOwner; }
+	Entity* GetSourceOwner() const { return sourceOwner_; }
 	void SetOrbitAngleRadians(float angle);
 	void SetOrbitRadius(float radius);
 	void SetOrbitHeight(float height);
@@ -64,33 +67,35 @@ public:
 	void SetTravelOrigin(const Vector3& origin);
 	void SetClawSlashIndex(int index);
 	void SetClawSlashCount(int count);
-	void SetHomingTarget(GameObject* target);
-	GameObject* GetHomingTarget() const;
+	void SetHomingTarget(Entity* target);
+	Entity* GetHomingTarget() const;
 	void SetLifeTime(float lifeTime);
 	void Expire();
 	bool IsExpired() const;
 	void SetPierceCount(int pierceCount);
 	int GetPierceCount() const;
+	void SetKnockback(int knockback);
+	int GetKnockback() const;
 	void SetInfinitePierce(bool infinitePierce);
 	bool IsInfinitePierce() const;
 	void SetRepeatHitInterval(float intervalSeconds);
 	float GetRepeatHitInterval() const;
-	bool HasHitObject(GameObject* object) const;
-	void RegisterHitObject(GameObject* object);
+	bool HasHitObject(Entity* object) const;
+	void RegisterHitObject(Entity* object);
 
 private:
 	/// <summary>同じ対象への連続ヒットを抑制する対象別クールダウンです。</summary>
 	struct HitRecord {
-		GameObject* object = nullptr;
+		Entity* object = nullptr;
 		float cooldownSeconds = -1.0f;
 	};
 
 	void UpdateHitCooldowns(float deltaTime);
-	void UpdateLinearMotion(GameObject* owner, float deltaTime, float frameScale, bool rampHoming);
+	void UpdateLinearMotion(Entity* owner, float deltaTime, float frameScale, bool rampHoming);
 
-	void UpdateBoomerang(GameObject* owner, float deltaTime, float frameScale);
+	void UpdateBoomerang(Entity* owner, float deltaTime, float frameScale);
 
-	void UpdateClawSlash(GameObject* owner, float deltaTime);
+	void UpdateClawSlash(Entity* owner, float deltaTime);
 
 	std::string attackName_;
 	/// <summary>生成元攻撃のレベルです。デバッグ表示や将来の分岐用に保持します。</summary>
@@ -111,6 +116,8 @@ private:
 	float initialLifeTime_ = 3.0f;
 	/// <summary>残り貫通回数です。</summary>
 	int pierceCount_ = 0;
+	/// <summary>敵へ命中したときに適用する0～3のノックバック段階です。</summary>
+	int knockback_ = 0;
 	/// <summary>trueの場合、貫通回数を消費せず同一対象の再ヒット制御だけ行います。</summary>
 	bool infinitePierce_ = false;
 	/// <summary>追尾補正を有効にするかを保持します。</summary>
@@ -122,7 +129,9 @@ private:
 	/// <summary>直進、周回、ブーメランなどの移動方式です。</summary>
 	PlayerAttackEntityMotionType motionType_ = PlayerAttackEntityMotionType::Linear;
 	/// <summary>周回弾などの中心として使用する非所有参照です。</summary>
-	GameObject* motionAnchor_ = nullptr;
+	Entity* motionAnchor_ = nullptr;
+	/// <summary>命中時にキャラクター特性を参照する攻撃元です。</summary>
+	Entity* sourceOwner_ = nullptr;
 	float orbitAngleRadians_ = 0.0f;
 	float orbitRadius_ = 2.2f;
 	float orbitHeight_ = 0.65f;
@@ -135,6 +144,8 @@ private:
 	Vector3 returnTarget_{};
 	/// <summary>ブーメランが帰還フェーズへ入ったかを表します。</summary>
 	bool returning_ = false;
+	/// <summary>大幣を飛行中に水平回転させるための累積角度です。</summary>
+	float boomerangSpinAngleRadians_ = 0.0f;
 	/// <summary>複数の爪を中央基準で並べるための番号と総数です。</summary>
 	int clawSlashIndex_ = 0;
 	int clawSlashCount_ = 3;
@@ -143,7 +154,7 @@ private:
 	/// <summary>爪攻撃の基準向きを初回更新で固定済みかを表します。</summary>
 	bool isClawSlashYawInitialized_ = false;
 	/// <summary>追尾対象となるGameObjectへの非所有参照です。</summary>
-	GameObject* homingTarget_ = nullptr;
+	Entity* homingTarget_ = nullptr;
 	/// <summary>同一対象へ再度命中可能になるまでの秒数です。</summary>
 	float repeatHitIntervalSeconds_ = 0.0f;
 	/// <summary>命中済み対象と残りクールダウンの一覧です。</summary>

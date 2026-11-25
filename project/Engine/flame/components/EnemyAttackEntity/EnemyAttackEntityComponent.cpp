@@ -83,7 +83,7 @@ void EnemyAttackEntityComponent::SetContractingOrbit(
 	SetMotionType(EnemyAttackEntityMotionType::ContractingOrbit);
 }
 
-void EnemyAttackEntityComponent::SetHomingTarget(GameObject* target) {
+void EnemyAttackEntityComponent::SetHomingTarget(Entity* target) {
 	homingTarget_ = target;
 	SetMotionType(EnemyAttackEntityMotionType::Homing);
 }

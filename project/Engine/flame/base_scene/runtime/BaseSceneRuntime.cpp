@@ -30,7 +30,7 @@ void BaseScene::ApplyCamera(Camera* camera) {
 	float aspectRatio = clientWidth > 0.0f && clientHeight > 0.0f ? clientWidth / clientHeight : 1.0f;
 #ifdef USE_IMGUI
 	const float gameViewAspectRatio = ImGuiManager::GetInstance()->GetGameViewAspectRatio();
-	if (gameViewAspectRatio > 0.0f) {
+	if ((!sceneManager_ || !sceneManager_->IsDemoPlayActive()) && gameViewAspectRatio > 0.0f) {
 		aspectRatio = gameViewAspectRatio;
 	}
 #endif
@@ -41,10 +41,10 @@ void BaseScene::ApplyCamera(Camera* camera) {
 	ParticleManager::GetInstance()->SetCamera(camera);
 	for (const auto& object : sceneObjects_) {
 		if (Object3dComponent* object3dComponent = object->GetComponent<Object3dComponent>()) {
+			if (!object3dComponent->IsEnabled()) continue;
 			object3dComponent->SetCamera(camera);
-			if (object3dComponent->GetObject3d()) {
-				object3dComponent->GetObject3d()->Update();
-			}
+			// カメラ変更は描画情報だけを同期し、アニメーション時間を再加算しない。
+			object3dComponent->SyncRenderState();
 		}
 	}
 }
@@ -53,21 +53,21 @@ void BaseScene::ApplyCamera(Camera* camera) {
 /// 現在選択されているアクティブカメラを反映します。
 /// </summary>
 void BaseScene::ApplyActiveCamera() {
-	if (activeCameraObjectName_.empty()) {
+	if (!sceneEditorState_.HasActiveCamera()) {
 		ApplyCamera(fallbackCamera_);
 		return;
 	}
 
-	GameObject* cameraObject = FindObjectByName(activeCameraObjectName_);
+	Entity* cameraObject = FindObjectByName(sceneEditorState_.GetActiveCameraName());
 	if (!cameraObject) {
-		activeCameraObjectName_.clear();
+		sceneEditorState_.ClearActiveCamera();
 		ApplyCamera(fallbackCamera_);
 		return;
 	}
 
 	CameraComponent* cameraComponent = cameraObject->GetComponent<CameraComponent>();
 	if (!cameraComponent || !cameraComponent->IsEnabled() || !cameraComponent->GetCamera()) {
-		activeCameraObjectName_.clear();
+		sceneEditorState_.ClearActiveCamera();
 		ApplyCamera(fallbackCamera_);
 		return;
 	}
@@ -80,45 +80,62 @@ void BaseScene::ApplyActiveCamera() {
 /// カメラの追従対象リンクを名前から解決します。
 /// </summary>
 void BaseScene::ResolveCameraLinks() {
-	for (const auto& object : sceneObjects_) {
+	for (Entity* object : sceneObjects_.GetEntitiesWith<CameraComponent>()) {
 		CameraComponent* cameraComponent = object->GetComponent<CameraComponent>();
 		if (!cameraComponent || !cameraComponent->IsEnabled() || cameraComponent->GetFollowTargetName().empty()) {
 			continue;
 		}
-
-		GameObject* target = FindObjectByName(cameraComponent->GetFollowTargetName());
-		if (target && target != object.get() && target != cameraComponent->GetFollowTarget()) {
-			cameraComponent->SetFollowTarget(target);
+		Entity* resolvedTarget = cameraComponent->GetFollowTarget();
+		if (resolvedTarget && resolvedTarget != object &&
+		    resolvedTarget->GetName() == cameraComponent->GetFollowTargetName()) {
+			// 削除時と設定名変更時に参照が解除されるため、有効なリンクは再検索しない。
+			continue;
 		}
+
+		Entity* target = FindObjectByName(cameraComponent->GetFollowTargetName());
+		// 解決失敗時も古いアドレスを残さず、名前だけを次回の再解決用に維持する。
+		cameraComponent->SetResolvedFollowTarget(target != object ? target : nullptr);
 	}
 }
 
 void BaseScene::ResolveEnemySpawnPointLinks() {
-	GameObject* firstPlayer = nullptr;
-	for (const auto& object : sceneObjects_) {
-		if (object->GetComponent<Player>()) {
-			firstPlayer = object.get();
-			break;
+	Entity* firstPlayer = nullptr;
+	bool searchedFirstPlayer = false;
+	auto findFirstPlayer = [&]() -> Entity* {
+		if (!searchedFirstPlayer) {
+			searchedFirstPlayer = true;
+			const auto& players = sceneObjects_.GetEntitiesWith<PlayerComponent>();
+			firstPlayer = players.empty() ? nullptr : players.front();
 		}
-	}
+		return firstPlayer;
+	};
 
-	for (const auto& object : sceneObjects_) {
+	for (Entity* object : sceneObjects_.GetEntitiesWith<EnemySpawnPointComponent>()) {
 		EnemySpawnPointComponent* spawnPoint = object->GetComponent<EnemySpawnPointComponent>();
 		if (!spawnPoint || !spawnPoint->IsEnabled()) {
 			continue;
 		}
 
-		GameObject* target = spawnPoint->GetTargetName().empty() ? firstPlayer : FindObjectByName(spawnPoint->GetTargetName());
+		Entity* target = spawnPoint->GetTarget();
+		const bool targetLinkIsValid = target &&
+			(spawnPoint->GetTargetName().empty() || target->GetName() == spawnPoint->GetTargetName());
+		if (!targetLinkIsValid) {
+			target = spawnPoint->GetTargetName().empty()
+				? findFirstPlayer()
+				: FindObjectByName(spawnPoint->GetTargetName());
+		}
 		if (target && target != spawnPoint->GetTarget()) {
 			spawnPoint->SetTarget(target);
 			if (spawnPoint->GetTargetName().empty()) {
 				spawnPoint->SetTargetName(target->GetName());
 			}
+		} else if (!target) {
+			spawnPoint->SetTarget(nullptr);
 		}
 
-		Camera* camera = nullptr;
-		if (!spawnPoint->GetCameraName().empty()) {
-			GameObject* cameraObject = FindObjectByName(spawnPoint->GetCameraName());
+		Camera* camera = spawnPoint->GetCamera();
+		if (!camera && !spawnPoint->GetCameraName().empty()) {
+			Entity* cameraObject = FindObjectByName(spawnPoint->GetCameraName());
 			CameraComponent* cameraComponent = cameraObject ? cameraObject->GetComponent<CameraComponent>() : nullptr;
 			if (cameraComponent && cameraComponent->IsEnabled()) {
 				camera = cameraComponent->GetCamera();
@@ -132,132 +149,100 @@ void BaseScene::ResolveEnemySpawnPointLinks() {
 }
 
 void BaseScene::ResolveEnemyLinks() {
-	GameObject* firstPlayer = nullptr;
-	for (const auto& object : sceneObjects_) {
-		if (object->GetComponent<Player>()) {
-			firstPlayer = object.get();
-			break;
+	Entity* firstPlayer = nullptr;
+	bool searchedFirstPlayer = false;
+	auto findFirstPlayer = [&]() -> Entity* {
+		if (!searchedFirstPlayer) {
+			searchedFirstPlayer = true;
+			const auto& players = sceneObjects_.GetEntitiesWith<PlayerComponent>();
+			firstPlayer = players.empty() ? nullptr : players.front();
 		}
-	}
+		return firstPlayer;
+	};
 
-	for (const auto& object : sceneObjects_) {
+	for (Entity* object : sceneObjects_.GetEntitiesWith<EnemyComponent>()) {
 		EnemyComponent* enemy = object->GetComponent<EnemyComponent>();
 		if (!enemy || !enemy->IsEnabled()) {
 			continue;
 		}
 
-		GameObject* target = enemy->GetTargetName().empty() ? firstPlayer : FindObjectByName(enemy->GetTargetName());
+		Entity* target = enemy->GetTarget();
+		const bool targetLinkIsValid = target &&
+			(enemy->GetTargetName().empty() || target->GetName() == enemy->GetTargetName());
+		if (!targetLinkIsValid) {
+			target = enemy->GetTargetName().empty()
+				? findFirstPlayer()
+				: FindObjectByName(enemy->GetTargetName());
+		}
 		if (target && target != enemy->GetTarget()) {
 			enemy->SetTarget(target);
 			if (enemy->GetTargetName().empty()) {
 				enemy->SetTargetName(target->GetName());
 			}
+		} else if (!target) {
+			enemy->SetTarget(nullptr);
 		}
 	}
 }
 
+void BaseScene::BeginRuntimeBossEncounter(const Entity& boss) {
+	enemySpawnSystem_.BeginBossEncounter(boss.GetName());
+}
+
 void BaseScene::UpdateEnemySpawning() {
-	// ボス名を保持している間は通常スポーンを完全停止し、撃破後も報酬処理が終わるまでクリアを確定しない。
-	if (!activeBossEncounterObjectName_.empty()) {
-		GameObject* bossObject = FindObjectByName(activeBossEncounterObjectName_);
-		EnemyComponent* bossEnemy = bossObject ? bossObject->GetComponent<EnemyComponent>() : nullptr;
-		const bool bossIsAlive = bossEnemy && bossEnemy->IsEnabled() && bossEnemy->GetCurrentHealth() > 0.0f;
-		for (const auto& object : sceneObjects_) {
-			if (EnemySpawnPointComponent* spawnPoint = object->GetComponent<EnemySpawnPointComponent>()) {
-				spawnPoint->SetBossEncounterActive(bossIsAlive);
-			}
-		}
-		if (bossIsAlive) {
-			return;
-		}
-		// 最終ボスの金色報酬を拾い、強化選択を終えるまではリザルトへ移動しない。
-		for (const auto& object : sceneObjects_) {
-			ExperienceComponent* reward = object->GetComponent<ExperienceComponent>();
-			if (reward && reward->IsBossUpgradeReward() &&
-			    (!reward->IsCollected() || !reward->IsBossUpgradeApplied())) {
-				return;
-			}
-		}
-		if (IsLevelUpSelectionActive() || !bossAcquisitionOfferQueue_.empty()) {
-			return;
-		}
-		// Boss Encounter はステージの最後に一度だけ発生するため、撃破をクリア条件とする。
-		isStageCleared_ = true;
-		activeBossEncounterObjectName_.clear();
+	EnemySpawnUpdateResult updateResult = enemySpawnSystem_.Update(
+		sceneObjects_,
+		IsLevelUpSelectionActive(),
+		!bossAcquisitionOfferQueue_.empty());
+	if (updateResult.stageCleared) {
+		gameplaySession_.MarkStageCleared();
 		return;
 	}
 
-	struct SpawnRequest {
-		std::string enemyTypeName;
-		Vector3 position;
-		GameObject* target = nullptr;
-		EnemySpawnPointComponent::EnemyStatMultipliers statMultipliers{};
-	};
-	std::vector<SpawnRequest> spawnRequests;
-	EnemySpawnPointComponent* triggeredBossSpawnPoint = nullptr;
-	for (const auto& object : sceneObjects_) {
-		EnemySpawnPointComponent* spawnPoint = object->GetComponent<EnemySpawnPointComponent>();
-		if (!spawnPoint || !spawnPoint->IsEnabled()) {
-			continue;
-		}
-
-		if (spawnPoint->ConsumeBossEncounterRequest()) {
-			triggeredBossSpawnPoint = spawnPoint;
-			break;
-		}
-
-		if (!spawnPoint->GetSpawnSchedules().empty()) {
-			const std::vector<EnemySpawnPointComponent::ScheduledSpawnRequest> scheduledRequests = spawnPoint->ConsumeScheduledSpawnRequests();
-			for (const EnemySpawnPointComponent::ScheduledSpawnRequest& request : scheduledRequests) {
-				spawnRequests.push_back({request.enemyTypeName, request.position, spawnPoint->GetTarget(), request.statMultipliers});
-			}
-		} else {
-			const std::string enemyTypeName = spawnPoint->GetEnemyTypeName();
-			const EnemyStats stats = LoadEnemyStats(enemyTypeName);
-			Vector3 spawnPosition{};
-			if (spawnPoint->ConsumeSpawnRequest(stats.spawnsPerMinute, spawnPosition)) {
-				spawnRequests.push_back({enemyTypeName, spawnPosition, spawnPoint->GetTarget(), spawnPoint->GetCurrentTimeScaling()});
-			}
-		}
-	}
-
-	if (triggeredBossSpawnPoint) {
+	if (updateResult.hasBossEncounterRequest) {
 		const EnemySpawnPointComponent::BossEncounterSettings& bossSettings =
-		    triggeredBossSpawnPoint->GetBossEncounterSettings();
-		GameObject* player = triggeredBossSpawnPoint->GetTarget();
+			updateResult.bossEncounter.settings;
+		Entity* player = updateResult.bossEncounter.player;
 		if (player) {
 			// ボス生成より先にプレイヤーを戦闘位置へ移し、落下速度を残さない。
 			player->GetTransform().translate = bossSettings.playerWarpPosition;
-			if (Player* playerComponent = player->GetComponent<Player>()) {
-				playerComponent->ResetGravityVelocity();
+			if (GravityComponent* gravity = player->GetComponent<GravityComponent>()) {
+				gravity->ResetVelocity();
 			}
 		}
 
 		// ボス戦へ通常敵や途中の中ボスを持ち越さないよう、全EnemyComponentを即時除去する。
+		// erase中はunique_ptrの並び替えが発生するため、事前走査で全参照を安全に解除する。
+		for (const auto& object : sceneObjects_) {
+			if (object->GetComponent<EnemyComponent>()) {
+				ClearEntityReferences(object.get());
+			}
+		}
 		sceneObjects_.erase(
-		    std::remove_if(sceneObjects_.begin(), sceneObjects_.end(), [](const std::unique_ptr<GameObject>& object) {
+		    std::remove_if(sceneObjects_.begin(), sceneObjects_.end(), [](const std::unique_ptr<Entity>& object) {
 			    return object->GetComponent<EnemyComponent>() != nullptr;
 		    }),
 		    sceneObjects_.end()
 		);
-		selectedObjectIndex_ = -1;
+		sceneEditorState_.ClearSelection();
 		for (const auto& object : sceneObjects_) {
 			if (EnemySpawnPointComponent* spawnPoint = object->GetComponent<EnemySpawnPointComponent>()) {
 				spawnPoint->SetBossEncounterActive(true);
 			}
 		}
+		CreateBossArenaWalls(bossSettings);
 
-		GameObject* bossObject = CreateRuntimeEnemy(bossSettings.enemyTypeName, bossSettings.bossPosition, player);
+		Entity* bossObject = CreateRuntimeEnemy(bossSettings.enemyTypeName, bossSettings.bossPosition, player);
 		if (bossObject) {
-			activeBossEncounterObjectName_ = bossObject->GetName();
+			BeginRuntimeBossEncounter(*bossObject);
 		}
 		return;
 	}
 
-	for (const SpawnRequest& request : spawnRequests) {
+	for (const EnemySpawnRequest& request : updateResult.enemyRequests) {
 		Vector3 spawnPosition = request.position;
 		// ステージ2では画面外の生成候補も上下の壁より内側へ収める。
-		if (sceneManager && sceneManager->GetSelectedGameplayStageId() == "stage2") {
+		if (sceneManager_ && sceneManager_->GetSelectedGameplayStageId() == "stage2") {
 			constexpr float kStage2SpawnLimitZ = 8.5f;
 			spawnPosition.z = std::clamp(spawnPosition.z, -kStage2SpawnLimitZ, kStage2SpawnLimitZ);
 		}
@@ -265,12 +250,177 @@ void BaseScene::UpdateEnemySpawning() {
 	}
 }
 
-void BaseScene::UpdateLoopingTerrain() {
-	if (!sceneManager) {
+namespace {
+constexpr const char* kBossArenaWallPrefix = "__BossArenaWall_";
+}
+
+void BaseScene::CreateBossArenaWalls(const EnemySpawnPointComponent::BossEncounterSettings& settings) {
+	RemoveBossArenaWalls();
+	if (!settings.arenaWallsEnabled) {
 		return;
 	}
 
-	const std::string& stageId = sceneManager->GetSelectedGameplayStageId();
+	const float extent = (std::max)(2.0f, settings.arenaHalfExtent);
+	const float height = (std::max)(0.5f, settings.arenaWallHeight);
+	const float thickness = (std::max)(0.1f, settings.arenaWallThickness);
+	const Vector3 center = settings.bossPosition;
+
+	struct WallPlacement {
+		const char* suffix;
+		Vector3 position;
+		Vector3 scale;
+		Vector3 tangent;
+	};
+	const std::array<WallPlacement, 4> placements = {{
+		{"North", {center.x, center.y + height * 0.5f, center.z + extent + thickness * 0.5f},
+		 {extent + thickness, height * 0.5f, thickness * 0.5f}, {1.0f, 0.0f, 0.0f}},
+		{"South", {center.x, center.y + height * 0.5f, center.z - extent - thickness * 0.5f},
+		 {extent + thickness, height * 0.5f, thickness * 0.5f}, {1.0f, 0.0f, 0.0f}},
+		{"East", {center.x + extent + thickness * 0.5f, center.y + height * 0.5f, center.z},
+		 {thickness * 0.5f, height * 0.5f, extent + thickness}, {0.0f, 0.0f, 1.0f}},
+		{"West", {center.x - extent - thickness * 0.5f, center.y + height * 0.5f, center.z},
+		 {thickness * 0.5f, height * 0.5f, extent + thickness}, {0.0f, 0.0f, 1.0f}}
+	}};
+	const float barrierHalfLength = extent + thickness;
+
+	for (const WallPlacement& placement : placements) {
+		auto wall = std::make_unique<Entity>();
+		wall->SetName(std::string(kBossArenaWallPrefix) + placement.suffix);
+		wall->SetEditorType("RuntimeBossArenaWall");
+		wall->GetTransform().translate = placement.position;
+		wall->GetTransform().scale = placement.scale;
+
+		OBBColliderComponent* collider = wall->AddComponent<OBBColliderComponent>();
+		collider->SetHalfSize({1.0f, 1.0f, 1.0f});
+		collider->SetPushBackEnabled(false);
+		collider->SetDrawDebug(false);
+
+		wall->Update();
+		sceneObjects_.push_back(std::move(wall));
+
+		// 添付の透過グラデーション画像を壁面全体へ貼り、光の筋が連なる結界として表示する。
+		auto barrierVisual = std::make_unique<Entity>();
+		barrierVisual->SetName(std::string(kBossArenaWallPrefix) + placement.suffix + "_Visual");
+		barrierVisual->SetEditorType("RuntimeBossArenaVisual");
+		barrierVisual->GetTransform().translate = placement.position;
+		barrierVisual->GetTransform().rotate = placement.tangent.x != 0.0f
+			? Vector3{}
+			: Vector3{0.0f, MathConstants::kPi * 0.5f, 0.0f};
+		barrierVisual->GetTransform().scale = {barrierHalfLength, height * 0.5f, 1.0f};
+
+		Object3dComponent* visual = barrierVisual->AddComponent<Object3dComponent>();
+		visual->CreatePlane(2.0f, 2.0f);
+		visual->SetTexture("Resources/gradationLine.png");
+		visual->SetColor({0.24f, 0.72f, 1.0f, 0.82f});
+		visual->SetEmission({0.08f, 0.48f, 1.0f}, 2.4f);
+		visual->SetLightingEnabled(false);
+		visual->SetShadowEnabled(false);
+
+		barrierVisual->Update();
+		sceneObjects_.push_back(std::move(barrierVisual));
+	}
+}
+
+void BaseScene::UpdateBossArenaWalls() {
+	bool encounterActive = false;
+	for (const auto& object : sceneObjects_) {
+		const EnemySpawnPointComponent* spawnPoint = object->GetComponent<EnemySpawnPointComponent>();
+		if (spawnPoint && spawnPoint->IsBossEncounterActive()) {
+			encounterActive = true;
+			break;
+		}
+	}
+	if (!encounterActive) {
+		RemoveBossArenaWalls();
+	}
+}
+
+void BaseScene::ConstrainPlayersToBossArena() {
+	const EnemySpawnPointComponent::BossEncounterSettings* activeSettings = nullptr;
+	for (const auto& object : sceneObjects_) {
+		const EnemySpawnPointComponent* spawnPoint = object->GetComponent<EnemySpawnPointComponent>();
+		if (spawnPoint && spawnPoint->IsBossEncounterActive() &&
+		    spawnPoint->IsBossEncounterTriggered()) {
+			activeSettings = &spawnPoint->GetBossEncounterSettings();
+			break;
+		}
+	}
+	if (!activeSettings || !activeSettings->arenaWallsEnabled) {
+		return;
+	}
+
+	const float extent = (std::max)(2.0f, activeSettings->arenaHalfExtent);
+	const float arenaMinX = activeSettings->bossPosition.x - extent;
+	const float arenaMaxX = activeSettings->bossPosition.x + extent;
+	const float arenaMinZ = activeSettings->bossPosition.z - extent;
+	const float arenaMaxZ = activeSettings->bossPosition.z + extent;
+
+	for (Entity* player : sceneObjects_.GetEntitiesWith<PlayerComponent>()) {
+		const PlayerComponent* playerComponent = player ? player->GetComponent<PlayerComponent>() : nullptr;
+		if (!playerComponent || !playerComponent->IsEnabled()) {
+			continue;
+		}
+
+		// プレイヤーが持つすべての有効コライダーを囲むXZ範囲を求める。
+		CollisionSpatialGrid::Bounds playerBounds{};
+		bool hasBounds = false;
+		if (const OBBColliderComponent* obb = player->GetComponent<OBBColliderComponent>();
+		    obb && obb->IsEnabled()) {
+			playerBounds = CollisionSpatialGrid::FromOBB(obb->GetWorldOBB());
+			hasBounds = true;
+		}
+		if (const SphereColliderComponent* sphere = player->GetComponent<SphereColliderComponent>();
+		    sphere && sphere->IsEnabled()) {
+			const CollisionSpatialGrid::Bounds sphereBounds =
+				CollisionSpatialGrid::FromSphere(sphere->GetWorldSphere());
+			playerBounds = hasBounds
+				? CollisionSpatialGrid::Merge(playerBounds, sphereBounds)
+				: sphereBounds;
+			hasBounds = true;
+		}
+		if (!hasBounds) {
+			const Vector3 position = player->GetTransform().translate;
+			playerBounds = CollisionSpatialGrid::FromCenterRadius(position, 0.0f);
+		}
+
+		Vector3 correction{};
+		const float boundsWidth = playerBounds.maxX - playerBounds.minX;
+		const float boundsDepth = playerBounds.maxZ - playerBounds.minZ;
+		if (boundsWidth > extent * 2.0f) {
+			correction.x = activeSettings->bossPosition.x -
+				(playerBounds.minX + playerBounds.maxX) * 0.5f;
+		} else if (playerBounds.minX < arenaMinX) {
+			correction.x = arenaMinX - playerBounds.minX;
+		} else if (playerBounds.maxX > arenaMaxX) {
+			correction.x = arenaMaxX - playerBounds.maxX;
+		}
+		if (boundsDepth > extent * 2.0f) {
+			correction.z = activeSettings->bossPosition.z -
+				(playerBounds.minZ + playerBounds.maxZ) * 0.5f;
+		} else if (playerBounds.minZ < arenaMinZ) {
+			correction.z = arenaMinZ - playerBounds.minZ;
+		} else if (playerBounds.maxZ > arenaMaxZ) {
+			correction.z = arenaMaxZ - playerBounds.maxZ;
+		}
+
+		player->GetTransform().translate = player->GetTransform().translate + correction;
+	}
+}
+
+void BaseScene::RemoveBossArenaWalls() {
+	sceneObjects_.erase(
+		std::remove_if(sceneObjects_.begin(), sceneObjects_.end(), [](const std::unique_ptr<Entity>& object) {
+			return object && object->GetName().rfind(kBossArenaWallPrefix, 0) == 0;
+		}),
+		sceneObjects_.end());
+}
+
+void BaseScene::UpdateLoopingTerrain() {
+	if (!sceneManager_) {
+		return;
+	}
+
+	const std::string& stageId = sceneManager_->GetSelectedGameplayStageId();
 	// ステージ1はX/Z両方向、ステージ2は壁に沿ったX方向だけを20単位で循環させる。
 	const bool wrapsBothAxes = stageId == "default";
 	const bool wrapsHorizontally = stageId == "stage2";
@@ -279,10 +429,10 @@ void BaseScene::UpdateLoopingTerrain() {
 		return;
 	}
 
-	GameObject* playerObject = nullptr;
-	GameObject* centerTerrain = nullptr;
+	Entity* playerObject = nullptr;
+	Entity* centerTerrain = nullptr;
 	for (const auto& object : sceneObjects_) {
-		if (object->GetComponent<Player>()) {
+		if (object->GetComponent<PlayerComponent>()) {
 			playerObject = object.get();
 		}
 		if (object->GetName() == "terrain_7") {
@@ -316,7 +466,7 @@ void BaseScene::UpdateLoopingTerrain() {
 
 	// 床の9タイルに加え、ステージ2では壁と和風背景も同じ量だけ送り、
 	// ループ境界を越えても街並みの相対配置が崩れないようにする。
-	auto isLoopingTerrain = [isStage2](const GameObject* target) {
+	auto isLoopingTerrain = [isStage2](const Entity* target) {
 		if (!target) return false;
 		const std::string& name = target->GetName();
 		return name == "terrain_7" ||
@@ -325,12 +475,12 @@ void BaseScene::UpdateLoopingTerrain() {
 	};
 
 	for (const auto& object : sceneObjects_) {
-		GameObject* target = object.get();
+		Entity* target = object.get();
 		if (isLoopingTerrain(target)) {
 			target->GetTransform().translate = target->GetTransform().translate + shift;
 			// 通常のObject3d更新後に再配置するため、描画行列だけは同フレーム中に同期する。
 			if (Object3dComponent* object3d = target->GetComponent<Object3dComponent>()) {
-				object3d->Update();
+				object3d->SyncRenderState();
 			}
 		}
 	}
@@ -385,7 +535,7 @@ void BaseScene::UpdateEditorObjectPicking() {
 	}
 
 	if (hitIndex >= 0) {
-		selectedObjectIndex_ = hitIndex;
+		sceneEditorState_.SelectObject(hitIndex);
 	}
 #endif
 }
@@ -416,12 +566,13 @@ void BaseScene::UpdateEditorCameraControl() {
 		return;
 	}
 
-	GameObject* selectedObject =
-	    selectedObjectIndex_ >= 0 && selectedObjectIndex_ < static_cast<int>(sceneObjects_.size())
-	        ? sceneObjects_[selectedObjectIndex_].get()
+	const int selectedObjectIndex = sceneEditorState_.GetSelectedObjectIndex();
+	Entity* selectedObject =
+	    sceneEditorState_.HasValidSelection(sceneObjects_.size())
+	        ? sceneObjects_[selectedObjectIndex].get()
 	        : nullptr;
 
-	GameObject* activeCameraObject = FindObjectByName(activeCameraObjectName_);
+	Entity* activeCameraObject = FindObjectByName(sceneEditorState_.GetActiveCameraName());
 	EulerTransform* cameraTransform = nullptr;
 	Camera* fallbackCamera = nullptr;
 	Vector3 cameraPosition{};
@@ -489,20 +640,20 @@ void BaseScene::UpdateEditorCameraControl() {
 /// 指定したオブジェクトのカメラをアクティブカメラに設定します。
 /// </summary>
 
-void BaseScene::SetActiveCameraObject(GameObject* object) {
+void BaseScene::SetActiveCameraObject(Entity* object) {
 	CameraComponent* cameraComponent = object ? object->GetComponent<CameraComponent>() : nullptr;
 	if (!cameraComponent || !cameraComponent->IsEnabled()) {
 		return;
 	}
 
-	activeCameraObjectName_ = object->GetName();
+	sceneEditorState_.SetActiveCameraName(object->GetName());
 	ApplyActiveCamera();
 }
 
 /// <summary>
 /// 最初に見つかった有効なカメラオブジェクトを返します。
 /// </summary>
-GameObject* BaseScene::FindFirstCameraObject() {
+Entity* BaseScene::FindFirstCameraObject() {
 	for (const auto& object : sceneObjects_) {
 		CameraComponent* cameraComponent = object->GetComponent<CameraComponent>();
 		if (cameraComponent && cameraComponent->IsEnabled()) {
@@ -515,17 +666,8 @@ GameObject* BaseScene::FindFirstCameraObject() {
 /// <summary>
 /// 名前に一致するシーンオブジェクトを検索します。
 /// </summary>
-GameObject* BaseScene::FindObjectByName(const std::string& name) const {
-	if (name.empty()) {
-		return nullptr;
-	}
-
-	for (const auto& object : sceneObjects_) {
-		if (object->GetName() == name) {
-			return object.get();
-		}
-	}
-	return nullptr;
+Entity* BaseScene::FindObjectByName(const std::string& name) const {
+	return sceneObjects_.FindByName(name);
 }
 
 

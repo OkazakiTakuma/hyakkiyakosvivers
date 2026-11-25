@@ -45,6 +45,8 @@ public:
 	void UpdateHotkeys();
 	/// <summary>プレイヤー被弾時の赤い画面端エフェクトを開始します。</summary>
 	void TriggerDamageVignette();
+	/// <summary>一時演出用ラジアルブラー強度を設定します。0で通常設定だけへ戻ります。</summary>
+	void SetCinematicRadialBlur(float strength);
 	/// <summary>深度と画面位置から合成する低層霧の有効状態と外観を設定します。</summary>
 	void SetFogSettings(bool enabled, const Vector4& color, float density, float height,
 		float noiseScale, float noiseStrength, float particleAmount, float speed,
@@ -221,6 +223,8 @@ private:
 	float vignetteRadius_ = 0.05f;
 	float vignetteSoftness_ = 0.2f;
 	float radialBlurStrength_ = 0.16f;
+	/// <summary>ボス撃破など、通常のデバッグ設定を上書きせず一時的に加えるブラーです。</summary>
+	float cinematicRadialBlurStrength_ = 0.0f;
 	int radialBlurSamples_ = 16;
 	float randomStrength_ = 0.1f;
 	// 深度差アウトラインの描画濃度、検出感度、サンプリング間隔です。

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Vector.h"
+#include <cstdint>
 
 /// <summary>
 /// 空、太陽光、遠景の霞が同じ太陽方向を参照するための共有設定です。
@@ -22,6 +23,30 @@ struct AtmosphereSettings {
 	float heightFogDensity = 0.16f;
 	float aerialPerspectiveStrength = 0.68f;
 };
+
+/// <summary>Object3dとInstancingModelで共用する大気遠近法のGPUレイアウトです。</summary>
+struct AerialPerspectiveGpuData {
+	Vector3 horizonColor;
+	float distanceFogDensity;
+	float heightFogDensity;
+	float aerialPerspectiveStrength;
+	int32_t enableAerialPerspective;
+	float padding;
+};
+static_assert(sizeof(AerialPerspectiveGpuData) == 32,
+	"AerialPerspectiveGpuData must match the HLSL constant-buffer layout.");
+
+/// <summary>シーン設定をHLSLと一致するGPU転送値へ変換します。</summary>
+inline AerialPerspectiveGpuData MakeAerialPerspectiveGpuData(const AtmosphereSettings& settings) {
+	// boolのサイズをGPU側へ持ち込まず、HLSLのintと同じ32bit値へ明示的に変換する。
+	return {
+		settings.horizonColor,
+		settings.distanceFogDensity,
+		settings.heightFogDensity,
+		settings.aerialPerspectiveStrength,
+		settings.enabled ? 1 : 0,
+		0.0f};
+}
 
 /// <summary>
 /// シーン全体で使用する大気設定を一元管理します。

@@ -1,76 +1,16 @@
 #pragma once
-#include "core/Component.h"
+#include "core/EntityComponent.h"
+#include "data/PlayerStatsData.h"
 #include "Vector.h"
-#include <array>
 #include <cmath>
 #include <memory>
 #include <string>
 
 class Object3d;
 
-/// <summary>プレイヤーが装備している攻撃スロット1枠分の設定です。</summary>
-struct PlayerAttackSlot {
-	/// <summary>このスロットの攻撃を実行するかどうかです。</summary>
-	bool enabled = false;
-	/// <summary>player_attack_status.json に保存されている攻撃タイプ名です。</summary>
-	std::string attackName;
-	/// <summary>攻撃タイプ内で使用するレベルです。1～5 または super を指定します。</summary>
-	std::string attackLevel = "1";
-};
-
-/// <summary>プレイヤーへ加算適用するステータスアップアイテムのスロット設定です。</summary>
-struct PlayerStatusSlot {
-	/// <summary>このスロットの補正を適用するかどうかです。</summary>
-	bool enabled = false;
-	/// <summary>player_status_item_status.json に保存されているステータスアップアイテム名です。</summary>
-	std::string statusName;
-	/// <summary>ステータスアップアイテムの効果量レベルです。1～5 を指定します。</summary>
-	std::string level = "1";
-};
-
-/// <summary>プレイヤータイプごとの基礎能力、装備、保存対象の状態をまとめたデータです。</summary>
-struct PlayerStats {
-	/// <summary>プレイヤータイプ名です。</summary>
-	std::string name = "Default";
-	/// <summary>HP計算の基準値です。</summary>
-	float baseHealth = 100.0f;
-	/// <summary>baseHealth に掛けるHP倍率です。100で等倍です。</summary>
-	float health = 100.0f;
-	/// <summary>攻撃力倍率です。100で等倍です。</summary>
-	float attack = 100.0f;
-	/// <summary>被ダメージ軽減率です。1増えるごとに受けるダメージを1%軽減します。</summary>
-	float defense = 0.0f;
-	/// <summary>移動速度計算の基準値です。</summary>
-	float baseSpeed = 0.1f;
-	/// <summary>baseSpeed に掛ける速度倍率です。100で等倍です。</summary>
-	float speed = 100.0f;
-	/// <summary>攻撃間隔に掛ける攻撃速度倍率です。100で等倍です。</summary>
-	float attackSpeed = 100.0f;
-	/// <summary>攻撃弾サイズに掛ける倍率です。100で等倍です。</summary>
-	float attackSize = 100.0f;
-	/// <summary>プレイヤーモデルとコライダーに掛ける一様なサイズ倍率です。</summary>
-	float sizeScale = 1.0f;
-	/// <summary>被ダメージ後に再度ダメージを受けない時間です。</summary>
-	float damageInvincibilityDuration = 1.0f;
-	/// <summary>現在レベルです。</summary>
-	int level = 1;
-	/// <summary>現在経験値です。</summary>
-	int experience = 0;
-	/// <summary>獲得経験値へ掛ける倍率です。100で等倍です。</summary>
-	float experienceCorrection = 100.0f;
-	/// <summary>プレイヤー表示に使用するモデルファイルパスです。</summary>
-	std::string modelFilePath;
-	/// <summary>モデルをアニメーションモデルとして扱うかどうかです。</summary>
-	bool isAnimationModel = false;
-	/// <summary>プレイヤーが同時に装備できる攻撃スロットです。</summary>
-	std::array<PlayerAttackSlot, 5> attackSlots{};
-	/// <summary>一時的または恒久的に能力へ加算するステータスアップアイテムスロットです。</summary>
-	std::array<PlayerStatusSlot, 5> statusSlots{};
-};
-
-class Player : public Component {
+class PlayerComponent : public EntityComponent {
 public:
-	~Player() override;
+	~PlayerComponent() override;
 
 	/// <summary>
 	/// 毎フレーム WASD 入力を見て、XZ 平面上でプレイヤーを移動します。
@@ -95,8 +35,13 @@ public:
 	void ApplyStats(const PlayerStats& baseStats, const PlayerStats& effectiveStats);
 	/// <summary>防御力と無敵時間を考慮してダメージを適用し、実際に減った整数ダメージを返します。</summary>
 	int TakeDamage(float rawDamage);
+	void SetDemoMove(const Vector3& velocity) { demoControlled_ = true; demoMoveVelocity_ = velocity; }
 	float GetMaxHealth() const { return effectiveStats_.baseHealth * (effectiveStats_.health / 100.0f); }
-	float GetEffectiveMoveSpeed() const { return effectiveStats_.baseSpeed * (effectiveStats_.speed / 100.0f); }
+	/// <summary>キャラクター特性を含めた速度倍率です。100を等倍として扱います。</summary>
+	float GetEffectiveSpeedPercent() const;
+	float GetEffectiveMoveSpeed() const { return effectiveStats_.baseSpeed * (GetEffectiveSpeedPercent() / 100.0f); }
+	/// <summary>攻撃対象までの距離に応じたキャラクター固有の与ダメージ倍率を返します。</summary>
+	float GetOutgoingDamageMultiplier(float targetDistance) const;
 	const PlayerStats& GetStats() const { return effectiveStats_; }
 	const PlayerStats& GetBaseStats() const { return stats_; }
 	/// <summary>経験値補正を掛けた経験値を加算し、必要ならレベルアップ待ち回数を増やします。</summary>
@@ -159,7 +104,7 @@ public:
 
 private:
 	/// <summary>
-	/// 烏天狗用の刀モデルを必要になった時点で一度だけ生成します。
+	/// プレイヤー定義の右手装備モデルを必要になった時点で一度だけ生成します。
 	/// </summary>
 	void EnsureBladeEquipment();
 	/// <summary>現在経験値からレベルを再計算し、上昇回数をレベルアップ処理用に蓄積します。</summary>
@@ -172,6 +117,8 @@ private:
 	float moveSpeed_ = 0.1f;
 	/// <summary>現在HPです。最大HPは effectiveStats_ から計算します。</summary>
 	float currentHealth_ = 100.0f;
+	bool demoControlled_ = false;
+	Vector3 demoMoveVelocity_{};
 	/// <summary>生成直後の初回適用だけ、購入強化反映後の最大HPで開始するための判定です。</summary>
 	bool hasAppliedStats_ = false;
 	/// <summary>被ダメージ後の残り無敵時間です。</summary>

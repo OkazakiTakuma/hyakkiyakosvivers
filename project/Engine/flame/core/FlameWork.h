@@ -1,32 +1,12 @@
 #pragma once
-#include "Audio.h"
-#include "camera/Camera.h"
-#include "D3DResourceLeakChecker.h"
-#include "DirectXCommon.h"
-#include "core/FlameWork.h"
-#include "ImGuiManager.h"
-#include "Input.h"
-#include "Matrix.h"
-#include "model/ModelManager.h"
-#include "object/Object3d.h"
-#include "object/Object3dCommon.h"
-#include "particle/ParticleEmitter.h"
-#include "particle/ParticleManager.h"
-#include "Resource.h"
-#include "Sprite.h"
-#include "SpriteCommon.h"
-#include "sky/SkyBoxCommon.h"
-#include "SrvManager.h"
-#include "TextureManager.h"
-#include "Vector.h"
-#include "WinApp.h"
-#include "struct.h"
-#include <Windows.h>
-#include <d3d12.h>
-#include <string>
-#include <strsafe.h>
-#include <wrl.h>
-#include "core/AbstractSceneFactory.h"
+#include <cstdint>
+#include <memory>
+
+// 実体を必要とする描画・Windows依存はcppへ閉じ込め、基盤ヘッダの利用側へ伝播させない。
+class D3DResourceLeakChecker;
+class DirectXCommon;
+class ImGuiManager;
+class WinApp;
 
 #pragma comment(lib, "DirectXTex.lib")
 #pragma comment(lib, "d3d12.lib")
@@ -41,7 +21,8 @@
 /// </summary>
 class FlameWork {
 public:
-	virtual ~FlameWork() = default;
+	FlameWork();
+	virtual ~FlameWork();
 
 	/// <summary>
 	/// 必要なリソースを準備し、オブジェクトを初期化します。
@@ -68,15 +49,18 @@ public:
 	int32_t GetRenderWidth() const;
 	int32_t GetRenderHeight() const;
 
-	virtual bool IsEndRequest() const { return endRequest; };
+	bool IsEndRequest() const { return endRequest_; }
 
+protected:
+	/// <summary>派生ゲームから共通メインループへ安全に終了を要求します。</summary>
+	void RequestEnd() { endRequest_ = true; }
 
 private:
-	bool endRequest = false;
+	/// <summary>ウィンドウ終了とゲーム固有終了要求をまとめる唯一の状態です。</summary>
+	bool endRequest_ = false;
 	std::unique_ptr<WinApp> winApp = nullptr;
 	std::unique_ptr<D3DResourceLeakChecker> resourceLeakChecker_ = nullptr;
 	std::unique_ptr<DirectXCommon> dxCommon = nullptr;
 	std::unique_ptr<ImGuiManager> imguiManager = nullptr;
-	std::unique_ptr<AbstractSceneFactory> sceneFactory = nullptr;
 };
 

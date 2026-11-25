@@ -1,9 +1,9 @@
 #pragma once
 #include "GameTime.h"
 #include "camera/Camera.h"
-#include "core/Component.h"
+#include "core/EntityComponent.h"
 #include "MathConstants.h"
-#include "core/GameObject.h"
+#include "core/Entity.h"
 #include "LineDrawer.h"
 #include "Matrix.h"
 #include "object/Object3dCommon.h"
@@ -13,7 +13,7 @@
 #include <vector>
 
 /// <summary>カメラ表示範囲の外側に敵の出現候補点を作り、時間帯別の生成要求を発行します。</summary>
-class EnemySpawnPointComponent : public Component {
+class EnemySpawnPointComponent : public EntityComponent {
 public:
 	/// <summary>敵生成時に基礎能力へ掛ける時間帯別倍率です。</summary>
 	struct EnemyStatMultipliers {
@@ -52,21 +52,28 @@ public:
 	struct BossEncounterSettings {
 		bool enabled = false;
 		float triggerTimeSeconds = 300.0f;
-		std::string enemyTypeName = "MidBoss";
+		std::string enemyTypeName = "Stage1Boss";
 		Vector3 bossPosition{0.0f, 0.0f, 0.0f};
 		Vector3 playerWarpPosition{0.0f, 0.0f, 6.0f};
+		/// <summary>ボス戦中に、ボス位置を中心とした閉鎖アリーナを生成します。</summary>
+		bool arenaWallsEnabled = true;
+		/// <summary>アリーナ中心から壁の内側までの距離です。10で20x20（地形1枚分）になります。</summary>
+		float arenaHalfExtent = 10.0f;
+		float arenaWallHeight = 3.0f;
+		float arenaWallThickness = 0.5f;
 	};
 
 	void Update() override;
 
 	void Draw3D() override;
 
-	void SetTarget(GameObject* target);
-	GameObject* GetTarget() const;
+	void SetTarget(Entity* target);
+	Entity* GetTarget() const;
 	void SetTargetName(const std::string& name);
 	const std::string& GetTargetName() const;
 
 	void SetCamera(Camera* camera);
+	Camera* GetCamera() const;
 	void SetCameraName(const std::string& name);
 	const std::string& GetCameraName() const;
 
@@ -117,7 +124,7 @@ private:
 	void RecalculateSpawnPoints();
 
 	/// <summary>生成位置の基準となる対象への非所有参照です。</summary>
-	GameObject* target_ = nullptr;
+	Entity* target_ = nullptr;
 	Camera* camera_ = nullptr;
 	std::string enemyTypeName_ = "Default";
 	std::string targetName_;

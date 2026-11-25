@@ -1,6 +1,6 @@
-#include "Player.h"
+#include "PlayerComponent.h"
 #include "MathConstants.h"
-#include "core/GameObject.h"
+#include "core/Entity.h"
 #include "Input.h"
 #include "GameTime.h"
 #include "object/Object3dComponent.h"
@@ -11,6 +11,7 @@
 #include "model/ModelManager.h"
 #include "Matrix.h"
 #include "PostEffect.h"
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <dinput.h>
@@ -18,6 +19,14 @@
 namespace {
 constexpr float kHealthRegenerationInterval = 6.0f;
 constexpr float kHealthRegenerationAmount = 1.0f;
+constexpr int kMikoBonusRewardLevelInterval = 5;
+constexpr float kCatMinimumDamageMultiplier = 0.5f;
+constexpr float kCatMaximumDamageMultiplier = 2.0f;
+// 初期爪の最遠配置約2.0 + 当たり判定半径約1.05 + 通常敵半径約0.45。
+constexpr float kCatMaximumDamageRange = 3.5f;
+constexpr float kCatMinimumDamageDistance = 15.0f;
+constexpr float kTenguSpeedIncreasePerLevel = 0.01f;
+constexpr float kTenguDamageIncreasePerTenSpeed = 0.01f;
 // brade.obj はプレイヤーモデルより小さいため、装備表示用の倍率と柄の中心位置をまとめて管理する。
 constexpr float kBladeScale = 12.0f;
 constexpr float kBladeGripCenter = 0.007f * kBladeScale;
@@ -99,12 +108,12 @@ bool TryGetMouseAimDirection(const Vector3& playerPosition, Vector3& outDirectio
 
 }
 
-Player::~Player() = default;
+PlayerComponent::~PlayerComponent() = default;
 
 /// <summary>
 /// 毎フレーム WASD 入力を見て、XZ 平面上でプレイヤーを移動します。
 /// </summary>
-void Player::Update() {
+void PlayerComponent::Update() {
 	const float deltaTime = GameTime::GetDeltaTime();
 	const float frameScale = GameTime::GetFrameScale60();
 	UpdateHealthRegeneration(deltaTime);
@@ -115,12 +124,12 @@ void Player::Update() {
 		}
 	}
 
-	GameObject* owner = GetOwner();
+	Entity* owner = GetOwner();
 	if (!owner) {
 		return;
 	}
 
-	// 烏天狗を選択した場合だけ、一度だけ刀の描画オブジェクトを準備する。
+	// プレイヤー定義に右手装備がある場合だけ、一度だけ描画オブジェクトを準備する。
 	EnsureBladeEquipment();
 
 	Input* input = Input::GetInstance();
@@ -155,10 +164,13 @@ void Player::Update() {
 		targetVelocity = (effectiveMoveSpeed * moveAmount) * moveDirection;
 	}
 
+	if (demoControlled_) {
+		targetVelocity = demoMoveVelocity_;
+	}
 	const bool hasMoveInput = Length(targetVelocity) > MathConstants::kNormalizationEpsilon;
 	// 入力開始時と終了時で補間量を分け、歩き始めと停止を自然に見せる。
 	const float smoothingDelta = (hasMoveInput ? effectiveMoveSpeed * 0.18f : effectiveMoveSpeed * 0.14f) * frameScale;
-	currentMoveVelocity_ = MoveTowards(currentMoveVelocity_, targetVelocity, smoothingDelta);
+	currentMoveVelocity_ = demoControlled_ ? targetVelocity : MoveTowards(currentMoveVelocity_, targetVelocity, smoothingDelta);
 
 	const float currentSpeed = Length(currentMoveVelocity_);
 	if (Object3dComponent* object3d = owner->GetComponent<Object3dComponent>()) {
@@ -171,10 +183,10 @@ void Player::Update() {
 	// 照準入力は移動方向より優先する。両方が同時なら、明示的に押しているマウスを最優先にする。
 	Vector3 facingDirection{};
 	bool hasFacingDirection = false;
-	if (input->PushMouseButton(kLeftMouseButton)) {
+	if (!demoControlled_ && input->PushMouseButton(kLeftMouseButton)) {
 		hasFacingDirection = TryGetMouseAimDirection(owner->GetTransform().translate, facingDirection);
 	}
-	if (!hasFacingDirection) {
+	if (!demoControlled_ && !hasFacingDirection) {
 		const Vector3 rightStick = input->GetGamepadRightStick();
 		const float rightStickLength = Length(rightStick);
 		if (rightStickLength > MathConstants::kNormalizationEpsilon) {
@@ -205,7 +217,7 @@ void Player::Update() {
 	owner->GetTransform().translate = owner->GetTransform().translate + frameScale * currentMoveVelocity_;
 }
 
-void Player::UpdateHealthRegeneration(float deltaTime) {
+void PlayerComponent::UpdateHealthRegeneration(float deltaTime) {
 	// 最大HP未満のときだけ回復タイマーを進め、満タンまたは死亡中はタイマーを初期化する。
 	const float maxHealth = GetMaxHealth();
 	if (currentHealth_ <= 0.0f || currentHealth_ >= maxHealth) {
@@ -223,13 +235,13 @@ void Player::UpdateHealthRegeneration(float deltaTime) {
 	SetCurrentHealth(currentHealth_ + regenerationCount * kHealthRegenerationAmount);
 }
 
-void Player::Draw3D() {
-	// 刀は烏天狗専用装備。読み込みに失敗した場合も安全に描画を中止する。
-	if (playerTypeName_ != "烏天狗" || !bladeObject_) {
+void PlayerComponent::Draw3D() {
+	// 装備未設定または読み込み失敗時は、安全に追加描画を中止する。
+	if (stats_.rightHandEquipmentModelFilePath.empty() || !bladeObject_) {
 		return;
 	}
 
-	GameObject* owner = GetOwner();
+	Entity* owner = GetOwner();
 	Object3dComponent* playerObject3d = owner ? owner->GetComponent<Object3dComponent>() : nullptr;
 	if (!playerObject3d || !playerObject3d->GetObject3d()) {
 		return;
@@ -274,39 +286,45 @@ void Player::Draw3D() {
 	bladeObject_->Draw();
 }
 
-void Player::Finalize() {
+void PlayerComponent::Finalize() {
 	// Playerが所有する装備用GPUリソースをシーン終了時に解放する。
 	bladeObject_.reset();
 }
 
-void Player::EnsureBladeEquipment() {
-	// 生成済みなら再利用し、毎フレームのモデル読み込みとObject3d生成を避ける。
-	if (playerTypeName_ != "烏天狗" || bladeObject_) {
+void PlayerComponent::EnsureBladeEquipment() {
+	// 装備指定がない場合は生成せず、生成済みなら毎フレーム再利用する。
+	if (stats_.rightHandEquipmentModelFilePath.empty() || bladeObject_) {
 		return;
 	}
 
 	ModelManager* modelManager = ModelManager::GetInstance();
 	// シーン側で未ロードの場合にも装備単体で初期化できるよう、ここでも読み込みを保証する。
-	if (!modelManager->FindModel("brade.obj")) {
-		modelManager->LoadModel("brade.obj", false, "/brade");
+	const std::string& equipmentModel = stats_.rightHandEquipmentModelFilePath;
+	if (!modelManager->FindModel(equipmentModel)) {
+		modelManager->LoadModel(equipmentModel, false, stats_.rightHandEquipmentModelDirectory);
 	}
-	if (!modelManager->FindModel("brade.obj")) {
+	if (!modelManager->FindModel(equipmentModel)) {
 		return;
 	}
 
 	bladeObject_ = std::make_unique<Object3d>();
 	bladeObject_->Initialize();
-	bladeObject_->SetModel("brade.obj");
+	bladeObject_->SetModel(equipmentModel);
 	// 白を乗算し、MTLが参照するbradeC.pngの色をそのまま使用する。
 	bladeObject_->SetColor({1.0f, 1.0f, 1.0f, 1.0f});
 }
 
-void Player::ApplyStats(const PlayerStats& stats) {
+void PlayerComponent::ApplyStats(const PlayerStats& stats) {
 	ApplyStats(stats, stats);
 }
 
-void Player::ApplyStats(const PlayerStats& baseStats, const PlayerStats& effectiveStats) {
+void PlayerComponent::ApplyStats(const PlayerStats& baseStats, const PlayerStats& effectiveStats) {
 	// 保存用の基礎値と、強化アイテム反映済みの実効値を分けて保持する。
+	// タイプ変更で装備モデルが変わる場合は、以前の装備オブジェクトを破棄して再生成する。
+	if (stats_.rightHandEquipmentModelFilePath != baseStats.rightHandEquipmentModelFilePath ||
+	    stats_.rightHandEquipmentModelDirectory != baseStats.rightHandEquipmentModelDirectory) {
+		bladeObject_.reset();
+	}
 	stats_ = baseStats;
 	effectiveStats_ = effectiveStats;
 	effectiveStats_.level = stats_.level;
@@ -322,8 +340,38 @@ void Player::ApplyStats(const PlayerStats& baseStats, const PlayerStats& effecti
 	hasAppliedStats_ = true;
 }
 
-int Player::TakeDamage(float rawDamage) {
-	if (rawDamage <= 0.0f || currentHealth_ <= 0.0f || damageInvincibilityTimer_ > 0.0f) {
+float PlayerComponent::GetEffectiveSpeedPercent() const {
+	if (playerTypeName_ != "烏天狗") {
+		return effectiveStats_.speed;
+	}
+
+	// Lv1を基準とし、レベルアップするたびに現在の速度倍率を1%ずつ高める。
+	const int completedLevelUps = (std::max)(0, effectiveStats_.level - 1);
+	return effectiveStats_.speed *
+	       (1.0f + static_cast<float>(completedLevelUps) * kTenguSpeedIncreasePerLevel);
+}
+
+float PlayerComponent::GetOutgoingDamageMultiplier(float targetDistance) const {
+	if (playerTypeName_ == "猫") {
+		// 爪の攻撃が届く間合いまでは最大火力を維持し、その外側から15まで滑らかに減衰する。
+		const float distanceRate = (std::clamp)(
+			(targetDistance - kCatMaximumDamageRange) /
+				(kCatMinimumDamageDistance - kCatMaximumDamageRange),
+			0.0f,
+			1.0f);
+		return kCatMaximumDamageMultiplier +
+		       (kCatMinimumDamageMultiplier - kCatMaximumDamageMultiplier) * distanceRate;
+	}
+	if (playerTypeName_ == "烏天狗") {
+		// 特性適用後の速度10ごとに、最終与ダメージを1%増やす。
+		const int speedSteps = static_cast<int>(std::floor(GetEffectiveSpeedPercent() / 10.0f));
+		return 1.0f + static_cast<float>((std::max)(0, speedSteps)) * kTenguDamageIncreasePerTenSpeed;
+	}
+	return 1.0f;
+}
+
+int PlayerComponent::TakeDamage(float rawDamage) {
+	if (demoControlled_ || rawDamage <= 0.0f || currentHealth_ <= 0.0f || damageInvincibilityTimer_ > 0.0f) {
 		return 0;
 	}
 
@@ -342,7 +390,7 @@ int Player::TakeDamage(float rawDamage) {
 	return damage;
 }
 
-void Player::AddExperience(int experience) {
+void PlayerComponent::AddExperience(int experience) {
 	if (experience <= 0) {
 		return;
 	}
@@ -365,7 +413,7 @@ void Player::AddExperience(int experience) {
 	UpdateLevelFromExperience();
 }
 
-int Player::GetRequiredExperienceForNextLevel(int level) {
+int PlayerComponent::GetRequiredExperienceForNextLevel(int level) {
 	// Lv1から順に必要値を倍増させる。int上限を超える場合は最大値で打ち止めにする。
 	const int safeLevel = level < 1 ? 1 : level;
 	constexpr long long maxExperience = static_cast<long long>((std::numeric_limits<int>::max)());
@@ -382,12 +430,12 @@ int Player::GetRequiredExperienceForNextLevel(int level) {
 		if (levelExperience > maxExperience / 2) {
 			return static_cast<int>(maxExperience);
 		}
-		levelExperience *= 2;
+		levelExperience *= (1.8f);
 	}
 	return static_cast<int>(requiredExperience);
 }
 
-void Player::UpdateLevelFromExperience() {
+void PlayerComponent::UpdateLevelFromExperience() {
 	// 現在経験値で到達済みのレベルまで一気に上げ、後続の報酬選択処理へ回数を渡す。
 	constexpr int maxExperience = (std::numeric_limits<int>::max)();
 	const int previousLevel = stats_.level;
@@ -399,14 +447,21 @@ void Player::UpdateLevelFromExperience() {
 		++stats_.level;
 	}
 	effectiveStats_.level = stats_.level;
-	pendingLevelUpCount_ += stats_.level - previousLevel;
+	const int gainedLevels = stats_.level - previousLevel;
+	pendingLevelUpCount_ += gainedLevels;
+	if (playerTypeName_ == "巫女" && gainedLevels > 0) {
+		// Lv5、10、15…をまたいだ回数だけ、通常分とは別の報酬選択を追加する。
+		pendingLevelUpCount_ +=
+			stats_.level / kMikoBonusRewardLevelInterval -
+			previousLevel / kMikoBonusRewardLevelInterval;
+	}
 }
 
 /// <summary>
 /// 現在位置をスポーンポイントへ戻します。
 /// </summary>
-void Player::ResetToSpawnPoint() {
-	GameObject* owner = GetOwner();
+void PlayerComponent::ResetToSpawnPoint() {
+	Entity* owner = GetOwner();
 	if (!owner) {
 		return;
 	}

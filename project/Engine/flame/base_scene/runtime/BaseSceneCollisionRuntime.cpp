@@ -22,21 +22,25 @@
 #endif
 #include "base_scene/details/BaseSceneRuntimeDetails.h"
 
-void BaseScene::UpdateColliderCollisions() {
+/// <summary>有効コライダーを空間分割へ登録し、近傍ペアだけを精密判定します。</summary>
+void CombatSystem::UpdateColliderCollisions(SceneWorld& sceneObjects) {
 	std::vector<EnemyPlayerContact> enemyPlayerContacts;
+	// Entityが持つOBB・球と、それらをまとめたBroad Phase範囲を1レコードに保持する。
 	struct ColliderRecord {
-		GameObject* owner = nullptr;
+		Entity* owner = nullptr;
 		OBBColliderComponent* obb = nullptr;
 		SphereColliderComponent* sphere = nullptr;
 		CollisionSpatialGrid::Bounds bounds{};
 	};
 	std::vector<ColliderRecord> colliderRecords;
-	colliderRecords.reserve(sceneObjects_.size());
+	colliderRecords.reserve(sceneObjects.size());
+	// グリッドと計測値はフレームごとに再構築する。
 	collisionSpatialGrid_.Clear();
 	collisionDebugStats_.colliderCandidatePairs = 0;
 	collisionDebugStats_.colliderNarrowPhaseTests = 0;
 
-	for (const auto& object : sceneObjects_) {
+	// 各Entityの有効コライダーを収集し、両方を持つ場合は結合範囲をグリッドへ登録する。
+	for (const auto& object : sceneObjects) {
 		OBBColliderComponent* collider = object->GetComponent<OBBColliderComponent>();
 		const bool hasOBB = collider && collider->IsEnabled();
 		if (collider) {
@@ -69,14 +73,16 @@ void BaseScene::UpdateColliderCollisions() {
 	collisionDebugStats_.occupiedCells = collisionSpatialGrid_.GetOccupiedCellCount();
 	collisionDebugStats_.gridEntries = collisionSpatialGrid_.GetEntryCount();
 
-	std::unordered_map<GameObject*, size_t> recordIndices;
+	// グリッドから返るEntityを定数時間でColliderRecordへ引き直す。
+	std::unordered_map<Entity*, size_t> recordIndices;
 	recordIndices.reserve(colliderRecords.size());
 	for (size_t index = 0; index < colliderRecords.size(); ++index) {
 		recordIndices.emplace(colliderRecords[index].owner, index);
 	}
 
 	for (ColliderRecord& recordA : colliderRecords) {
-		for (GameObject* candidateOwner : collisionSpatialGrid_.Query(recordA.bounds)) {
+		for (Entity* candidateOwner : collisionSpatialGrid_.Query(recordA.bounds)) {
+			// RuntimeIdの小さい側だけで処理し、同じペアの二重判定を防ぐ。
 			if (recordA.owner->GetRuntimeId() >= candidateOwner->GetRuntimeId()) {
 				continue;
 			}
@@ -90,6 +96,7 @@ void BaseScene::UpdateColliderCollisions() {
 			}
 			++collisionDebugStats_.colliderCandidatePairs;
 
+			// 敵とプレイヤーの接触は通常の押し戻しとは別に、後段でダメージを合算する。
 			auto registerContact = [&]() {
 				return RegisterEnemyPlayerContact(recordA.owner, recordB->owner, enemyPlayerContacts);
 			};
@@ -132,6 +139,7 @@ void BaseScene::UpdateColliderCollisions() {
 				}
 			}
 
+			// OBBと球の組み合わせは向きを入れ替えて再利用できる共通処理にまとめる。
 			auto testOBBSphere = [&](ColliderRecord& obbRecord, OBBColliderComponent* obb,
 				ColliderRecord& sphereRecord, SphereColliderComponent* sphere) {
 				++collisionDebugStats_.colliderNarrowPhaseTests;
@@ -162,10 +170,10 @@ void BaseScene::UpdateColliderCollisions() {
 		}
 	}
 
-	std::vector<std::pair<Player*, float>> playerDamageTotals;
+	std::vector<std::pair<PlayerComponent*, float>> playerDamageTotals;
 	// 同じフレームで複数の敵へ触れた場合はプレイヤー単位で合算し、TakeDamageを一度だけ呼ぶ。
 	for (const EnemyPlayerContact& contact : enemyPlayerContacts) {
-		auto total = std::find_if(playerDamageTotals.begin(), playerDamageTotals.end(), [&contact](const std::pair<Player*, float>& entry) {
+		auto total = std::find_if(playerDamageTotals.begin(), playerDamageTotals.end(), [&contact](const std::pair<PlayerComponent*, float>& entry) {
 			return entry.first == contact.player;
 		});
 		if (total == playerDamageTotals.end()) {

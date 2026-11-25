@@ -14,44 +14,45 @@
 #include <limits>
 #endif
 #include "base_scene/details/BaseSceneEditorDetails.h"
+#include "services/PlayerAssembler.h"
 
-GameObject* BaseScene::CreateEditorObject(EditorCreateType type, const std::string& modelFilePath) {
-	auto object = std::make_unique<GameObject>();
+Entity* BaseScene::CreateEditorObject(EditorCreateType type, const std::string& modelFilePath) {
+	auto object = std::make_unique<Entity>();
 	object->SetEditorType(BaseSceneEditorGeometry::EditorCreateTypeName(type));
 
 	/// <summary>生成タイプと初期化処理を対応付ける型消去登録です。</summary>
 	struct EditorObjectRegistration {
 		EditorCreateType type;
-		bool (*initialize)(BaseScene& scene, GameObject& object, const std::string& resourceName);
+		bool (*initialize)(BaseScene& scene, Entity& object, const std::string& resourceName);
 	};
 
 	// 新しい生成タイプはこの表へ登録し、継承階層を増やさず生成手順だけを差し替える。
 	static const std::array<EditorObjectRegistration, 14> registrations = {{
-		{EditorCreateType::Empty, [](BaseScene& scene, GameObject& object, const std::string&) {
+		{EditorCreateType::Empty, [](BaseScene& scene, Entity& object, const std::string&) {
 			object.SetName(scene.MakeUniqueObjectName("Empty"));
 			return true;
 		}},
-		{EditorCreateType::Object3dSphere, [](BaseScene& scene, GameObject& object, const std::string&) {
+		{EditorCreateType::Object3dSphere, [](BaseScene& scene, Entity& object, const std::string&) {
 			object.SetName(scene.MakeUniqueObjectName("Sphere"));
 			ModelManager::GetInstance()->LoadModel("sphere.obj");
 			object.AddComponent<Object3dComponent>()->SetModel("sphere.obj");
 			return true;
 		}},
-		{EditorCreateType::Object3dCylinder, [](BaseScene& scene, GameObject& object, const std::string&) {
+		{EditorCreateType::Object3dCylinder, [](BaseScene& scene, Entity& object, const std::string&) {
 			object.SetName(scene.MakeUniqueObjectName("Cylinder"));
 			Object3dComponent* object3d = object.AddComponent<Object3dComponent>();
 			object3d->CreateCylinder(1.0f, 2.0f, 16, true, true);
 			object3d->SetTexture("Resources/gradationLine.png");
 			return true;
 		}},
-		{EditorCreateType::Object3dCylinderOpen, [](BaseScene& scene, GameObject& object, const std::string&) {
+		{EditorCreateType::Object3dCylinderOpen, [](BaseScene& scene, Entity& object, const std::string&) {
 			object.SetName(scene.MakeUniqueObjectName("OpenCylinder"));
 			Object3dComponent* object3d = object.AddComponent<Object3dComponent>();
 			object3d->CreateCylinder(1.0f, 2.0f, 16, false, false);
 			object3d->SetTexture("Resources/gradationLine.png");
 			return true;
 		}},
-		{EditorCreateType::Sprite, [](BaseScene& scene, GameObject& object, const std::string& resourceName) {
+		{EditorCreateType::Sprite, [](BaseScene& scene, Entity& object, const std::string& resourceName) {
 			const std::string spriteBaseName = resourceName.empty()
 				? "Sprite" : StringUtility::PathToUtf8(StringUtility::Utf8ToPath(resourceName).stem());
 			object.SetName(scene.MakeUniqueObjectName(spriteBaseName.empty() ? "Sprite" : spriteBaseName));
@@ -67,7 +68,7 @@ GameObject* BaseScene::CreateEditorObject(EditorCreateType type, const std::stri
 			sprite->SetSize({100.0f, 100.0f});
 			return true;
 		}},
-		{EditorCreateType::Text, [](BaseScene& scene, GameObject& object, const std::string&) {
+		{EditorCreateType::Text, [](BaseScene& scene, Entity& object, const std::string&) {
 			object.SetName(scene.MakeUniqueObjectName("Text"));
 			TextComponent* text = object.AddComponent<TextComponent>();
 			text->SetText("Text");
@@ -76,7 +77,7 @@ GameObject* BaseScene::CreateEditorObject(EditorCreateType type, const std::stri
 			object.GetTransform().translate = {100.0f, 100.0f, 0.0f};
 			return true;
 		}},
-		{EditorCreateType::LoadedModel, [](BaseScene& scene, GameObject& object, const std::string& resourceName) {
+		{EditorCreateType::LoadedModel, [](BaseScene& scene, Entity& object, const std::string& resourceName) {
 			if (resourceName.empty() || !ModelManager::GetInstance()->FindModel(resourceName)) {
 				return false;
 			}
@@ -85,7 +86,7 @@ GameObject* BaseScene::CreateEditorObject(EditorCreateType type, const std::stri
 			object.AddComponent<Object3dComponent>()->SetModel(resourceName);
 			return true;
 		}},
-		{EditorCreateType::AnimatedModel, [](BaseScene& scene, GameObject& object, const std::string& resourceName) {
+		{EditorCreateType::AnimatedModel, [](BaseScene& scene, Entity& object, const std::string& resourceName) {
 			if (resourceName.empty() || !ModelManager::GetInstance()->FindModel(resourceName)) {
 				return false;
 			}
@@ -96,13 +97,13 @@ GameObject* BaseScene::CreateEditorObject(EditorCreateType type, const std::stri
 			object3d->SetDrawSkeleton(true);
 			return true;
 		}},
-		{EditorCreateType::Camera, [](BaseScene& scene, GameObject& object, const std::string&) {
+		{EditorCreateType::Camera, [](BaseScene& scene, Entity& object, const std::string&) {
 			object.SetName(scene.MakeUniqueObjectName("Camera"));
 			object.AddComponent<CameraComponent>()->SetFovY(0.45f);
 			object.GetTransform().translate = {0.0f, 4.0f, -10.0f};
 			return true;
 		}},
-		{EditorCreateType::PointLight, [](BaseScene& scene, GameObject& object, const std::string&) {
+		{EditorCreateType::PointLight, [](BaseScene& scene, Entity& object, const std::string&) {
 			object.SetName(scene.MakeUniqueObjectName("PointLight"));
 			ModelManager::GetInstance()->LoadModel("sphere.obj");
 			Object3dComponent* object3d = object.AddComponent<Object3dComponent>();
@@ -112,22 +113,24 @@ GameObject* BaseScene::CreateEditorObject(EditorCreateType type, const std::stri
 			object.GetTransform().scale = {0.25f, 0.25f, 0.25f};
 			return true;
 		}},
-		{EditorCreateType::ParticleEmitter, [](BaseScene& scene, GameObject& object, const std::string& resourceName) {
+		{EditorCreateType::ParticleEmitter, [](BaseScene& scene, Entity& object, const std::string& resourceName) {
 			object.SetName(scene.MakeUniqueObjectName("ParticleEmitter"));
 			ParticleEmitterComponent* emitter = object.AddComponent<ParticleEmitterComponent>();
 			const std::string groupName = object.GetName();
-			std::string textureFilePath = "Resources/circle.png";
-			ParticleMeshType meshType = kMeshTypeQuad;
-			ParticlePresetRepository::GetResourceInfo(resourceName, textureFilePath, meshType);
+			ParticlePresetData preset;
+			// プリセット未指定時は、従来と同じ円形テクスチャで新規エミッターを作る。
+			preset.textureFilePath = "Resources/circle.png";
+			const bool hasPreset = ParticlePresetRepository::Load(resourceName, preset);
 			if (!ParticleManager::GetInstance()->HasGroup(groupName)) {
-				ParticleManager::GetInstance()->CreateParticleGroup(groupName, textureFilePath, meshType);
+				ParticleManager::GetInstance()->CreateParticleGroup(
+					groupName, preset.textureFilePath, preset.meshType);
 			}
 			emitter->SetGroupName(groupName);
-			emitter->SetTexture(textureFilePath);
-			emitter->SetMeshType(meshType);
-			if (!resourceName.empty()) {
-				ParticlePresetRepository::Apply(resourceName, emitter);
+			if (hasPreset) {
+				ApplyParticlePreset(emitter, preset);
 			} else {
+				emitter->SetTexture(preset.textureFilePath);
+				emitter->SetMeshType(preset.meshType);
 				emitter->SetFrequency(0.0f);
 				ParticleEmitParam param = emitter->GetParam();
 				param.count = 10;
@@ -140,27 +143,35 @@ GameObject* BaseScene::CreateEditorObject(EditorCreateType type, const std::stri
 			}
 			return true;
 		}},
-		{EditorCreateType::Player, [](BaseScene& scene, GameObject& object, const std::string& resourceName) {
+		{EditorCreateType::Player, [](BaseScene& scene, Entity& object, const std::string& resourceName) {
 			const std::string playerTypeName = resourceName.empty() ? "Default" : resourceName;
 			PlayerStats playerStats = LoadPlayerStats(playerTypeName);
 			object.SetName(scene.MakeUniqueObjectName(playerTypeName.empty() ? "Player" : playerTypeName));
-			Player* player = object.AddComponent<Player>();
-			player->SetPlayerTypeName(playerTypeName);
-			player->ApplyStats(playerStats, ApplyPlayerStatusItems(playerStats));
+			PlayerComponent* player = object.AddComponent<PlayerComponent>();
+			PlayerAttackComponent* attack = object.AddComponent<PlayerAttackComponent>();
+			ApplyPlayerDefinition(
+				player,
+				attack,
+				playerTypeName,
+				playerStats,
+				ApplyPlayerStatusItems(playerStats, LoadPlayerStatusItemDefinitions()),
+				LoadPlayerAttackDefinitions());
 			object.GetTransform().scale = {playerStats.sizeScale, playerStats.sizeScale, playerStats.sizeScale};
 			player->SetSpawnPoint(object.GetTransform().translate);
-			ApplyPlayerAttackSlots(object.AddComponent<PlayerAttackComponent>(), playerStats);
 
 			Object3dComponent* object3d = object.AddComponent<Object3dComponent>();
 			std::string playerModelFilePath = playerStats.modelFilePath;
 			if (!playerModelFilePath.empty() && !ModelManager::GetInstance()->FindModel(playerModelFilePath)) {
-				ModelManager::GetInstance()->LoadModel(playerModelFilePath);
+				// プレイヤー定義のモデル種別と配置先を使い、エディタ生成でも実行時と同じ読込条件にする。
+				ModelManager::GetInstance()->LoadModel(playerModelFilePath, playerStats.isAnimationModel, playerStats.modelDirectory);
 			}
 			if (playerModelFilePath.empty() || !ModelManager::GetInstance()->FindModel(playerModelFilePath)) {
 				ModelManager::GetInstance()->LoadModel("sphere.obj");
 				playerModelFilePath = "sphere.obj";
 				playerStats.modelFilePath = playerModelFilePath;
-				player->ApplyStats(playerStats, ApplyPlayerStatusItems(playerStats));
+				player->ApplyStats(
+					playerStats,
+					ApplyPlayerStatusItems(playerStats, LoadPlayerStatusItemDefinitions()));
 			}
 			object3d->SetModel(playerModelFilePath);
 			Model* playerModel = ModelManager::GetInstance()->FindModel(playerModelFilePath);
@@ -180,12 +191,12 @@ GameObject* BaseScene::CreateEditorObject(EditorCreateType type, const std::stri
 			camera->SetFarClip(1000.0f);
 			return true;
 		}},
-		{EditorCreateType::EnemySpawnPoint, [](BaseScene& scene, GameObject& object, const std::string&) {
+		{EditorCreateType::EnemySpawnPoint, [](BaseScene& scene, Entity& object, const std::string&) {
 			object.SetName(scene.MakeUniqueObjectName("EnemySpawnPoint"));
 			object.AddComponent<EnemySpawnPointComponent>();
 			return true;
 		}},
-		{EditorCreateType::Enemy, [](BaseScene& scene, GameObject& object, const std::string& resourceName) {
+		{EditorCreateType::Enemy, [](BaseScene& scene, Entity& object, const std::string& resourceName) {
 			const std::string enemyTypeName = resourceName.empty() ? "Default" : resourceName;
 			const EnemyStats enemyStats = LoadEnemyStats(enemyTypeName);
 			object.SetName(scene.MakeUniqueObjectName(enemyTypeName));
@@ -217,8 +228,8 @@ GameObject* BaseScene::CreateEditorObject(EditorCreateType type, const std::stri
 
 	object->Update();
 	sceneObjects_.push_back(std::move(object));
-	selectedObjectIndex_ = static_cast<int>(sceneObjects_.size()) - 1;
-	if (type == EditorCreateType::Player || (type == EditorCreateType::Camera && activeCameraObjectName_.empty())) {
+	sceneEditorState_.SelectLastOrClear(sceneObjects_.size());
+	if (type == EditorCreateType::Player || (type == EditorCreateType::Camera && !sceneEditorState_.HasActiveCamera())) {
 		SetActiveCameraObject(sceneObjects_.back().get());
 	}
 	++nextObjectId_;
@@ -229,32 +240,31 @@ GameObject* BaseScene::CreateEditorObject(EditorCreateType type, const std::stri
 /// 現在選択中のエディタオブジェクトを削除します。
 /// </summary>
 void BaseScene::DeleteSelectedEditorObject() {
-	if (selectedObjectIndex_ < 0 || selectedObjectIndex_ >= static_cast<int>(sceneObjects_.size())) {
+	if (!sceneEditorState_.HasValidSelection(sceneObjects_.size())) {
 		return;
 	}
+	const int selectedObjectIndex = sceneEditorState_.GetSelectedObjectIndex();
 
 	const bool deletesActiveCamera =
-	    !activeCameraObjectName_.empty() &&
-	    sceneObjects_[selectedObjectIndex_]->GetName() == activeCameraObjectName_;
-	const std::string deletedObjectName = sceneObjects_[selectedObjectIndex_]->GetName();
-	sceneObjects_.erase(sceneObjects_.begin() + selectedObjectIndex_);
+	    sceneEditorState_.HasActiveCamera() &&
+	    sceneObjects_[selectedObjectIndex]->GetName() == sceneEditorState_.GetActiveCameraName();
+	const std::string deletedObjectName = sceneObjects_[selectedObjectIndex]->GetName();
+	// 所有オブジェクトを破棄する前に、残るComponentから対象への非所有参照を解除する。
+	ClearEntityReferences(sceneObjects_[selectedObjectIndex].get());
+	sceneObjects_.erase(sceneObjects_.begin() + selectedObjectIndex);
 	for (const auto& object : sceneObjects_) {
 		if (object->GetParentName() == deletedObjectName) {
-			object->SetParentName("");
+			TrySetObjectParent(object.get(), "");
 		}
 	}
-	if (sceneObjects_.empty()) {
-		selectedObjectIndex_ = -1;
-	} else if (selectedObjectIndex_ >= static_cast<int>(sceneObjects_.size())) {
-		selectedObjectIndex_ = static_cast<int>(sceneObjects_.size()) - 1;
-	}
+	sceneEditorState_.ClampSelection(sceneObjects_.size());
 
 	if (deletesActiveCamera) {
-		GameObject* nextCamera = FindFirstCameraObject();
+		Entity* nextCamera = FindFirstCameraObject();
 		if (nextCamera) {
 			SetActiveCameraObject(nextCamera);
 		} else {
-			activeCameraObjectName_.clear();
+			sceneEditorState_.ClearActiveCamera();
 			ApplyCamera(fallbackCamera_);
 		}
 	}
@@ -267,7 +277,7 @@ void BaseScene::DrawEditorHierarchy() {
 #ifdef USE_IMGUI
 	ImGui::Begin("Component Manager");
 
-	DrawEditorSkyBoxControls();
+	sceneEditorSkyBox_.DrawControls();
 	ImGui::Separator();
 	DrawEditorCameraSelector();
 	ImGui::Separator();
@@ -386,7 +396,7 @@ void BaseScene::DrawEditorHierarchy() {
 		CreateEditorObject(createType_, createArgument);
 	}
 	ImGui::SameLine();
-	const bool canDelete = selectedObjectIndex_ >= 0 && selectedObjectIndex_ < static_cast<int>(sceneObjects_.size());
+	const bool canDelete = sceneEditorState_.HasValidSelection(sceneObjects_.size());
 	if (!canDelete) {
 		ImGui::BeginDisabled();
 	}
@@ -412,14 +422,14 @@ void BaseScene::DrawEditorHierarchy() {
 				continue;
 			}
 
-			const bool isSelected = selectedObjectIndex_ == index;
+			const bool isSelected = sceneEditorState_.GetSelectedObjectIndex() == index;
 			std::string label(depth * 2, ' ');
 			label += sceneObjects_[index]->GetName();
-			if (!activeCameraObjectName_.empty() && sceneObjects_[index]->GetName() == activeCameraObjectName_) {
+			if (sceneEditorState_.HasActiveCamera() && sceneObjects_[index]->GetName() == sceneEditorState_.GetActiveCameraName()) {
 				label += " [Active Camera]";
 			}
 			if (ImGui::Selectable(label.c_str(), isSelected)) {
-				selectedObjectIndex_ = index;
+				sceneEditorState_.SelectObject(index);
 				selectedInspectorComponentIndex_ = 0;
 			}
 			drawChildren(sceneObjects_[index]->GetName(), depth + 1);
@@ -479,7 +489,7 @@ void BaseScene::HandleGameViewAssetDrop() {
 #ifdef USE_IMGUI
 	ImGuiManager::DroppedAssetPayload payload;
 	while (ImGuiManager::GetInstance()->ConsumeDroppedAsset(payload)) {
-		GameObject* createdObject = nullptr;
+		Entity* createdObject = nullptr;
 		switch (payload.type) {
 		case ImGuiManager::DroppedAssetPayload::Type::Model:
 			createdObject = CreateEditorObject(EditorCreateType::LoadedModel, payload.path);
@@ -520,7 +530,7 @@ void BaseScene::DrawEditorCameraSelector() {
 			continue;
 		}
 		cameraNames.push_back(object->GetName());
-		if (!activeCameraObjectName_.empty() && object->GetName() == activeCameraObjectName_) {
+		if (sceneEditorState_.HasActiveCamera() && object->GetName() == sceneEditorState_.GetActiveCameraName()) {
 			currentCameraIndex = static_cast<int>(cameraNames.size()) - 1;
 		}
 	}
@@ -528,15 +538,15 @@ void BaseScene::DrawEditorCameraSelector() {
 	std::vector<const char*> cameraLabels = MakeLabelPointers(cameraNames);
 	if (ImGui::Combo("Active Camera", &currentCameraIndex, cameraLabels.data(), static_cast<int>(cameraLabels.size()))) {
 		if (currentCameraIndex == 0) {
-			activeCameraObjectName_.clear();
+			sceneEditorState_.ClearActiveCamera();
 			ApplyCamera(fallbackCamera_);
 		} else {
-			GameObject* cameraObject = FindObjectByName(cameraNames[currentCameraIndex]);
+			Entity* cameraObject = FindObjectByName(cameraNames[currentCameraIndex]);
 			SetActiveCameraObject(cameraObject);
-			selectedObjectIndex_ = -1;
+			sceneEditorState_.ClearSelection();
 			for (int index = 0; index < static_cast<int>(sceneObjects_.size()); ++index) {
 				if (sceneObjects_[index].get() == cameraObject) {
-					selectedObjectIndex_ = index;
+					sceneEditorState_.SelectObject(index);
 					selectedInspectorComponentIndex_ = 0;
 					break;
 				}
@@ -544,10 +554,10 @@ void BaseScene::DrawEditorCameraSelector() {
 		}
 	}
 
-	if (activeCameraObjectName_.empty()) {
+	if (!sceneEditorState_.HasActiveCamera()) {
 		ImGui::Text("Current: Fallback Camera");
 	} else {
-		ImGui::Text("Current: %s", activeCameraObjectName_.c_str());
+		ImGui::Text("Current: %s", sceneEditorState_.GetActiveCameraName().c_str());
 	}
 #endif
 }
@@ -556,13 +566,13 @@ void BaseScene::DrawEditorInspector() {
 #ifdef USE_IMGUI
 	ImGui::Begin("Component Inspector");
 
-	if (selectedObjectIndex_ < 0 || selectedObjectIndex_ >= static_cast<int>(sceneObjects_.size())) {
+	if (!sceneEditorState_.HasValidSelection(sceneObjects_.size())) {
 		ImGui::Text("No object selected");
 		ImGui::End();
 		return;
 	}
 
-	GameObject* selectedObject = sceneObjects_[selectedObjectIndex_].get();
+	Entity* selectedObject = sceneObjects_[sceneEditorState_.GetSelectedObjectIndex()].get();
 	ImGui::Text("%s", selectedObject->GetName().c_str());
 	ImGui::Separator();
 
@@ -580,7 +590,7 @@ void BaseScene::DrawEditorInspector() {
 	parentLabels.push_back("None");
 	int currentParentIndex = 0;
 	for (const auto& object : sceneObjects_) {
-		if (object.get() == selectedObject) {
+		if (!CanSetObjectParent(selectedObject, object->GetName())) {
 			continue;
 		}
 		parentLabels.push_back(object->GetName());
@@ -590,15 +600,16 @@ void BaseScene::DrawEditorInspector() {
 	}
 	std::vector<const char*> parentLabelPtrs = MakeLabelPointers(parentLabels);
 	if (ImGui::Combo("Parent", &currentParentIndex, parentLabelPtrs.data(), static_cast<int>(parentLabelPtrs.size()))) {
-		selectedObject->SetParentName(currentParentIndex == 0 ? "" : parentLabels[currentParentIndex]);
+		// 自己参照と子孫への接続を検証するHierarchy API以外から親を書き換えない。
+		TrySetObjectParent(selectedObject, currentParentIndex == 0 ? "" : parentLabels[currentParentIndex]);
 	}
 
 	std::vector<std::string> componentLabels;
-	std::vector<std::pair<const EditorComponentRegistration*, Component*>> registeredComponents;
+	std::vector<std::pair<const EditorComponentRegistration*, EntityComponent*>> registeredComponents;
 	componentLabels.push_back("Transform");
 	for (const EditorComponentRegistration& registration : GetEditorComponentRegistrations()) {
-		if (Component* component = registration.find(selectedObject)) {
-			componentLabels.push_back(registration.label);
+		if (EntityComponent* component = registration.find(selectedObject)) {
+			componentLabels.push_back(registration.metadata->displayName);
 			registeredComponents.push_back({&registration, component});
 		}
 	}
@@ -606,11 +617,11 @@ void BaseScene::DrawEditorInspector() {
 		selectedInspectorComponentIndex_ = 0;
 	}
 	std::vector<const char*> componentLabelPtrs = MakeLabelPointers(componentLabels);
-	ImGui::Combo("Edit Component", &selectedInspectorComponentIndex_, componentLabelPtrs.data(), static_cast<int>(componentLabelPtrs.size()));
+	ImGui::Combo("Edit EntityComponent", &selectedInspectorComponentIndex_, componentLabelPtrs.data(), static_cast<int>(componentLabelPtrs.size()));
 
 	const std::string selectedComponentLabel = componentLabels[selectedInspectorComponentIndex_];
 
-	auto drawComponentEnabledCheckbox = [](const char* label, Component* component) {
+	auto drawComponentEnabledCheckbox = [](const char* label, EntityComponent* component) {
 		if (!component) {
 			return;
 		}
@@ -619,39 +630,33 @@ void BaseScene::DrawEditorInspector() {
 			component->SetEnabled(isComponentEnabled);
 		}
 	};
-	auto drawComponentGravityControls = [](const char* label, Component* component) {
-		if (!component) {
-			return;
-		}
-		if (ImGui::TreeNode(label)) {
-			bool isGravityEnabled = component->IsGravityEnabled();
-			if (ImGui::Checkbox("Use Gravity", &isGravityEnabled)) {
-				component->SetGravityEnabled(isGravityEnabled);
-			}
-			float gravityStrength = component->GetGravityStrength();
-			if (ImGui::DragFloat("Gravity Strength", &gravityStrength, 0.1f, 0.0f, 200.0f)) {
-				component->SetGravityStrength(gravityStrength);
-			}
-			if (ImGui::Button("Reset Gravity Velocity")) {
-				component->ResetGravityVelocity();
-			}
-			ImGui::TreePop();
-		}
-	};
 	ImGui::Separator();
-	ImGui::Text("Component Enabled");
+	ImGui::Text("EntityComponent Enabled");
 	for (const auto& [registration, component] : registeredComponents) {
-		const std::string label = std::string(registration->label) + " Enabled";
+		// 表示名はComponentTypeMetadataを正本とし、Inspector固有の重複ラベルを持たない。
+		const std::string label = std::string(registration->metadata->displayName) + " Enabled";
 		drawComponentEnabledCheckbox(label.c_str(), component);
 	}
 	ImGui::Separator();
-	ImGui::Text("Component Gravity");
-	for (const auto& [registration, component] : registeredComponents) {
-		if (!registration->supportsGravity) {
-			continue;
+	ImGui::Text("Entity Gravity");
+	GravityComponent* gravity = selectedObject->GetComponent<GravityComponent>();
+	bool useGravity = gravity != nullptr;
+	if (ImGui::Checkbox("Use Gravity", &useGravity)) {
+		if (useGravity) {
+			gravity = selectedObject->AddComponent<GravityComponent>();
+		} else {
+			selectedObject->RemoveComponent<GravityComponent>();
+			gravity = nullptr;
 		}
-		const std::string label = std::string(registration->label) + " Gravity";
-		drawComponentGravityControls(label.c_str(), component);
+	}
+	if (gravity) {
+		float gravityStrength = gravity->GetStrength();
+		if (ImGui::DragFloat("Gravity Strength", &gravityStrength, 0.1f, 0.0f, 200.0f)) {
+			gravity->SetStrength(gravityStrength);
+		}
+		if (ImGui::Button("Reset Gravity Velocity")) {
+			gravity->ResetVelocity();
+		}
 	}
 
 	if (componentLabels.size() == 1) {
@@ -667,7 +672,7 @@ void BaseScene::DrawEditorInspector() {
 #endif
 }
 
-void BaseScene::DrawSelectedComponentInspector(GameObject* selectedObject, const std::string& selectedComponentLabel) {
+void BaseScene::DrawSelectedComponentInspector(Entity* selectedObject, const std::string& selectedComponentLabel) {
 #ifdef USE_IMGUI
 	if (Object3dComponent* object3dComponent = selectedObject->GetComponent<Object3dComponent>()) {
 		if (selectedComponentLabel == "Object3d" || object3dComponent->HasModel() || object3dComponent->HasSkeleton()) {

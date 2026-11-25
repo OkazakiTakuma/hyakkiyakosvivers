@@ -4,6 +4,7 @@
 // flame 外部から直接参照しないでください。
 
 #include "base_scene/BaseScene.h"
+#include "data/ComponentTypeMetadata.h"
 #include "StringUtility.h"
 #include "helpers/BaseSceneEditorGeometry.h"
 #include "helpers/BaseSceneResourceCatalog.h"
@@ -23,33 +24,31 @@ constexpr float kProjectThumbnailSize = 64.0f;
 
 /// <summary>Inspectorへ公開するComponentの取得方法と共通UI機能をまとめた型消去登録です。</summary>
 struct EditorComponentRegistration {
-	const char* label;
-	Component* (*find)(GameObject* object);
-	bool supportsGravity;
+	const ComponentTypeMetadata* metadata;
+	EntityComponent* (*find)(Entity* object);
 };
 
 template<class T>
-Component* FindEditorComponent(GameObject* object) {
+EntityComponent* FindEditorComponent(Entity* object) {
 	return object ? object->GetComponent<T>() : nullptr;
 }
 
 const std::array<EditorComponentRegistration, 13>& GetEditorComponentRegistrations() {
-	// 新しいComponentをInspectorへ追加するときは、この表へ1行登録するだけで
-	// 選択リスト・有効状態・共通重力UIへ同時に反映される。
+	// 新しいEntityComponentをInspectorへ追加するときは、この表へ1行登録する。
 	static const std::array<EditorComponentRegistration, 13> registrations = {{
-		{"Object3d", &FindEditorComponent<Object3dComponent>, true},
-		{"PointLight", &FindEditorComponent<PointLightComponent>, false},
-		{"GlowBillboard", &FindEditorComponent<GlowBillboardComponent>, false},
-		{"Sprite", &FindEditorComponent<SpriteComponent>, true},
-		{"Text", &FindEditorComponent<TextComponent>, true},
-		{"Camera", &FindEditorComponent<CameraComponent>, true},
-		{"ParticleEmitter", &FindEditorComponent<ParticleEmitterComponent>, true},
-		{"Player", &FindEditorComponent<Player>, true},
-		{"PlayerAttack", &FindEditorComponent<PlayerAttackComponent>, true},
-		{"EnemySpawnPoint", &FindEditorComponent<EnemySpawnPointComponent>, true},
-		{"Enemy", &FindEditorComponent<EnemyComponent>, true},
-		{"OBBCollider", &FindEditorComponent<OBBColliderComponent>, true},
-		{"SphereCollider", &FindEditorComponent<SphereColliderComponent>, true}
+		{&ComponentTypes::Object3d, &FindEditorComponent<Object3dComponent>},
+		{&ComponentTypes::PointLight, &FindEditorComponent<PointLightComponent>},
+		{&ComponentTypes::GlowBillboard, &FindEditorComponent<GlowBillboardComponent>},
+		{&ComponentTypes::Sprite, &FindEditorComponent<SpriteComponent>},
+		{&ComponentTypes::Text, &FindEditorComponent<TextComponent>},
+		{&ComponentTypes::Camera, &FindEditorComponent<CameraComponent>},
+		{&ComponentTypes::ParticleEmitter, &FindEditorComponent<ParticleEmitterComponent>},
+		{&ComponentTypes::Player, &FindEditorComponent<PlayerComponent>},
+		{&ComponentTypes::PlayerAttack, &FindEditorComponent<PlayerAttackComponent>},
+		{&ComponentTypes::EnemySpawnPoint, &FindEditorComponent<EnemySpawnPointComponent>},
+		{&ComponentTypes::Enemy, &FindEditorComponent<EnemyComponent>},
+		{&ComponentTypes::OBBCollider, &FindEditorComponent<OBBColliderComponent>},
+		{&ComponentTypes::SphereCollider, &FindEditorComponent<SphereColliderComponent>}
 	}};
 	return registrations;
 }

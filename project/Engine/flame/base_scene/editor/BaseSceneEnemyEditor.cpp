@@ -15,7 +15,7 @@
 #endif
 #include "base_scene/details/BaseSceneEditorDetails.h"
 
-void BaseScene::DrawEnemySpawnPointInspector(GameObject* selectedObject) {
+void BaseScene::DrawEnemySpawnPointInspector(Entity* selectedObject) {
 #ifdef USE_IMGUI
 	if (EnemySpawnPointComponent* enemySpawnPoint = selectedObject->GetComponent<EnemySpawnPointComponent>()) {
 		ImGui::Separator();
@@ -25,7 +25,7 @@ void BaseScene::DrawEnemySpawnPointInspector(GameObject* selectedObject) {
 		targetLabels.push_back("Auto First Player");
 		int currentTargetIndex = 0;
 		for (const auto& object : sceneObjects_) {
-			if (!object->GetComponent<Player>()) {
+			if (!object->GetComponent<PlayerComponent>()) {
 				continue;
 			}
 			targetLabels.push_back(object->GetName());
@@ -231,6 +231,13 @@ void BaseScene::DrawEnemySpawnPointInspector(GameObject* selectedObject) {
 			}
 			bossSettingsChanged |= ImGui::DragFloat3("Boss Position", &bossSettings.bossPosition.x, 0.1f);
 			bossSettingsChanged |= ImGui::DragFloat3("Player Warp Position", &bossSettings.playerWarpPosition.x, 0.1f);
+			bossSettingsChanged |= ImGui::Checkbox("Create Arena Walls", &bossSettings.arenaWallsEnabled);
+			if (bossSettings.arenaWallsEnabled) {
+				bossSettingsChanged |= ImGui::DragFloat("Arena Half Extent", &bossSettings.arenaHalfExtent, 0.1f, 2.0f, 100.0f);
+				bossSettingsChanged |= ImGui::DragFloat("Arena Wall Height", &bossSettings.arenaWallHeight, 0.1f, 0.5f, 20.0f);
+				bossSettingsChanged |= ImGui::DragFloat("Arena Wall Thickness", &bossSettings.arenaWallThickness, 0.05f, 0.1f, 5.0f);
+				ImGui::TextDisabled("Half extent 10 = one 20x20 terrain tile.");
+			}
 			const char* bossState = enemySpawnPoint->IsBossEncounterActive()
 			    ? "Active (normal spawn timer paused)"
 			    : enemySpawnPoint->IsBossEncounterTriggered() ? "Finished" : "Waiting";
@@ -281,13 +288,13 @@ void BaseScene::DrawEnemyInspector() {
 		ImGui::End();
 		return;
 	}
-	if (selectedObjectIndex_ < 0 || selectedObjectIndex_ >= static_cast<int>(sceneObjects_.size())) {
+	if (!sceneEditorState_.HasValidSelection(sceneObjects_.size())) {
 		ImGui::Text("No selected enemy");
 		ImGui::End();
 		return;
 	}
 
-	GameObject* selectedObject = sceneObjects_[selectedObjectIndex_].get();
+	Entity* selectedObject = sceneObjects_[sceneEditorState_.GetSelectedObjectIndex()].get();
 	EnemyComponent* enemy = selectedObject->GetComponent<EnemyComponent>();
 	if (!enemy) {
 		ImGui::Text("Selected object has no Enemy component");
@@ -319,7 +326,7 @@ void BaseScene::DrawEnemyInspector() {
 	std::vector<std::string> targetLabels = {"Auto First Player"};
 	int currentTargetIndex = 0;
 	for (const auto& object : sceneObjects_) {
-		if (!object->GetComponent<Player>()) {
+		if (!object->GetComponent<PlayerComponent>()) {
 			continue;
 		}
 		targetLabels.push_back(object->GetName());
@@ -359,28 +366,44 @@ void BaseScene::DrawEnemyInspector() {
 	statsChanged |= ImGui::DragFloat("Health", &stats.health, 0.1f, 0.0f, 10000.0f);
 	statsChanged |= ImGui::DragFloat("Attack", &stats.attack, 0.1f, 0.0f, 10000.0f);
 	statsChanged |= ImGui::DragFloat("Speed", &stats.speed, 0.001f, 0.0f, 100.0f);
+	statsChanged |= ImGui::SliderInt("Knockback Resistance", &stats.knockbackResistance, 0, 3);
+	ImGui::TextDisabled("Reduces the weapon knockback level by this amount");
 	if (ImGui::DragFloat("Size Scale", &stats.sizeScale, 0.05f, 0.1f, 10.0f)) {
 		const float enemyScale = 0.75f * stats.sizeScale;
 		selectedObject->GetTransform().scale = {enemyScale, enemyScale, enemyScale};
 		statsChanged = true;
 	}
 	const char* behaviorLabels[] = {
-		"Chase", "Shooter", "Charger", "Night Slash Boss", "Self Destruct", "Tornado Boss", "Burst Shooter"};
+		"Chase", "Shooter", "Charger", "Night Slash Boss", "Self Destruct", "Tornado Boss", "Burst Shooter", "Barrier Boss"};
 	int behaviorIndex = static_cast<int>(stats.behavior);
-	if (ImGui::Combo("Behavior", &behaviorIndex, behaviorLabels, 7)) {
+	if (ImGui::Combo("Behavior", &behaviorIndex, behaviorLabels, 8)) {
 		stats.behavior = static_cast<EnemyBehaviorType>(behaviorIndex);
 		statsChanged = true;
 	}
-	if (stats.behavior == EnemyBehaviorType::Shooter || stats.behavior == EnemyBehaviorType::BurstShooter) {
+	if (stats.behavior == EnemyBehaviorType::Shooter || stats.behavior == EnemyBehaviorType::BurstShooter ||
+		stats.behavior == EnemyBehaviorType::BarrierBoss) {
 		statsChanged |= ImGui::DragFloat("Shoot Interval", &stats.shootingInterval, 0.01f, 0.05f, 1000.0f);
 		statsChanged |= ImGui::DragFloat("Preferred Distance", &stats.preferredDistance, 0.1f, 0.0f, 1000.0f);
 		statsChanged |= ImGui::DragFloat("Distance Tolerance", &stats.distanceTolerance, 0.1f, 0.0f, 1000.0f);
 		statsChanged |= ImGui::DragFloat("Projectile Speed", &stats.projectileSpeed, 0.005f, 0.0f, 100.0f);
 		statsChanged |= ImGui::DragFloat("Projectile Size", &stats.projectileSize, 0.01f, 0.01f, 100.0f);
 		statsChanged |= ImGui::DragFloat("Projectile Life", &stats.projectileLifeTime, 0.1f, 0.0f, 1000.0f);
-		if (stats.behavior == EnemyBehaviorType::BurstShooter) {
+		if (stats.behavior == EnemyBehaviorType::BurstShooter || stats.behavior == EnemyBehaviorType::BarrierBoss) {
 			statsChanged |= ImGui::DragInt("Burst Shot Count", &stats.burstShotCount, 1.0f, 1, 31);
 			statsChanged |= ImGui::SliderAngle("Burst Shot Spacing", &stats.burstSpreadAngle, 0.0f, 45.0f);
+		}
+		if (stats.behavior == EnemyBehaviorType::BarrierBoss) {
+			ImGui::SeparatorText("Shrinking Barrier");
+			statsChanged |= ImGui::DragFloat("Barrier Trigger Distance", &stats.bossTornadoTriggerDistance, 0.1f, 0.0f, 1000.0f);
+			statsChanged |= ImGui::DragFloat("Barrier Warning Time", &stats.bossTornadoWindup, 0.05f, 0.0f, 100.0f);
+			statsChanged |= ImGui::DragFloat("Barrier Recovery Time", &stats.bossTornadoRecovery, 0.05f, 0.0f, 100.0f);
+			statsChanged |= ImGui::DragInt("Barrier Orb Count", &stats.bossConvergingTornadoCount, 1.0f, 1, 24);
+			statsChanged |= ImGui::DragFloat("Barrier Initial Radius", &stats.bossConvergingTornadoInitialRadius, 0.1f, 0.0f, 100.0f);
+			statsChanged |= ImGui::DragFloat("Barrier Angular Speed", &stats.bossConvergingTornadoAngularSpeed, 0.1f, -20.0f, 20.0f);
+			statsChanged |= ImGui::DragFloat("Barrier Shrink Speed", &stats.bossConvergingTornadoRadialSpeed, 0.001f, 0.0f, 5.0f);
+			statsChanged |= ImGui::DragFloat("Barrier Orb Size", &stats.bossConvergingTornadoSize, 0.05f, 0.01f, 10.0f);
+			statsChanged |= ImGui::DragFloat("Barrier Duration", &stats.bossConvergingTornadoLifeTime, 0.1f, 0.0f, 30.0f);
+			statsChanged |= ImGui::DragFloat("Barrier Attack Multiplier", &stats.bossConvergingTornadoAttackMultiplier, 0.05f, 0.0f, 10.0f);
 		}
 	} else if (stats.behavior == EnemyBehaviorType::Charger) {
 		statsChanged |= ImGui::DragFloat("Charge Trigger Distance", &stats.chargeTriggerDistance, 0.1f, 0.0f, 1000.0f);
@@ -392,6 +415,10 @@ void BaseScene::DrawEnemyInspector() {
 		statsChanged |= ImGui::DragFloat("Explosion Trigger Distance", &stats.selfDestructTriggerDistance, 0.1f, 0.0f, 1000.0f);
 		statsChanged |= ImGui::DragFloat("Explosion Fuse Time", &stats.selfDestructFuseDuration, 0.05f, 0.0f, 100.0f);
 		statsChanged |= ImGui::DragFloat("Explosion Radius", &stats.selfDestructRadius, 0.1f, 0.0f, 1000.0f);
+		statsChanged |= ImGui::Checkbox("Spawn In Front Of Player", &stats.selfDestructSpawnInFront);
+		if (stats.selfDestructSpawnInFront) {
+			statsChanged |= ImGui::DragFloat("Front Spawn Distance", &stats.selfDestructSpawnDistance, 0.1f, 0.0f, 1000.0f);
+		}
 	} else if (stats.behavior == EnemyBehaviorType::TornadoBoss) {
 		statsChanged |= ImGui::DragFloat("Tornado Trigger Distance", &stats.bossTornadoTriggerDistance, 0.1f, 0.0f, 1000.0f);
 		statsChanged |= ImGui::DragFloat("Tornado Warning Time", &stats.bossTornadoWindup, 0.05f, 0.0f, 100.0f);
@@ -446,6 +473,13 @@ void BaseScene::DrawEnemyInspector() {
 	statsChanged |= ImGui::SliderFloat("Health Item Drop Chance", &stats.healthItemDropChance, 0.0f, 1.0f, "%.2f");
 	statsChanged |= ImGui::SliderFloat("EXP Collector Drop Chance", &stats.collectExperienceItemDropChance, 0.0f, 1.0f, "%.2f");
 	statsChanged |= ImGui::DragFloat("Health Item Heal Amount", &stats.healthItemHealAmount, 1.0f, 0.0f, 100000.0f);
+	// 敵名ではなく定義データで、撃破時に強化報酬を生成する敵を指定する。
+	statsChanged |= ImGui::Checkbox("Drops Boss Upgrade", &stats.dropsBossUpgrade);
+	statsChanged |= ImGui::Checkbox("Override Base Color", &stats.overridesBaseColor);
+	if (stats.overridesBaseColor) {
+		// 固有色を持つ敵だけ編集欄を表示し、通常敵の設定項目を増やしすぎない。
+		statsChanged |= ImGui::ColorEdit4("Enemy Base Color", &stats.baseColor.x);
+	}
 
 	const std::vector<std::string> experienceModels = CollectAllLoadedModelNames();
 	if (!experienceModels.empty()) {

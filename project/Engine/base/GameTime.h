@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <chrono>
 
 /// <summary>フレーム間隔と一時停止状態をアプリケーション全体で共有します。</summary>
@@ -30,7 +31,10 @@ public:
 
 	static void SetPaused(bool paused) { isPaused_ = paused; }
 	static bool IsPaused() { return isPaused_; }
-	static float GetDeltaTime() { return isPaused_ ? 0.0f : deltaTime_; }
+	/// <summary>ゲーム世界へ適用する時間倍率を設定します。0で更新を止め、1で等速になります。</summary>
+	static void SetTimeScale(float timeScale) { timeScale_ = std::clamp(timeScale, 0.0f, 4.0f); }
+	static float GetTimeScale() { return timeScale_; }
+	static float GetDeltaTime() { return isPaused_ ? 0.0f : deltaTime_ * timeScale_; }
 	/// <summary>ポーズ中も進める画面演出向けに、実時間のフレーム間隔を返します。</summary>
 	static float GetUnscaledDeltaTime() { return deltaTime_; }
 	static float GetFrameRate() { return deltaTime_ > 0.0f ? 1.0f / deltaTime_ : 0.0f; }
@@ -49,4 +53,6 @@ private:
 	static inline bool isInitialized_ = false;
 	/// <summary>ゲーム内時間を停止しているかを表します。</summary>
 	static inline bool isPaused_ = false;
+	/// <summary>ヒットストップやスローモーションに使うゲーム世界の時間倍率です。</summary>
+	static inline float timeScale_ = 1.0f;
 };

@@ -41,17 +41,32 @@ void EnemySpawnPointComponent::Draw3D() {
 #endif
 	}
 
-void EnemySpawnPointComponent::SetTarget(GameObject* target) { target_ = target; }
+void EnemySpawnPointComponent::SetTarget(Entity* target) { target_ = target; }
 
-GameObject* EnemySpawnPointComponent::GetTarget() const { return target_; }
+Entity* EnemySpawnPointComponent::GetTarget() const { return target_; }
 
-void EnemySpawnPointComponent::SetTargetName(const std::string& name) { targetName_ = name; }
+void EnemySpawnPointComponent::SetTargetName(const std::string& name) {
+	if (targetName_ != name) {
+		targetName_ = name;
+		// 設定名が変わった場合だけ参照を失効させ、次回のリンク解決を要求する。
+		if (!target_ || (!name.empty() && target_->GetName() != name)) {
+			target_ = nullptr;
+		}
+	}
+}
 
 const std::string& EnemySpawnPointComponent::GetTargetName() const { return targetName_; }
 
 void EnemySpawnPointComponent::SetCamera(Camera* camera) { camera_ = camera; }
 
-void EnemySpawnPointComponent::SetCameraName(const std::string& name) { cameraName_ = name; }
+Camera* EnemySpawnPointComponent::GetCamera() const { return camera_; }
+
+void EnemySpawnPointComponent::SetCameraName(const std::string& name) {
+	if (cameraName_ != name) {
+		cameraName_ = name;
+		camera_ = nullptr;
+	}
+}
 
 const std::string& EnemySpawnPointComponent::GetCameraName() const { return cameraName_; }
 
@@ -157,7 +172,10 @@ void EnemySpawnPointComponent::SetBossEncounterSettings(const BossEncounterSetti
 		bossEncounterSettings_ = settings;
 		bossEncounterSettings_.triggerTimeSeconds = (std::max)(0.0f, bossEncounterSettings_.triggerTimeSeconds);
 		bossEncounterSettings_.enemyTypeName =
-		    bossEncounterSettings_.enemyTypeName.empty() ? "MidBoss" : bossEncounterSettings_.enemyTypeName;
+		    bossEncounterSettings_.enemyTypeName.empty() ? "Stage1Boss" : bossEncounterSettings_.enemyTypeName;
+		bossEncounterSettings_.arenaHalfExtent = (std::max)(2.0f, bossEncounterSettings_.arenaHalfExtent);
+		bossEncounterSettings_.arenaWallHeight = (std::max)(0.5f, bossEncounterSettings_.arenaWallHeight);
+		bossEncounterSettings_.arenaWallThickness = (std::max)(0.1f, bossEncounterSettings_.arenaWallThickness);
 		bossEncounterTriggered_ = false;
 	}
 
@@ -266,8 +284,8 @@ void EnemySpawnPointComponent::RecalculateSpawnPoints() {
 		spawnPoints_.clear();
 		groundViewCorners_.clear();
 
-		GameObject* owner = GetOwner();
-		GameObject* target = target_ ? target_ : owner;
+		Entity* owner = GetOwner();
+		Entity* target = target_ ? target_ : owner;
 		if (!owner || !target) {
 			return;
 		}

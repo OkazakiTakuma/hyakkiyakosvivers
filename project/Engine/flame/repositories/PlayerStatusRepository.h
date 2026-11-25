@@ -1,7 +1,7 @@
 #pragma once
-#include "components/PlayerAttack/PlayerAttackComponent.h"
-#include "../../../Player/Player.h"
-#include <array>
+#include "data/PlayerAttackDefinition.h"
+#include "data/PlayerStatsData.h"
+#include "data/PlayerStatusItemDefinition.h"
 #include <json_fwd.hpp>
 #include <string>
 #include <vector>
@@ -10,28 +10,6 @@
 constexpr const char* kPlayerStatusFilePath = "Resources/Data/player_status.json";
 constexpr const char* kPlayerAttackStatusFilePath = "Resources/Data/player_attack_status.json";
 constexpr const char* kPlayerStatusItemFilePath = "Resources/Data/player_status_item_status.json";
-
-/// <summary>強化アイテムが変更するプレイヤー能力の種類です。</summary>
-enum class PlayerStatusItemType {
-	Attack,
-	Health,
-	AttackSpeed,
-	Speed,
-	Defense,
-	AttackSize,
-	Experience
-};
-
-/// <summary>強化アイテムのレベル別効果量と選択画面表示情報です。</summary>
-struct PlayerStatusItemStats {
-	std::string name = "AttackUp";
-	PlayerStatusItemType type = PlayerStatusItemType::Attack;
-	std::array<float, 5> levelAmounts{10.0f, 20.0f, 30.0f, 40.0f, 50.0f};
-	/// レベルアップ選択カードへ表示するLv1～Lv5の説明文です。
-	std::array<std::string, 5> levelDescriptions{};
-	/// レベルアップ選択カードと右上スロットHUDで使うLv1～Lv5の画像パスです。
-	std::array<std::string, 5> levelTextureFilePaths{};
-};
 
 std::vector<std::string> GetPlayerStatusItemLevels();
 
@@ -51,11 +29,15 @@ std::vector<std::string> LoadPlayerStatusItemNames();
 
 PlayerStatusItemStats LoadPlayerStatusItemStats(const std::string& itemName);
 
+/// <summary>内部名から、全画面で共通利用する加護の表示名を読み込みます。</summary>
+std::string LoadPlayerStatusItemDisplayName(const std::string& itemName);
+
+/// <summary>全強化アイテム定義を一度のファイル読込で名前付きコレクションへ変換します。</summary>
+PlayerStatusItemDefinitions LoadPlayerStatusItemDefinitions();
+
 void SavePlayerStatusItemStats(const std::string& itemName, const PlayerStatusItemStats& stats);
 
 int PlayerStatusSlotLevelToIndex(const std::string& level);
-
-PlayerStats ApplyPlayerStatusItems(const PlayerStats& baseStats);
 
 PlayerStats MakeDefaultPlayerStats();
 
@@ -79,7 +61,11 @@ std::vector<std::string> LoadPlayerAttackNames();
 
 PlayerAttackStats LoadPlayerAttackStats(const std::string& attackName);
 
-void ApplyPlayerAttackSlots(PlayerAttackComponent* attack, const PlayerStats& playerStats);
+/// <summary>内部名から、全画面で共通利用する武器の通常またはSuper表示名を読み込みます。</summary>
+std::string LoadPlayerAttackDisplayName(const std::string& attackName, bool isSuper = false);
+
+/// <summary>全攻撃定義を一度のファイル読込で名前付きコレクションへ変換します。</summary>
+PlayerAttackDefinitions LoadPlayerAttackDefinitions();
 
 void SavePlayerAttackStats(const std::string& attackName, const PlayerAttackStats& stats);
 

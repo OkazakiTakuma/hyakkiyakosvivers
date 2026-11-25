@@ -1,4 +1,6 @@
 #include "core/FlameWork.h"
+#include "Logger.h"
+#include "StringUtility.h"
 #include <strsafe.h>
 #include <d3d12.h>
 #include <d3d12sdklayers.h>
@@ -7,6 +9,7 @@
 #include <wrl/client.h>
 #include <excpt.h>
 #include <memory>
+#include <string>
 #include <filesystem>
 #include <particle/ParticleManager.h>
 #include <SpriteCommon.h>
@@ -24,11 +27,16 @@
 #include <FontManager.h>
 #include <Input.h>
 #include <SrvManager.h>
+#include <sky/SkyBoxCommon.h>
 #include <WinApp.h>
 #include"PostEffect.h"
 #include "GameTime.h"
 using namespace Logger;
 using namespace StringUtility;
+
+// unique_ptrの前方宣言型が完全型になる翻訳単位で生成・破棄処理を定義する。
+FlameWork::FlameWork() = default;
+FlameWork::~FlameWork() = default;
 
 static std::wstring GetExecutableDirectory() {
 	wchar_t buffer[MAX_PATH]{};
@@ -117,7 +125,7 @@ void FlameWork::Initialize() {
 void FlameWork::Update() {
 	GameTime::Update();
 	if (winApp->ProcessMessage()) {
-		endRequest = true;
+		RequestEnd();
 		return;
 	}
 	if (dxCommon) {
@@ -201,7 +209,7 @@ void FlameWork::Run() {
 	Initialize();
 	while (true) {
 		Update();
-		if (IsEndRequest() || endRequest) {
+		if (IsEndRequest()) {
 			break;
 		}
 		Draw();

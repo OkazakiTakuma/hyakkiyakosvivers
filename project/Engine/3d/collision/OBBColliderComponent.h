@@ -1,12 +1,12 @@
 #pragma once
 #include "../../collision/CollisionPrimitive.h"
-#include "core/Component.h"
-#include "core/GameObject.h"
+#include "core/EntityComponent.h"
+#include "core/Entity.h"
 #include "LineDrawer.h"
 #include "Matrix.h"
 #include <algorithm>
 
-class OBBColliderComponent : public Component {
+class OBBColliderComponent : public EntityComponent {
 public:
 	/// <summary>
 	/// 3D 要素の描画処理を行います。
@@ -76,6 +76,14 @@ public:
 	/// </summary>
 	/// <returns>押し戻し処理が有効な場合 true を返します。</returns>
 	bool GetPushBackEnabled() const { return isPushBackEnabled_; }
+	/// <summary>
+	/// プレイヤーとの組み合わせだけを衝突判定の対象にするかを設定します。
+	/// </summary>
+	void SetPlayerOnly(bool playerOnly) { playerOnly_ = playerOnly; }
+	/// <summary>
+	/// プレイヤー専用コライダーの場合 true を返します。
+	/// </summary>
+	bool GetPlayerOnly() const { return playerOnly_; }
 	void SetColliding(bool isColliding) { isColliding_ = isColliding; }
 	bool IsColliding() const { return isColliding_; }
 
@@ -117,6 +125,8 @@ private:
 	bool isDrawDebug_ = true;
 	// 衝突時にオーナーの位置を押し戻すかを保持します。保存データにも書き出します。
 	bool isPushBackEnabled_ = false;
+	// プレイヤー以外との衝突判定を無視するかを保持します。
+	bool playerOnly_ = false;
 	// 現在フレームで他コライダーと衝突しているかを保持します。
 	bool isColliding_ = false;
 };

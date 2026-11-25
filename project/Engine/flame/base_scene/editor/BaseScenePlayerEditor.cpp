@@ -1,4 +1,5 @@
 #include "base_scene/BaseScene.h"
+#include "data/PlayerAttackLevel.h"
 #include "StringUtility.h"
 #include "helpers/BaseSceneEditorGeometry.h"
 #include "helpers/BaseSceneResourceCatalog.h"
@@ -21,14 +22,14 @@ void BaseScene::DrawPlayerInspector() {
 		ImGui::End();
 		return;
 	}
-	if (selectedObjectIndex_ < 0 || selectedObjectIndex_ >= static_cast<int>(sceneObjects_.size())) {
+	if (!sceneEditorState_.HasValidSelection(sceneObjects_.size())) {
 		ImGui::Text("No selected player");
 		ImGui::End();
 		return;
 	}
 
-	GameObject* selectedObject = sceneObjects_[selectedObjectIndex_].get();
-	Player* player = selectedObject->GetComponent<Player>();
+	Entity* selectedObject = sceneObjects_[sceneEditorState_.GetSelectedObjectIndex()].get();
+	PlayerComponent* player = selectedObject->GetComponent<PlayerComponent>();
 	if (!player) {
 		ImGui::Text("Selected object has no Player component");
 		ImGui::End();
@@ -60,10 +61,10 @@ void BaseScene::DrawPlayerInspector() {
 			const size_t copyLength = (std::min)(selectedTypeName.size(), playerTypeNameBuffer_.size() - 1);
 			std::memcpy(playerTypeNameBuffer_.data(), selectedTypeName.data(), copyLength);
 			PlayerStats stats = LoadPlayerStats(selectedTypeName);
-			player->ApplyStats(stats, ApplyPlayerStatusItems(stats));
+			player->ApplyStats(stats, ApplyPlayerStatusItems(stats, LoadPlayerStatusItemDefinitions()));
 			selectedObject->GetTransform().scale = {stats.sizeScale, stats.sizeScale, stats.sizeScale};
 			if (PlayerAttackComponent* attack = selectedObject->GetComponent<PlayerAttackComponent>()) {
-				ApplyPlayerAttackSlots(attack, stats);
+				ApplyPlayerAttackSlots(attack, stats, LoadPlayerAttackDefinitions());
 			}
 			if (Object3dComponent* object3dComponent = selectedObject->GetComponent<Object3dComponent>()) {
 				if (!stats.modelFilePath.empty() && ModelManager::GetInstance()->FindModel(stats.modelFilePath)) {
@@ -95,7 +96,7 @@ void BaseScene::DrawPlayerInspector() {
 #endif
 }
 
-void BaseScene::DrawPlayerStatsInspector(GameObject* selectedObject, Player* player) {
+void BaseScene::DrawPlayerStatsInspector(Entity* selectedObject, PlayerComponent* player) {
 #ifdef USE_IMGUI
 	PlayerStats stats = player->GetBaseStats();
 	bool statsChanged = false;
@@ -122,7 +123,7 @@ void BaseScene::DrawPlayerStatsInspector(GameObject* selectedObject, Player* pla
 	statsChanged |= ImGui::DragFloat("Damage Invincibility (sec)", &stats.damageInvincibilityDuration, 0.05f, 0.0f, 60.0f);
 	statsChanged |= ImGui::DragInt("Level", &stats.level, 1.0f, 1, 100000);
 	statsChanged |= ImGui::DragInt("Experience", &stats.experience, 1.0f, 0, 100000000);
-	const int nextLevelExperience = Player::GetRequiredExperienceForNextLevel(stats.level);
+	const int nextLevelExperience = PlayerComponent::GetRequiredExperienceForNextLevel(stats.level);
 	if (nextLevelExperience == (std::numeric_limits<int>::max)()) {
 		ImGui::Text("Next Level EXP: Max");
 	} else {
@@ -243,7 +244,8 @@ void BaseScene::DrawPlayerStatsInspector(GameObject* selectedObject, Player* pla
 			ImGui::PopID();
 		}
 	}
-	const PlayerStats appliedStatusStats = ApplyPlayerStatusItems(stats);
+	const PlayerStats appliedStatusStats = ApplyPlayerStatusItems(
+		stats, LoadPlayerStatusItemDefinitions());
 	if (ImGui::CollapsingHeader("Applied Status", ImGuiTreeNodeFlags_DefaultOpen)) {
 		ImGui::Text("Base Health: %.1f", appliedStatusStats.baseHealth);
 		ImGui::Text("Health %%: %.1f", appliedStatusStats.health);
@@ -267,7 +269,7 @@ void BaseScene::DrawPlayerStatsInspector(GameObject* selectedObject, Player* pla
 #endif
 }
 
-void BaseScene::DrawPlayerPersistenceInspector(GameObject* selectedObject, Player* player, PlayerStats& stats, bool& statsChanged, bool statusSlotsChanged) {
+void BaseScene::DrawPlayerPersistenceInspector(Entity* selectedObject, PlayerComponent* player, PlayerStats& stats, bool& statsChanged, bool statusSlotsChanged) {
 #ifdef USE_IMGUI
 	if (ImGui::CollapsingHeader("Status Item Settings")) {
 		static int selectedStatusItemIndex = 0;
@@ -316,9 +318,8 @@ void BaseScene::DrawPlayerPersistenceInspector(GameObject* selectedObject, Playe
 			editingStatusItemStats.name = saveItemName.empty() ? selectedItemName : saveItemName;
 			SavePlayerStatusItemStats(editingStatusItemStats.name, editingStatusItemStats);
 			// 保存直後の画像を右上HUDへ反映するため、ステータス画像キャッシュを破棄する。
-			playerStatusSlotTextureKeys_.fill({});
-			playerStatusSlotTexturePaths_.fill({});
-			player->ApplyStats(stats, ApplyPlayerStatusItems(stats));
+			gameplayHud_.InvalidateStatusTextures();
+			player->ApplyStats(stats, ApplyPlayerStatusItems(stats, LoadPlayerStatusItemDefinitions()));
 			std::fill(statusItemNameBuffer.begin(), statusItemNameBuffer.end(), '\0');
 			isEditingStatusItemLoaded = false;
 		}
@@ -361,9 +362,9 @@ void BaseScene::DrawPlayerPersistenceInspector(GameObject* selectedObject, Playe
 
 	if (statsChanged) {
 		// ステータススロットはJSONへ即時保存せず、現在シーン上のプレイヤーにだけ反映する。
-		player->ApplyStats(stats, ApplyPlayerStatusItems(stats));
+		player->ApplyStats(stats, ApplyPlayerStatusItems(stats, LoadPlayerStatusItemDefinitions()));
 		if (PlayerAttackComponent* attack = selectedObject->GetComponent<PlayerAttackComponent>()) {
-			ApplyPlayerAttackSlots(attack, stats);
+			ApplyPlayerAttackSlots(attack, stats, LoadPlayerAttackDefinitions());
 		}
 	}
 	if (statusSlotsChanged) {
@@ -377,7 +378,9 @@ void BaseScene::DrawPlayerPersistenceInspector(GameObject* selectedObject, Playe
 		} else {
 			PlayerStats saveStats = player->GetBaseStats();
 			saveStats.name = editedTypeName;
-			player->ApplyStats(saveStats, ApplyPlayerStatusItems(saveStats));
+			player->ApplyStats(
+				saveStats,
+				ApplyPlayerStatusItems(saveStats, LoadPlayerStatusItemDefinitions()));
 			if (editedTypeName == currentTypeName) {
 				// 名前が同じ場合は能力値や使用モデルなどの編集内容だけを保存する。
 				SavePlayerStats(currentTypeName, saveStats);
@@ -385,7 +388,7 @@ void BaseScene::DrawPlayerPersistenceInspector(GameObject* selectedObject, Playe
 			} else if (RenamePlayerStats(currentTypeName, editedTypeName, saveStats)) {
 				// シーン内にある同タイプのプレイヤー参照も新しい名前へ揃える。
 				for (const auto& object : sceneObjects_) {
-					if (Player* scenePlayer = object->GetComponent<Player>();
+					if (PlayerComponent* scenePlayer = object->GetComponent<PlayerComponent>();
 					    scenePlayer && scenePlayer->GetPlayerTypeName() == currentTypeName) {
 						scenePlayer->SetPlayerTypeName(editedTypeName);
 					}
@@ -416,19 +419,23 @@ void BaseScene::DrawPlayerPersistenceInspector(GameObject* selectedObject, Playe
 				// 削除したタイプへの参照を残さないよう、対象プレイヤーへDefault設定を適用する。
 				const PlayerStats defaultStats = LoadPlayerStats("Default");
 				for (const auto& object : sceneObjects_) {
-					Player* scenePlayer = object->GetComponent<Player>();
+					PlayerComponent* scenePlayer = object->GetComponent<PlayerComponent>();
 					if (!scenePlayer || scenePlayer->GetPlayerTypeName() != currentTypeName) {
 						continue;
 					}
 					scenePlayer->SetPlayerTypeName("Default");
-					scenePlayer->ApplyStats(defaultStats, ApplyPlayerStatusItems(defaultStats));
+					scenePlayer->ApplyStats(
+						defaultStats,
+						ApplyPlayerStatusItems(defaultStats, LoadPlayerStatusItemDefinitions()));
 					if (PlayerAttackComponent* attack = object->GetComponent<PlayerAttackComponent>()) {
-						ApplyPlayerAttackSlots(attack, defaultStats);
+						ApplyPlayerAttackSlots(
+							attack, defaultStats, LoadPlayerAttackDefinitions());
 					}
 					if (Object3dComponent* object3d = object->GetComponent<Object3dComponent>()) {
 						if (!defaultStats.modelFilePath.empty() &&
 						    !ModelManager::GetInstance()->FindModel(defaultStats.modelFilePath)) {
-							ModelManager::GetInstance()->LoadModel(defaultStats.modelFilePath);
+							ModelManager::GetInstance()->LoadModel(
+								defaultStats.modelFilePath, defaultStats.isAnimationModel, defaultStats.modelDirectory);
 						}
 						if (Model* model = ModelManager::GetInstance()->FindModel(defaultStats.modelFilePath)) {
 							object3d->SetModel(defaultStats.modelFilePath);
@@ -553,6 +560,22 @@ void BaseScene::DrawPlayerAttackInspector() {
 	}
 
 	bool changed = false;
+	// 表示名とは独立した安定IDから、発射アルゴリズムを選択する。
+	static constexpr std::array<const char*, 9> kAttackPatternIds = {
+		"default", "magatama", "orbit", "poison_cloud", "flame_field",
+		"sky_laser", "boomerang", "ricochet", "claw_slash"};
+	int patternIndex = 0;
+	for (int index = 0; index < static_cast<int>(kAttackPatternIds.size()); ++index) {
+		if (attackStats->patternId == kAttackPatternIds[index]) {
+			patternIndex = index;
+			break;
+		}
+	}
+	if (ImGui::Combo("Attack Pattern", &patternIndex, kAttackPatternIds.data(),
+		static_cast<int>(kAttackPatternIds.size()))) {
+		attackStats->patternId = kAttackPatternIds[patternIndex];
+		changed = true;
+	}
 	if (ImGui::CollapsingHeader("Super Condition", ImGuiTreeNodeFlags_DefaultOpen)) {
 		std::vector<std::string> statusItemNames = LoadPlayerStatusItemNames();
 		std::vector<std::string> statusItemLabels;
@@ -593,7 +616,7 @@ void BaseScene::DrawPlayerAttackInspector() {
 	}
 	ImGui::Separator();
 	changed |= InputTextMultilineString("Selection Text", selectedLevel->choiceDescription);
-	if (selectedLevel->level == "super") {
+	if (PlayerAttackLevel::IsSuper(selectedLevel->level)) {
 		// Superは見た目を区別できるよう、通常レベルとは別の画像を保持する。
 		changed |= SelectionTextureCombo("Super Selection Texture", selectedLevel->choiceTextureFilePath);
 	} else {
@@ -651,6 +674,8 @@ void BaseScene::DrawPlayerAttackInspector() {
 	changed |= ImGui::DragFloat("Life Time", &selectedLevel->lifeTime, 0.01f, 0.01f, 100.0f);
 	changed |= ImGui::DragFloat("Travel Distance", &selectedLevel->travelDistance, 0.1f, 0.1f, 1000.0f);
 	changed |= ImGui::DragInt("Pierce Count", &selectedLevel->pierceCount, 1.0f, 0, 1000);
+	changed |= ImGui::SliderInt("Knockback", &selectedLevel->knockback, 0, 3);
+	ImGui::TextDisabled("0 = none, 1 = weak, 2 = medium, 3 = strong");
 	changed |= ImGui::Checkbox("Infinite Pierce", &selectedLevel->infinitePierce);
 
 	const std::string currentAttackName = cachedPlayerAttackNames_[selectedPlayerAttackTypeIndex_];
@@ -668,8 +693,7 @@ void BaseScene::DrawPlayerAttackInspector() {
 		const std::string finalName = saveName.empty() ? currentAttackName : saveName;
 		attackStats->name = finalName;
 		SavePlayerAttackStats(finalName, *attackStats);
-		playerAttackSlotTextureKeys_.fill({});
-		playerAttackSlotTexturePaths_.fill({});
+		gameplayHud_.InvalidateAttackTextures();
 		cachedPlayerAttackNames_[selectedPlayerAttackTypeIndex_] = finalName;
 		std::fill(playerAttackNameBuffer_.begin(), playerAttackNameBuffer_.end(), '\0');
 	}

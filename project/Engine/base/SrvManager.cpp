@@ -1,6 +1,5 @@
 #include "SrvManager.h"
-const uint32_t SrvManager::kMaxSRVCount = 512;
-
+#include <stdexcept>
 /// <summary>
 /// 必要なリソースを準備し、オブジェクトを初期化します。
 /// </summary>
@@ -9,16 +8,45 @@ void SrvManager::Initialize(DirectXCommon* dxcommon) {
 	this->dxCommon = dxcommon;
 	descriptorHeap = dxCommon->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSRVCount, true);
 	descriptrSize = dxCommon->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	useIndex = 0;
+	allocatedCount_ = 0;
+	freeIndices_.clear();
+	allocatedIndices_.fill(false);
 }
 
 uint32_t SrvManager::Allocate() {
-	assert(kMaxSRVCount > useIndex);
-	uint32_t index = useIndex;
-	useIndex++;
+	uint32_t index = kMaxSRVCount;
+	// Releaseビルドでも境界外番号を返さず、GPUヒープ破壊より前に明示的な失敗として停止する。
+	if (!TryAllocate(index)) {
+		throw std::runtime_error("SRV descriptor heap is full.");
+	}
 	return index;
 }
 
-bool SrvManager::IsOverAllocated() const { return useIndex > kMaxSRVCount; }
+bool SrvManager::TryAllocate(uint32_t& index) {
+	if (!freeIndices_.empty()) {
+		index = freeIndices_.back();
+		freeIndices_.pop_back();
+	} else if (useIndex < kMaxSRVCount) {
+		index = useIndex++;
+	} else {
+		return false;
+	}
+	allocatedIndices_[index] = true;
+	++allocatedCount_;
+	return true;
+}
+
+void SrvManager::Release(uint32_t index) {
+	if (index >= kMaxSRVCount || !allocatedIndices_[index]) {
+		return;
+	}
+	allocatedIndices_[index] = false;
+	--allocatedCount_;
+	freeIndices_.push_back(index);
+}
+
+bool SrvManager::IsOverAllocated() const { return allocatedCount_ > kMaxSRVCount; }
 
 /// <param name="index">対象要素のインデックスを指定します。</param>
 D3D12_CPU_DESCRIPTOR_HANDLE SrvManager::GetCPUDescriptorHandle(uint32_t index) {
@@ -84,5 +112,8 @@ void SrvManager::SetGraphicsRootDescriptorTable(UINT rootParameterIndex, uint32_
 /// </summary>
 void SrvManager::Finalize() {
 	descriptorHeap.Reset();
-
+	useIndex = 0;
+	allocatedCount_ = 0;
+	freeIndices_.clear();
+	allocatedIndices_.fill(false);
 }

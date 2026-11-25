@@ -25,6 +25,8 @@ constexpr uint32_t kRecordingBitRate = 12'000'000;
 constexpr LONGLONG kHundredNanosecondsPerSecond = 10'000'000;
 }
 
+ScreenCapture::ScreenCapture() = default;
+
 ScreenCapture::~ScreenCapture() {
 	Finalize();
 }

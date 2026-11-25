@@ -1,10 +1,10 @@
 #pragma once
-#include "core/Component.h"
-#include "struct.h"
-#include "GameTime.h"
+#include "core/EntityComponent.h"
+#include "Matrix.h"
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -15,29 +15,30 @@
 /// シーン上の名前、Transform、親子関係とComponent群を所有するエンティティです。
 /// Componentの初期化、更新、描画、破棄を一括して管理します。
 /// </summary>
-class GameObject {
+class Entity {
 public:
-	GameObject() : runtimeId_(nextRuntimeId_.fetch_add(1, std::memory_order_relaxed)) {}
-	~GameObject() { Finalize(); }
+	Entity() : runtimeId_(nextRuntimeId_.fetch_add(1, std::memory_order_relaxed)) {}
+	~Entity() { Finalize(); }
 
-	GameObject(const GameObject&) = delete;
-	GameObject& operator=(const GameObject&) = delete;
+	Entity(const Entity&) = delete;
+	Entity& operator=(const Entity&) = delete;
 
 	template<class T, class... Args>
 	T* AddComponent(Args&&... args) {
-		static_assert(std::is_base_of_v<Component, T>, "T must inherit from Component.");
+		static_assert(std::is_base_of_v<EntityComponent, T>, "T must inherit from EntityComponent.");
 
 		auto component = std::make_unique<T>(std::forward<Args>(args)...);
 		T* rawComponent = component.get();
 		rawComponent->SetOwner(this);
 		components_.push_back(std::move(component));
 		rawComponent->Initialize();
+		NotifyIndexChanged();
 		return rawComponent;
 	}
 
 	template<class T>
 	T* GetComponent() {
-		static_assert(std::is_base_of_v<Component, T>, "T must inherit from Component.");
+		static_assert(std::is_base_of_v<EntityComponent, T>, "T must inherit from EntityComponent.");
 
 		for (const auto& component : components_) {
 			if (T* target = dynamic_cast<T*>(component.get())) {
@@ -49,7 +50,7 @@ public:
 
 	template<class T>
 	const T* GetComponent() const {
-		static_assert(std::is_base_of_v<Component, T>, "T must inherit from Component.");
+		static_assert(std::is_base_of_v<EntityComponent, T>, "T must inherit from EntityComponent.");
 
 		for (const auto& component : components_) {
 			if (const T* target = dynamic_cast<const T*>(component.get())) {
@@ -64,13 +65,13 @@ public:
 	/// 指定した型のコンポーネントを削除します。
 	/// </summary>
 	void RemoveComponent() {
-		static_assert(std::is_base_of_v<Component, T>, "T must inherit from Component.");
+		static_assert(std::is_base_of_v<EntityComponent, T>, "T must inherit from EntityComponent.");
 
 		components_.erase(
 		    std::remove_if(
 		        components_.begin(),
 		        components_.end(),
-		        [](const std::unique_ptr<Component>& component) {
+		        [](const std::unique_ptr<EntityComponent>& component) {
 			        if (dynamic_cast<T*>(component.get())) {
 				        component->Finalize();
 				        return true;
@@ -80,6 +81,7 @@ public:
 		    ),
 		    components_.end()
 		);
+		NotifyIndexChanged();
 	}
 
 	/// <summary>
@@ -88,7 +90,6 @@ public:
 	void Update() {
 		for (const auto& component : components_) {
 			if (component->IsEnabled()) {
-				component->ApplyGravity(transform_, GameTime::GetDeltaTime());
 				component->Update();
 			}
 		}
@@ -137,29 +138,32 @@ public:
 		components_.clear();
 	}
 
-	void ApplyCollisionResponse(const Vector3& collisionNormal) {
-		for (const auto& component : components_) {
-			if (component->IsEnabled()) {
-				component->ApplyCollisionResponse(collisionNormal);
-			}
-		}
-	}
-
 	EulerTransform& GetTransform() { return transform_; }
 	const EulerTransform& GetTransform() const { return transform_; }
-	void SetName(const std::string& name) { name_ = name; }
+	void SetName(const std::string& name) {
+		if (name_ != name) {
+			name_ = name;
+			NotifyIndexChanged();
+		}
+	}
 	const std::string& GetName() const { return name_; }
 	void SetEditorType(const std::string& editorType) { editorType_ = editorType; }
 	const std::string& GetEditorType() const { return editorType_; }
-	void SetParentName(const std::string& parentName) { parentName_ = parentName; }
 	const std::string& GetParentName() const { return parentName_; }
 	/// <summary>実行中のオブジェクトを一意に識別するIDです。保存データには含めません。</summary>
 	uint64_t GetRuntimeId() const { return runtimeId_; }
 
 private:
+	friend class BaseScene;
+	friend class SceneWorld;
+	void NotifyIndexChanged() {
+		if (indexChangedCallback_) indexChangedCallback_();
+	}
+	/// <summary>親子関係の検証後にBaseSceneだけが親名を更新します。</summary>
+	void SetParentName(const std::string& parentName) { parentName_ = parentName; }
 	inline static std::atomic<uint64_t> nextRuntimeId_{1};
 	uint64_t runtimeId_ = 0;
-	std::string name_ = "GameObject";
+	std::string name_ = "Entity";
 	std::string editorType_ = "Empty";
 	std::string parentName_;
 	EulerTransform transform_ = {
@@ -167,6 +171,8 @@ private:
 	    {0.0f, 0.0f, 0.0f},
 	    {0.0f, 0.0f, 0.0f}
 	};
-	std::vector<std::unique_ptr<Component>> components_;
+	/// <summary>SceneWorld所属後の名前・Component構成変更を索引へ通知します。</summary>
+	std::function<void()> indexChangedCallback_;
+	std::vector<std::unique_ptr<EntityComponent>> components_;
 };
 

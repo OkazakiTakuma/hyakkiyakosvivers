@@ -27,7 +27,7 @@
 
 namespace {
 // 新規取得の除外条件を通常レベルアップとボス報酬で共有する。装備済み武器の強化には使用しない。
-std::unordered_set<std::string> GetOtherPlayerInitialAttacks(const Player& player) {
+std::unordered_set<std::string> GetOtherPlayerInitialAttacks(const PlayerComponent& player) {
 	std::unordered_set<std::string> excludedAttacks;
 	for (const std::string& playerTypeName : LoadPlayerTypeNames()) {
 		if (playerTypeName == player.GetPlayerTypeName()) {
@@ -44,7 +44,7 @@ std::unordered_set<std::string> GetOtherPlayerInitialAttacks(const Player& playe
 }
 
 // Straight専用の描画。移動・当たり判定には触れず、弾の現在位置に光の円弧を重ねる。
-class StraightSlashVisualComponent final : public Component {
+class StraightSlashVisualComponent final : public EntityComponent {
 public:
 	/// <summary>弾と同じ寿命で残光を減衰させる描画専用コンポーネントを生成します。</summary>
 	explicit StraightSlashVisualComponent(float lifeTime) : remainingLifeTime_(lifeTime) {}
@@ -56,7 +56,7 @@ public:
 
 	/// <summary>弾の向きに合わせた三日月状の帯を重ね、斬撃と残光を描画します。</summary>
 	void Draw3D() override {
-		GameObject* owner = GetOwner();
+		Entity* owner = GetOwner();
 		if (!owner) {
 			return;
 		}
@@ -115,8 +115,113 @@ private:
 	float remainingLifeTime_ = 0.0f;
 };
 
+// Orbit専用の編隊描画。個々の陰陽玉とは別に、アイコンと同じ赤青の環とSuper時の中心渦を描く。
+class OrbitFormationVisualComponent final : public EntityComponent {
+public:
+	OrbitFormationVisualComponent(float lifeTime, Entity* anchor, float height, float radius, bool isSuper)
+	    : initialLifeTime_((std::max)(0.01f, lifeTime)), remainingLifeTime_(initialLifeTime_),
+	      anchor_(anchor), height_(height), radius_((std::max)(0.1f, radius)), isSuper_(isSuper) {}
+
+	void Update() override {
+		const float deltaTime = GameTime::GetDeltaTime();
+		remainingLifeTime_ -= deltaTime;
+		elapsedSeconds_ += deltaTime;
+	}
+
+	void Draw3D() override {
+		Entity* owner = GetOwner();
+		const auto* projectile = owner ? owner->GetComponent<PlayerAttackEntityComponent>() : nullptr;
+		if (!owner || !anchor_ || !projectile || !projectile->IsEnabled() || projectile->IsExpired()) {
+			return;
+		}
+
+		const float appear = SmoothStep((std::clamp)(elapsedSeconds_ / 0.18f, 0.0f, 1.0f));
+		const float lifeRate = (std::clamp)(remainingLifeTime_ / initialLifeTime_, 0.0f, 1.0f);
+		const float fade = SmoothStep((std::clamp)(lifeRate / 0.16f, 0.0f, 1.0f));
+		const float envelope = appear * fade;
+		const float rotation = elapsedSeconds_ * (isSuper_ ? 1.75f : 1.15f);
+		const Vector3 center = anchor_->GetTransform().translate + Vector3{0.0f, height_, 0.0f};
+
+		auto submit = [&](const std::vector<TrailRenderPoint>& points, float width, Vector4 color) {
+			color.w *= envelope;
+			TrailRenderer::GetInstance()->Submit(
+			    points, width, color, {color.x * 0.42f, color.y * 0.42f, color.z * 0.42f, 0.0f});
+		};
+
+		// アイコンの外周と同じく、炎の朱色と霊気の青を交互の弧として陰陽玉同士の間へ渡す。
+		constexpr int kArcCount = 6;
+		constexpr int kArcSegments = 8;
+		for (int arcIndex = 0; arcIndex < kArcCount; ++arcIndex) {
+			std::vector<TrailRenderPoint> arc;
+			arc.reserve(kArcSegments + 1);
+			for (int segment = 0; segment <= kArcSegments; ++segment) {
+				const float t = static_cast<float>(segment) / kArcSegments;
+				const float angle = rotation + MathConstants::kTwoPi *
+				    (static_cast<float>(arcIndex) + t * 0.91f) / kArcCount;
+				const float flicker = radius_ * 0.025f *
+				    std::sin(elapsedSeconds_ * 13.0f + arcIndex * 2.1f + segment * 1.7f);
+				arc.push_back({
+				    center + Vector3{std::cos(angle) * (radius_ + flicker), 0.0f,
+				                     std::sin(angle) * (radius_ + flicker)},
+				    envelope * std::sin(MathConstants::kPi * (0.08f + t * 0.84f))});
+			}
+			const bool fireArc = (arcIndex % 2) == 0;
+			submit(arc, radius_ * (isSuper_ ? 0.090f : 0.065f),
+			    fireArc ? Vector4{1.00f, 0.12f, 0.015f, 0.82f}
+			            : Vector4{0.02f, 0.48f, 1.00f, 0.82f});
+			// 外光の中央へ細い白熱線を重ね、回転中も輪の形が途切れて見えないようにする。
+			submit(arc, radius_ * 0.018f,
+			    fireArc ? Vector4{1.00f, 0.82f, 0.25f, 0.94f}
+			            : Vector4{0.66f, 0.94f, 1.00f, 0.94f});
+		}
+
+		if (!isSuper_) {
+			return;
+		}
+
+		// Superアイコンの中心を満たす赤青の渦。外周から中心へ絞る螺旋を重ねて密度を上げる。
+		constexpr int kSpiralCount = 8;
+		constexpr int kSpiralSegments = 14;
+		for (int spiralIndex = 0; spiralIndex < kSpiralCount; ++spiralIndex) {
+			std::vector<TrailRenderPoint> spiral;
+			spiral.reserve(kSpiralSegments + 1);
+			for (int segment = 0; segment <= kSpiralSegments; ++segment) {
+				const float t = static_cast<float>(segment) / kSpiralSegments;
+				const float spiralRadius = radius_ * (0.10f + t * 0.74f);
+				const float angle = -rotation * 1.8f + spiralIndex * MathConstants::kTwoPi / kSpiralCount +
+				    t * MathConstants::kPi * 1.15f;
+				spiral.push_back({
+				    center + Vector3{std::cos(angle) * spiralRadius,
+				                     0.015f + 0.025f * std::sin(t * MathConstants::kPi),
+				                     std::sin(angle) * spiralRadius},
+				    envelope * std::sin(MathConstants::kPi * t)});
+			}
+			const bool fireSpiral = (spiralIndex % 2) == 0;
+			submit(spiral, radius_ * 0.070f,
+			    fireSpiral ? Vector4{1.00f, 0.05f, 0.01f, 0.58f}
+			               : Vector4{0.02f, 0.30f, 1.00f, 0.58f});
+			submit(spiral, radius_ * 0.018f,
+			    fireSpiral ? Vector4{1.00f, 0.72f, 0.18f, 0.88f}
+			               : Vector4{0.55f, 0.90f, 1.00f, 0.88f});
+		}
+	}
+
+private:
+	static float SmoothStep(float value) {
+		return value * value * (3.0f - 2.0f * value);
+	}
+
+	float initialLifeTime_ = 0.01f;
+	float remainingLifeTime_ = 0.01f;
+	float elapsedSeconds_ = 0.0f;
+	Entity* anchor_ = nullptr;
+	float height_ = 0.0f;
+	float radius_ = 1.0f;
+	bool isSuper_ = false;
+};
+
 // 五行結界専用の描画。攻撃判定とは独立して、プレイヤーの足元に五芒星の結界を展開する。
-class PoisonBarrierVisualComponent final : public Component {
+class PoisonBarrierVisualComponent final : public EntityComponent {
 public:
 	PoisonBarrierVisualComponent(float lifeTime, float centerHeight)
 	    : initialLifeTime_((std::max)(0.01f, lifeTime)), remainingLifeTime_(initialLifeTime_),
@@ -129,7 +234,7 @@ public:
 	}
 
 	void Draw3D() override {
-		GameObject* owner = GetOwner();
+		Entity* owner = GetOwner();
 		const auto* projectile = owner ? owner->GetComponent<PlayerAttackEntityComponent>() : nullptr;
 		if (!owner || !projectile || !projectile->IsEnabled() || projectile->IsExpired()) {
 			return;
@@ -170,6 +275,45 @@ public:
 		submitRing(hitRadius * 0.84f, 0.025f, hitRadius * 0.025f, {0.58f, 1.00f, 0.78f, 0.74f * pulse}, -rotation * 0.72f, envelope);
 		submitRing(hitRadius * 0.54f, 0.045f, hitRadius * 0.018f, {0.18f, 0.78f, 0.54f, 0.48f}, rotation * 1.35f, envelope);
 
+		// 外周へ八卦を模した八組の爻を配置し、汎用的な魔法陣ではなく陰陽道の結界として見せる。
+		// 各組は三本の実線・陰線をビット列で組み合わせ、回転中も文様の差が残るようにする。
+		constexpr std::array<int, 8> kTrigramPatterns = {0b111, 0b110, 0b101, 0b100, 0b011, 0b010, 0b001, 0b000};
+		for (int trigramIndex = 0; trigramIndex < static_cast<int>(kTrigramPatterns.size()); ++trigramIndex) {
+			const float angle = MathConstants::kTwoPi * static_cast<float>(trigramIndex) / 8.0f - rotation * 0.72f;
+			const Vector3 radial{std::cos(angle), 0.0f, std::sin(angle)};
+			const Vector3 tangent{-std::sin(angle), 0.0f, std::cos(angle)};
+			for (int lineIndex = 0; lineIndex < 3; ++lineIndex) {
+				const float lineRadius = hitRadius * (0.895f + lineIndex * 0.030f);
+				const Vector3 lineCenter = center + lineRadius * radial + Vector3{0.0f, 0.050f, 0.0f};
+				const float halfLength = hitRadius * 0.066f;
+				const bool solidLine = (kTrigramPatterns[trigramIndex] & (1 << lineIndex)) != 0;
+				if (solidLine) {
+					submitPath(
+						{{lineCenter - halfLength * tangent, envelope}, {lineCenter + halfLength * tangent, envelope}},
+						hitRadius * 0.013f, {0.78f, 1.00f, 0.84f, 0.82f}, envelope);
+				} else {
+					const float gap = hitRadius * 0.018f;
+					submitPath(
+						{{lineCenter - halfLength * tangent, envelope}, {lineCenter - gap * tangent, envelope}},
+						hitRadius * 0.013f, {0.78f, 1.00f, 0.84f, 0.82f}, envelope);
+					submitPath(
+						{{lineCenter + gap * tangent, envelope}, {lineCenter + halfLength * tangent, envelope}},
+						hitRadius * 0.013f, {0.78f, 1.00f, 0.84f, 0.82f}, envelope);
+				}
+			}
+		}
+
+		// 紙垂を思わせる折れ線を星の外側へ巡らせ、神道系の結界らしい輪郭を加える。
+		constexpr int kShideSegments = 20;
+		std::vector<TrailRenderPoint> shideRing;
+		shideRing.reserve(kShideSegments + 1);
+		for (int index = 0; index <= kShideSegments; ++index) {
+			const float angle = MathConstants::kTwoPi * static_cast<float>(index) / kShideSegments + rotation * 0.45f;
+			const float shideRadius = hitRadius * (index % 2 == 0 ? 0.765f : 0.805f);
+			shideRing.push_back({pointOnCircle(shideRadius, angle, 0.042f), envelope});
+		}
+		submitPath(shideRing, hitRadius * 0.012f, {0.86f, 1.00f, 0.90f, 0.60f}, envelope);
+
 		// 円へ内接する五点を2つ飛ばしで結び、中央に五芒星を描く。
 		std::array<Vector3, 5> starVertices{};
 		for (int index = 0; index < 5; ++index) {
@@ -186,15 +330,25 @@ public:
 		// 白い細線を重ねて五芒星の輪郭をくっきりさせる。
 		submitPath(star, hitRadius * 0.015f, {0.90f, 1.00f, 0.94f, 0.98f}, envelope);
 
+		// 木・火・土・金・水の色を五頂点へ割り当て、五行の巡りを視覚的に区別する。
+		static const std::array<Vector4, 5> kElementColors = {{
+			{0.22f, 1.00f, 0.42f, 0.76f}, // 木
+			{1.00f, 0.24f, 0.06f, 0.76f}, // 火
+			{1.00f, 0.72f, 0.14f, 0.76f}, // 土
+			{0.92f, 1.00f, 0.96f, 0.76f}, // 金
+			{0.18f, 0.58f, 1.00f, 0.76f}  // 水
+		}};
+
 		// 五つの頂点を護符の核として光らせ、上部の小さな環まで光柱でつなぐ。
 		for (int index = 0; index < 5; ++index) {
 			const Vector3 base = starVertices[index];
+			const Vector4 elementColor = kElementColors[index];
 			const float pillarHeight = hitRadius * (0.50f + 0.06f * std::sin(elapsedSeconds_ * 3.2f + index));
 			std::vector<TrailRenderPoint> pillar = {
 				{base, envelope},
 				{base + Vector3{0.0f, pillarHeight, 0.0f}, 0.0f}
 			};
-			submitPath(pillar, hitRadius * 0.025f, {0.20f, 1.00f, 0.58f, 0.58f}, envelope);
+			submitPath(pillar, hitRadius * 0.028f, elementColor, envelope);
 
 			constexpr int kSealSegments = 16;
 			std::vector<TrailRenderPoint> seal;
@@ -203,7 +357,28 @@ public:
 				const float sealAngle = MathConstants::kTwoPi * static_cast<float>(segment) / kSealSegments - rotation * 2.0f;
 				seal.push_back({base + Vector3{std::cos(sealAngle) * hitRadius * 0.075f, 0.035f, std::sin(sealAngle) * hitRadius * 0.075f}, envelope});
 			}
-			submitPath(seal, hitRadius * 0.018f, {0.68f, 1.00f, 0.76f, 0.82f * pulse}, envelope);
+			Vector4 sealColor = elementColor;
+			sealColor.w = 0.88f * pulse;
+			submitPath(seal, hitRadius * 0.018f, sealColor, envelope);
+
+			// 各光柱へ小さな短冊形の護符を浮かせる。文字は使わず、枠と中央の印線だけで表現する。
+			const float vertexAngle = -MathConstants::kPi * 0.5f + MathConstants::kTwoPi * static_cast<float>(index) / 5.0f + rotation;
+			const Vector3 tangent{-std::sin(vertexAngle), 0.0f, std::cos(vertexAngle)};
+			const Vector3 talismanCenter = base + Vector3{0.0f, hitRadius * 0.25f, 0.0f};
+			const float talismanHalfWidth = hitRadius * 0.050f;
+			const float talismanHalfHeight = hitRadius * 0.095f;
+			const Vector3 topLeft = talismanCenter - talismanHalfWidth * tangent + Vector3{0.0f, talismanHalfHeight, 0.0f};
+			const Vector3 topRight = talismanCenter + talismanHalfWidth * tangent + Vector3{0.0f, talismanHalfHeight, 0.0f};
+			const Vector3 bottomRight = talismanCenter + talismanHalfWidth * tangent - Vector3{0.0f, talismanHalfHeight, 0.0f};
+			const Vector3 bottomLeft = talismanCenter - talismanHalfWidth * tangent - Vector3{0.0f, talismanHalfHeight, 0.0f};
+			std::vector<TrailRenderPoint> talisman = {
+				{topLeft, envelope}, {topRight, envelope}, {bottomRight, envelope}, {bottomLeft, envelope}, {topLeft, envelope}
+			};
+			submitPath(talisman, hitRadius * 0.013f, {1.00f, 0.86f, 0.42f, 0.76f}, envelope);
+			submitPath(
+				{{talismanCenter + Vector3{0.0f, talismanHalfHeight * 0.58f, 0.0f}, envelope},
+				 {talismanCenter - Vector3{0.0f, talismanHalfHeight * 0.58f, 0.0f}, envelope}},
+				hitRadius * 0.010f, {1.00f, 0.92f, 0.58f, 0.72f}, envelope);
 		}
 
 		// 頭上の薄い環が五本の光柱を束ね、守護結界としての立体感を作る。
@@ -222,7 +397,7 @@ private:
 };
 
 // FlameField専用の描画。円形の攻撃範囲全体へ複数の炎柱を配置し、燃えている領域を表現する。
-class FlameFieldVisualComponent final : public Component {
+class FlameFieldVisualComponent final : public EntityComponent {
 public:
 	FlameFieldVisualComponent(float lifeTime, float radius, float centerHeight)
 	    : initialLifeTime_((std::max)(0.01f, lifeTime)), remainingLifeTime_(initialLifeTime_),
@@ -235,7 +410,7 @@ public:
 	}
 
 	void Draw3D() override {
-		GameObject* owner = GetOwner();
+		Entity* owner = GetOwner();
 		const auto* projectile = owner ? owner->GetComponent<PlayerAttackEntityComponent>() : nullptr;
 		if (!owner || !projectile || !projectile->IsEnabled() || projectile->IsExpired()) {
 			return;
@@ -308,7 +483,7 @@ private:
 };
 
 // SkyLaser専用の描画。既存の投射物寿命と当たり判定を保ったまま、複数の加算帯で光柱を構成する。
-class SkyLaserVisualComponent final : public Component {
+class SkyLaserVisualComponent final : public EntityComponent {
 public:
 	SkyLaserVisualComponent(float lifeTime, float size)
 	    : initialLifeTime_((std::max)(0.01f, lifeTime)), remainingLifeTime_(initialLifeTime_), size_((std::max)(0.05f, size)) {}
@@ -319,7 +494,7 @@ public:
 	}
 
 	void Draw3D() override {
-		GameObject* owner = GetOwner();
+		Entity* owner = GetOwner();
 		const auto* projectile = owner ? owner->GetComponent<PlayerAttackEntityComponent>() : nullptr;
 		if (!owner || !projectile || projectile->IsExpired()) {
 			return;
@@ -407,7 +582,7 @@ private:
 };
 
 // 竜巻弾専用の描画。パーティクルの隙間を複数の螺旋帯で結び、円錐状の回転流を常に読めるようにする。
-class TornadoVisualComponent final : public Component {
+class TornadoVisualComponent final : public EntityComponent {
 public:
 	TornadoVisualComponent(bool isContracting, bool isGiant)
 	    : rotationDirection_(isContracting ? -1.0f : 1.0f) {
@@ -428,7 +603,7 @@ public:
 	}
 
 	void Draw3D() override {
-		GameObject* owner = GetOwner();
+		Entity* owner = GetOwner();
 		const auto* projectile = owner ? owner->GetComponent<EnemyAttackEntityComponent>() : nullptr;
 		if (!owner || !projectile || projectile->IsExpired()) {
 			return;
@@ -551,8 +726,17 @@ bool IsSweptSphereToOBB(
 }
 
 // 投射物の命中は専用処理で解決するため、汎用コライダー処理による押し戻しや二重判定を行わない。
-bool ShouldSkipColliderPair(GameObject* objectA, GameObject* objectB) {
+bool ShouldSkipColliderPair(Entity* objectA, Entity* objectB) {
 	if (!objectA || !objectB || objectA == objectB) {
+		return true;
+	}
+
+	const OBBColliderComponent* obbA = objectA->GetComponent<OBBColliderComponent>();
+	const OBBColliderComponent* obbB = objectB->GetComponent<OBBColliderComponent>();
+	if ((obbA && obbA->IsEnabled() && obbA->GetPlayerOnly() &&
+	     objectB->GetComponent<PlayerComponent>() == nullptr) ||
+	    (obbB && obbB->IsEnabled() && obbB->GetPlayerOnly() &&
+	     objectA->GetComponent<PlayerComponent>() == nullptr)) {
 		return true;
 	}
 
@@ -576,7 +760,7 @@ bool ShouldSkipColliderPair(GameObject* objectA, GameObject* objectB) {
 
 struct EnemyPlayerContact {
 	EnemyComponent* enemy = nullptr;
-	Player* player = nullptr;
+	PlayerComponent* player = nullptr;
 };
 
 // 通常経験値の表示単位です。隣り合う値の比が、その段階を1個上へ圧縮するための必要個数になります。
@@ -586,17 +770,17 @@ constexpr const char* kEnemyDropModelFilePath = "enemy_drop.obj";
 constexpr float kExperienceCompressionDistance = 1.5f;
 
 // 小さなドロップでも多面体と外周リングの陰影が読めるよう、待機中から一定速度で回転させる。
-class DropItemVisualComponent final : public Component {
+class DropItemVisualComponent final : public EntityComponent {
 public:
 	void Update() override {
-		if (GameObject* owner = GetOwner()) {
+		if (Entity* owner = GetOwner()) {
 			owner->GetTransform().rotate.y += GameTime::GetDeltaTime() * 2.4f;
 		}
 	}
 };
 
 // 経験値オーブ専用の弱い脈動発光。ほかのドロップには適用しない。
-class ExperienceGlowVisualComponent final : public Component {
+class ExperienceGlowVisualComponent final : public EntityComponent {
 public:
 	void Update() override {
 		Object3dComponent* object3d = GetOwner() ? GetOwner()->GetComponent<Object3dComponent>() : nullptr;
@@ -663,16 +847,16 @@ float GetExperienceScale(int denomination) {
 	}
 }
 
-bool RegisterEnemyPlayerContact(GameObject* objectA, GameObject* objectB, std::vector<EnemyPlayerContact>& contacts) {
+bool RegisterEnemyPlayerContact(Entity* objectA, Entity* objectB, std::vector<EnemyPlayerContact>& contacts) {
 	if (!objectA || !objectB) {
 		return false;
 	}
 
 	EnemyComponent* enemy = objectA->GetComponent<EnemyComponent>();
-	Player* player = objectB->GetComponent<Player>();
+	PlayerComponent* player = objectB->GetComponent<PlayerComponent>();
 	if (!enemy || !player) {
 		enemy = objectB->GetComponent<EnemyComponent>();
-		player = objectA->GetComponent<Player>();
+		player = objectA->GetComponent<PlayerComponent>();
 	}
 	if (!enemy || !player) {
 		return false;

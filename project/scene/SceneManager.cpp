@@ -5,11 +5,12 @@
 #include "base_scene/BaseScene.h"
 #include "helpers/SceneUiUtility.h"
 #include "Input.h"
-#include "GamePlayScene.h"
-#include "PlayerSelectScene.h"
+#include "DemoSceneControl.h"
+#include "GameProgressRepository.h"
 #include "repositories/PlayerStatusRepository.h"
 #include "Sprite.h"
 #include "SpriteCommon.h"
+#include "StageUnlockConditionsRepository.h"
 #include "TextureManager.h"
 #include "sky/SkyBoxCommon.h"
 #include "GameTime.h"
@@ -18,14 +19,15 @@
 
 #include <assert.h>
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cstring>
 #include <filesystem>
 #include <cmath>
-#include <fstream>
-#include <iomanip>
-#include <limits>
-#include <json.hpp>
+#include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
 
 namespace {
 const char* kSceneNames[] = {
@@ -50,11 +52,8 @@ const char* kTransitionNames[] = {
 // 外部画像を必要としないよう、遷移色の下地には実行時生成する白1pxテクスチャを使用する。
 constexpr const char* kTransitionTextureKey = "__scene_transition_white";
 constexpr const char* kTransitionFogTexturePath = "Resources/Texture/fog_transition.png";
-// 自動デモと動作検証だけで使用し、通常のステージ選択には表示しない予約IDです。
-constexpr const char* kDemoStageId = "demo";
-constexpr float kDemoPlayerSelectSeconds = 3.0f;
-constexpr float kDemoGameplaySeconds = 15.0f;
-constexpr float kDemoResultSeconds = 4.0f;
+// 自動デモ用の配置パターンは通常のステージ選択には表示しません。
+constexpr std::string_view kDemoStageIdPrefix = "demo";
 
 float SmoothStep(float start, float end, float value) {
 	const float rate = std::clamp((value - start) / (end - start), 0.0f, 1.0f);
@@ -86,15 +85,6 @@ void ApplyFadeWhiteFog(float coverage, bool keepBaseFog) {
 		52.0f + (9.0f - 52.0f) * fogRate,
 		true);
 }
-/// <summary>
-/// 所持金・ショップ購入レベル・ステージ開放状況を永続化するファイルです。
-/// </summary>
-constexpr const char* kGameProgressFilePath = "Resources/Data/game_progress.json";
-/// <summary>ImGuiから編集するステージ開放条件の設定ファイルです。</summary>
-constexpr const char* kStageUnlockConditionsFilePath = "Resources/Data/stage_unlock_conditions.json";
-/// <summary>全体強化1レベルあたりの経験値・獲得G上昇率です。</summary>
-constexpr float kGlobalGainBonusPercentPerLevel = 10.0f;
-
 /// <summary>
 /// SceneIndex を検索して取得します。
 /// </summary>
@@ -129,182 +119,92 @@ SceneManager::SceneManager() {
 	demoGuideTextObject_ = SceneUiUtility::CreateTextObject(
 		"デモプレイ再生中    F1: 停止", 20.0f,
 		Vector4{1.0f, 0.94f, 0.72f, 1.0f}, "Yu Gothic UI");
+	demoParticleGuideTextObject_ = SceneUiUtility::CreateTextObject(
+		"", 19.0f, TextComponent::Anchor::TopLeft, "Yu Gothic UI");
+	demoParticleGuideTextObject_->GetComponent<TextComponent>()->SetColor(
+		{0.90f, 0.96f, 1.0f, 1.0f});
+	demoParticleGuideBackgroundSprite_ = SceneUiUtility::CreateColorSprite();
 }
 
 void SceneManager::LoadGameProgress() {
-	std::ifstream input(StringUtility::Utf8ToPath(kGameProgressFilePath));
-	if (!input) {
-		// 初回起動など、セーブファイルがない場合はメンバーの初期値（所持金0・未購入）を使う。
+	GameProgressSaveData loaded;
+	const GameProgressLoadStatus status = GameProgressRepository::Load(loaded);
+	if (status == GameProgressLoadStatus::NotFound) {
+		// 初回起動では各クラスの初期値をそのまま使用する。
 		return;
 	}
-	try {
-		nlohmann::json root;
-		input >> root;
-		// 手編集された負の値がゲーム内へ入らないよう、読み込み時に0以上へ補正する。
-		money_ = (std::max)(0, root.value("money", 0));
-		if (root.contains("shopUpgradeLevels") && root.at("shopUpgradeLevels").is_object()) {
-			// JSONオブジェクトのキーは「プレイヤー名:商品ID」、値は購入済みレベルを表す。
-			for (auto it = root.at("shopUpgradeLevels").begin(); it != root.at("shopUpgradeLevels").end(); ++it) {
-				shopUpgradeLevels_[it.key()] = (std::max)(0, it.value().get<int>());
-			}
-		}
-		if (root.contains("unlockedGameplayStages") && root.at("unlockedGameplayStages").is_array()) {
-			// 一度開放されたステージは、あとから開放条件を変更してもプレイヤーから取り上げない。
-			for (const auto& stageId : root.at("unlockedGameplayStages")) {
-				if (stageId.is_string() && IsValidGameplayStageId(stageId.get<std::string>())) {
-					unlockedGameplayStageIds_.insert(stageId.get<std::string>());
-				}
-			}
-		}
-		if (root.contains("clearedGameplayStages") && root.at("clearedGameplayStages").is_array()) {
-			// クリア履歴も別に保持し、ImGuiで条件を変更した直後の開放判定にも再利用する。
-			for (const auto& stageId : root.at("clearedGameplayStages")) {
-				if (stageId.is_string() && IsValidGameplayStageId(stageId.get<std::string>())) {
-					clearedGameplayStageIds_.insert(stageId.get<std::string>());
-				}
-			}
-		}
-		if (root.contains("unlockedPlayerTypes") && root.at("unlockedPlayerTypes").is_array()) {
-			// プレイヤー名は日本語も使用するため、空文字だけを除外してそのまま復元する。
-			// 設定ファイル側でキャラクターが増えても、名前をキーにすることでセーブ形式を変更せず対応できる。
-			for (const auto& playerTypeName : root.at("unlockedPlayerTypes")) {
-				if (playerTypeName.is_string() && !playerTypeName.get<std::string>().empty()) {
-					unlockedPlayerTypeNames_.insert(playerTypeName.get<std::string>());
-				}
-			}
-		}
-		// defaultは新規・旧形式セーブのどちらでも必ずプレイ可能にする。
-		unlockedGameplayStageIds_.insert("default");
-		// プレイヤー開放情報がない旧形式セーブでも、開始キャラクターの巫女は必ず使用可能にする。
-		unlockedPlayerTypeNames_.insert("巫女");
-		// この機能追加前に条件ステージをクリア済みなら、その履歴からプレイヤー開放状態を復元する。
-		for (const auto& [playerTypeName, prerequisiteStageId] : playerUnlockStagePrerequisites_) {
-			if (clearedGameplayStageIds_.contains(prerequisiteStageId)) {
-				unlockedPlayerTypeNames_.insert(playerTypeName);
-			}
-		}
-	} catch (...) {
-		// 壊れた保存データでゲームを起動不能にせず、未購入状態へ戻して続行する。
-		money_ = 0;
-		shopUpgradeLevels_.clear();
-		unlockedGameplayStageIds_ = {"default"};
-		clearedGameplayStageIds_.clear();
-		unlockedPlayerTypeNames_ = {"巫女"};
+	if (status == GameProgressLoadStatus::Invalid) {
+		// 破損をファイル不在と区別し、安全な新規ゲーム状態へ明示的に戻す。
+		gameProgress_.ResetEconomy();
+		gameProgress_.ResetUnlocks();
+		return;
 	}
+
+	// JSONの解釈はRepositoryへ任せ、ここではゲーム内で有効なIDだけを進行状態へ反映する。
+	gameProgress_.RestoreEconomy(loaded.money, loaded.shopUpgradeLevels);
+	// 旧形式のキャラクター別レベルはGameProgressが共通レベルへ変換済み。
+	// 能力定義ファイルは変更せず、ゲーム開始時に共通レベルから実効値を計算する。
+	std::unordered_set<std::string> validUnlockedStageIds;
+	std::unordered_set<std::string> validClearedStageIds;
+	for (const std::string& stageId : loaded.unlockedGameplayStageIds) {
+		if (IsValidGameplayStageId(stageId)) validUnlockedStageIds.insert(stageId);
+	}
+	for (const std::string& stageId : loaded.clearedGameplayStageIds) {
+		if (IsValidGameplayStageId(stageId)) validClearedStageIds.insert(stageId);
+	}
+	gameProgress_.RestoreUnlocks(
+		validUnlockedStageIds, validClearedStageIds,
+		loaded.unlockedPlayerTypeNames, stageUnlockCatalog_.GetPlayerPrerequisites());
 }
 
-void SceneManager::SaveGameProgress() const {
-	// 初回保存時にも書き込めるよう、Resources/Dataが存在しなければ生成する。
-	std::filesystem::create_directories(StringUtility::Utf8ToPath(kGameProgressFilePath).parent_path());
-	nlohmann::json root;
-	// unordered_mapはJSONオブジェクトへ変換されるため、商品ごとのレベルをキー付きで復元できる。
-	root["money"] = money_;
-	root["shopUpgradeLevels"] = shopUpgradeLevels_;
-	// unordered_setの列挙順は不定なので、差分確認しやすいようIDを並べ替えて保存する。
-	std::vector<std::string> unlockedStages(unlockedGameplayStageIds_.begin(), unlockedGameplayStageIds_.end());
-	std::sort(unlockedStages.begin(), unlockedStages.end());
-	root["unlockedGameplayStages"] = unlockedStages;
-	std::vector<std::string> clearedStages(clearedGameplayStageIds_.begin(), clearedGameplayStageIds_.end());
-	std::sort(clearedStages.begin(), clearedStages.end());
-	root["clearedGameplayStages"] = clearedStages;
-	std::vector<std::string> unlockedPlayerTypes(unlockedPlayerTypeNames_.begin(), unlockedPlayerTypeNames_.end());
-	// 実行結果に影響しないunordered_setの順序差で、セーブJSONの差分が毎回変わらないよう整列する。
-	std::sort(unlockedPlayerTypes.begin(), unlockedPlayerTypes.end());
-	root["unlockedPlayerTypes"] = unlockedPlayerTypes;
-	std::ofstream output(StringUtility::Utf8ToPath(kGameProgressFilePath));
-	if (output) {
-		output << std::setw(4) << root << std::endl;
-	}
+bool SceneManager::SaveGameProgress() const {
+	GameProgressSaveData data;
+	data.money = gameProgress_.GetMoney();
+	data.shopUpgradeLevels = gameProgress_.GetShopUpgradeLevels();
+	data.unlockedGameplayStageIds = gameProgress_.GetUnlockedGameplayStageIds();
+	data.clearedGameplayStageIds = gameProgress_.GetClearedGameplayStageIds();
+	data.unlockedPlayerTypeNames = gameProgress_.GetUnlockedPlayerTypeNames();
+	// SceneManagerは保存形式を知らず、現在の進行値をRepositoryへ渡すだけにする。
+	return GameProgressRepository::Save(data);
 }
 
 bool SceneManager::IsPlayerTypeUnlocked(const std::string& playerTypeName) const {
 	// プレイヤー選択画面はこの関数だけを参照し、保存形式や開放条件の詳細には依存させない。
 	const std::string prerequisiteStageId = GetPlayerUnlockPrerequisiteStage(playerTypeName);
-	return unlockedPlayerTypeNames_.contains(playerTypeName) ||
-	    (!prerequisiteStageId.empty() && clearedGameplayStageIds_.contains(prerequisiteStageId));
+	return gameProgress_.IsPlayerTypeUnlocked(playerTypeName, prerequisiteStageId);
 }
 
 std::string SceneManager::GetPlayerUnlockPrerequisiteStage(const std::string& playerTypeName) const {
-	const auto found = playerUnlockStagePrerequisites_.find(playerTypeName);
-	return found == playerUnlockStagePrerequisites_.end() ? std::string{} : found->second;
+	return stageUnlockCatalog_.GetPlayerPrerequisite(playerTypeName);
 }
 
 void SceneManager::LoadStageUnlockConditions() {
-	std::ifstream input(StringUtility::Utf8ToPath(kStageUnlockConditionsFilePath));
-	if (!input) {
-		// 設定ファイル追加前と同じく、defaultクリアでstage2を開放する既定値を使用する。
-		return;
-	}
-	try {
-		nlohmann::json root;
-		input >> root;
-		std::unordered_map<std::string, std::string> loadedConditions;
-		// JSONは「開放されるステージID: 先にクリアするステージID」の対応表として読む。
-		const auto& conditions = root.at("stageUnlockPrerequisites");
-		if (!conditions.is_object()) {
-			return;
-		}
-		for (auto it = conditions.begin(); it != conditions.end(); ++it) {
-			// 不正なIDと、自分自身のクリアを要求する成立不能な条件は読み飛ばす。
-			if (it.value().is_string() && IsValidGameplayStageId(it.key())) {
-				const std::string prerequisite = it.value().get<std::string>();
-				if (IsValidGameplayStageId(prerequisite) && prerequisite != it.key()) {
-					loadedConditions[it.key()] = prerequisite;
-				}
-			}
-		}
-		stageUnlockPrerequisites_ = std::move(loadedConditions);
-	} catch (...) {
-		// 壊れた設定では既定条件を維持し、ステージ選択を起動不能にしない。
+	std::unordered_map<std::string, std::string> loadedConditions;
+	const StageUnlockConditionsLoadStatus status = StageUnlockConditionsRepository::Load(loadedConditions);
+	if (status == StageUnlockConditionsLoadStatus::Loaded) {
+		// Repositoryが検証した対応表だけを採用し、不在・破損時は既定条件を維持する。
+		stageUnlockCatalog_.ReplaceStagePrerequisites(loadedConditions);
 	}
 }
 
 void SceneManager::SaveStageUnlockConditions() const {
-	std::filesystem::create_directories(StringUtility::Utf8ToPath(kStageUnlockConditionsFilePath).parent_path());
-	nlohmann::json root;
-	root["stageUnlockPrerequisites"] = nlohmann::json::object();
-	std::vector<std::string> stageIds;
-	stageIds.reserve(stageUnlockPrerequisites_.size());
-	for (const auto& [stageId, prerequisite] : stageUnlockPrerequisites_) {
-		stageIds.push_back(stageId);
-	}
-	// 設定ファイルを手作業やGit差分でも読みやすくするため、キーを名前順で出力する。
-	std::sort(stageIds.begin(), stageIds.end());
-	for (const std::string& stageId : stageIds) {
-		root["stageUnlockPrerequisites"][stageId] = stageUnlockPrerequisites_.at(stageId);
-	}
-	std::ofstream output(StringUtility::Utf8ToPath(kStageUnlockConditionsFilePath));
-	if (output) {
-		output << std::setw(4) << root << std::endl;
-	}
+	// SceneManagerは条件表だけを渡し、保存形式と並び順はRepositoryへ任せる。
+	StageUnlockConditionsRepository::Save(stageUnlockCatalog_.GetStagePrerequisites());
 }
 
 bool SceneManager::IsGameplayStageUnlocked(const std::string& stageId) const {
 	const std::string prerequisite = GetGameplayStageUnlockPrerequisite(stageId);
-	// 条件なし・過去に開放済み・条件ステージをクリア済み、のいずれかなら選択可能とする。
-	return prerequisite.empty() || unlockedGameplayStageIds_.contains(stageId) ||
-	    clearedGameplayStageIds_.contains(prerequisite);
+	return gameProgress_.IsGameplayStageUnlocked(stageId, prerequisite);
 }
 
 std::string SceneManager::GetGameplayStageUnlockPrerequisite(const std::string& stageId) const {
-	const auto found = stageUnlockPrerequisites_.find(stageId);
-	return found == stageUnlockPrerequisites_.end() ? std::string{} : found->second;
+	return stageUnlockCatalog_.GetStagePrerequisite(stageId);
 }
 
 void SceneManager::RecordGameplayStageClear(const std::string& stageId) {
-	// クリアした本人の履歴と、そのステージを条件にしている全ステージの開放を同時に確定する。
-	bool progressChanged = clearedGameplayStageIds_.insert(stageId).second;
-	for (const auto& [lockedStageId, prerequisiteStageId] : stageUnlockPrerequisites_) {
-		if (prerequisiteStageId == stageId) {
-			progressChanged |= unlockedGameplayStageIds_.insert(lockedStageId).second;
-		}
-	}
-	// defaultクリアで猫、stage2クリアで烏天狗など、同じクリア通知からプレイヤー開放も確定する。
-	for (const auto& [playerTypeName, prerequisiteStageId] : playerUnlockStagePrerequisites_) {
-		if (prerequisiteStageId == stageId) {
-			progressChanged |= unlockedPlayerTypeNames_.insert(playerTypeName).second;
-		}
-	}
+	// 開放ルールの判定はGameProgressへ委譲し、SceneManagerは条件表と保存契機だけを渡す。
+	const bool progressChanged = gameProgress_.RecordGameplayStageClear(
+		stageId, stageUnlockCatalog_.GetStagePrerequisites(), stageUnlockCatalog_.GetPlayerPrerequisites());
 	if (progressChanged) {
 		// リザルト画面へ移る前に即時保存し、直後にゲームを閉じても進行を失わないようにする。
 		SaveGameProgress();
@@ -313,11 +213,8 @@ void SceneManager::RecordGameplayStageClear(const std::string& stageId) {
 
 void SceneManager::ResetGameProgress() {
 	// ファイルだけでなく実行中の値も初期化し、再起動せずそのまま新しいゲームを始められるようにする。
-	money_ = 0;
-	shopUpgradeLevels_.clear();
-	unlockedGameplayStageIds_ = {"default"};
-	clearedGameplayStageIds_.clear();
-	unlockedPlayerTypeNames_ = {"巫女"};
+	gameProgress_.ResetEconomy();
+	gameProgress_.ResetUnlocks();
 	selectedPlayerTypeName_ = "巫女";
 	selectedGameplayStageId_ = "default";
 	activeGameplayStageId_ = "default";
@@ -328,90 +225,76 @@ void SceneManager::ResetGameProgress() {
 	SaveGameProgress();
 }
 
-bool SceneManager::WouldCreateStageUnlockCycle(
-	const std::string& stageId, const std::string& prerequisiteStageId) const {
-	std::unordered_set<std::string> visited;
-	std::string current = prerequisiteStageId;
-	// 新しい条件から前提条件を順にたどり、設定対象へ戻ってきた場合は循環と判断する。
-	while (!current.empty() && visited.insert(current).second) {
-		if (current == stageId) {
-			return true;
-		}
-		current = GetGameplayStageUnlockPrerequisite(current);
-	}
-	return false;
-}
-
 void SceneManager::AddMoney(int amount) {
-	// 0以下の値を無視し、報酬処理から所持金が減ることを防ぐ。
-	if (amount <= 0) return;
-	money_ += amount;
+	// 金額の妥当性と加算はGameProgressへ委譲し、変更がない場合は保存しない。
+	if (!gameProgress_.AddMoney(amount)) return;
 	// 正常終了を待たず、その場で保存して強制終了時に失う進捗を最小限にする。
 	SaveGameProgress();
 }
 
 bool SceneManager::SpendMoney(int amount) {
-	// 不正な価格または残高不足の場合は、保存データを変更しない。
-	if (amount < 0 || money_ < amount) return false;
-	money_ -= amount;
+	// 不正価格と残高判定をGameProgressへ集約し、SceneManagerは永続化だけを担当する。
+	if (!gameProgress_.SpendMoney(amount)) return false;
 	// 購入直後の残高を永続化し、次回起動時の所持金表示へ反映する。
 	SaveGameProgress();
 	return true;
 }
 
-std::string SceneManager::MakeShopUpgradeKey(
-	const std::string& playerTypeName, const std::string& upgradeId) const {
-	return playerTypeName + ":" + upgradeId;
+ShopPurchaseResult SceneManager::PurchaseGlobalShopUpgrade(
+	const std::string& upgradeId, int price, int maxLevel) {
+	// 保存に失敗した場合にメモリ上の残高と購入レベルも購入前へ戻せるようスナップショットを保持する。
+	const GameProgress previousProgress = gameProgress_;
+	const ShopPurchaseResult result = gameProgress_.PurchaseGlobalUpgrade(upgradeId, price, maxLevel);
+	if (result != ShopPurchaseResult::Purchased) return result;
+	if (SaveGameProgress()) return ShopPurchaseResult::Purchased;
+	gameProgress_ = previousProgress;
+	return ShopPurchaseResult::SaveFailed;
 }
 
 int SceneManager::GetShopUpgradeLevelForPlayer(
 	const std::string& playerTypeName, const std::string& upgradeId) const {
-	const auto found = shopUpgradeLevels_.find(MakeShopUpgradeKey(playerTypeName, upgradeId));
-	return found == shopUpgradeLevels_.end() ? 0 : found->second;
+	return gameProgress_.GetPlayerUpgradeLevel(playerTypeName, upgradeId);
 }
 
 void SceneManager::SetShopUpgradeLevelForPlayer(
 	const std::string& playerTypeName, const std::string& upgradeId, int level) {
-	if (!IsPlayerTypeUnlocked(playerTypeName) || upgradeId.empty()) {
+	const std::vector<std::string> playerTypeNames = LoadPlayerTypeNames();
+	if (upgradeId.empty() || playerTypeName == "Default" ||
+	    std::find(playerTypeNames.begin(), playerTypeNames.end(), playerTypeName) == playerTypeNames.end()) {
 		return;
 	}
-	// ショップ画面の表示対象を変更しても、ゲーム開始用のselectedPlayerTypeName_へ影響させず保存する。
-	shopUpgradeLevels_[MakeShopUpgradeKey(playerTypeName, upgradeId)] = (std::max)(0, level);
+	// 共通ステータス強化を未開放キャラクターにも適用し、適用済みレベルを同期マーカーとして保存する。
+	gameProgress_.SetPlayerUpgradeLevel(playerTypeName, upgradeId, level);
 	SaveGameProgress();
 }
 
-std::string SceneManager::MakeGlobalShopUpgradeKey(const std::string& upgradeId) const {
-	// プレイヤー名を含めない固定接頭辞により、キャラクターを変更しても同じ購入レベルを参照する。
-	return "global:" + upgradeId;
-}
-
 int SceneManager::GetGlobalShopUpgradeLevel(const std::string& upgradeId) const {
-	const auto found = shopUpgradeLevels_.find(MakeGlobalShopUpgradeKey(upgradeId));
-	// 全体強化追加前のセーブデータにはキーがないため、未購入のLv.0として後方互換を保つ。
-	return found == shopUpgradeLevels_.end() ? 0 : found->second;
+	return gameProgress_.GetGlobalUpgradeLevel(upgradeId);
 }
 
 void SceneManager::SetGlobalShopUpgradeLevel(const std::string& upgradeId, int level) {
-	shopUpgradeLevels_[MakeGlobalShopUpgradeKey(upgradeId)] = (std::max)(0, level);
+	gameProgress_.SetGlobalUpgradeLevel(upgradeId, level);
 	// 購入直後に保存し、ゲームを閉じても全体強化レベルが失われないようにする。
 	SaveGameProgress();
 }
 
 float SceneManager::GetGlobalExperienceBonusPercent() const {
-	// 例: Lv.3なら 3 * 10 = +30% をPlayer側の経験値計算へ渡す。
-	return static_cast<float>(GetGlobalShopUpgradeLevel("experience_gain")) * kGlobalGainBonusPercentPerLevel;
+	return gameProgress_.GetGlobalExperienceBonusPercent();
 }
 
 int SceneManager::ApplyGlobalGoldBonus(int baseAmount) const {
-	if (baseAmount <= 0) return 0;
-	// 基礎額 × (1 + レベル × 10%) で計算する。端数は獲得側に有利な切り上げとする。
-	const double bonusRate = 1.0 +
-	    static_cast<double>(GetGlobalShopUpgradeLevel("gold_gain")) *
-	    static_cast<double>(kGlobalGainBonusPercentPerLevel) / 100.0;
-	const double boostedAmount = std::ceil(static_cast<double>(baseAmount) * bonusRate);
-	// 大量取得や不正データでもintをオーバーフローさせず、表現可能な最大値へ丸める。
-	const double maxAmount = static_cast<double>((std::numeric_limits<int>::max)());
-	return boostedAmount >= maxAmount ? (std::numeric_limits<int>::max)() : static_cast<int>(boostedAmount);
+	return gameProgress_.ApplyGlobalGoldBonus(baseAmount);
+}
+
+PlayerStats SceneManager::ApplyGlobalShopStatUpgrades(const PlayerStats& stats) const {
+	PlayerStats effective = stats;
+	// 商品定義JSONではなく進行スナップショットから実効値を計算し、新規ゲームで基礎値へ戻せるようにする。
+	effective.baseHealth += 10.0f * gameProgress_.GetGlobalUpgradeLevel("health");
+	effective.attack += 5.0f * gameProgress_.GetGlobalUpgradeLevel("attack");
+	effective.attackSpeed += 5.0f * gameProgress_.GetGlobalUpgradeLevel("attack_speed");
+	effective.defense += 2.0f * gameProgress_.GetGlobalUpgradeLevel("defense");
+	effective.baseSpeed += 0.01f * gameProgress_.GetGlobalUpgradeLevel("speed");
+	return effective;
 }
 
 /// <summary>
@@ -432,8 +315,10 @@ void SceneManager::Update() {
 		const bool revealsTitleBehindFadeWhite =
 			transitionPhase_ == TransitionPhase::In && activeTransitionType_ == SceneTransitionType::FadeWhite &&
 			currentSceneName_ == "TITLE";
+		const bool revealsDemo = demoDirector_.IsActive() && currentSceneName_ == "GAMEPLAY" &&
+			transitionPhase_ == TransitionPhase::In;
 		const bool shouldUpdateScene =
-			(transitionPhase_ == TransitionPhase::Idle || updatesBehindFadeWhite || revealsTitleBehindFadeWhite) &&
+			(transitionPhase_ == TransitionPhase::Idle || updatesBehindFadeWhite || revealsTitleBehindFadeWhite || revealsDemo) &&
 		    (isScenePlaying_ || isFrameStepRequested_);
 		if (shouldUpdateScene) {
 			scene_->Update();
@@ -449,94 +334,37 @@ void SceneManager::Update() {
 			scene_->UpdateEditorTools();
 		}
 		isFrameStepRequested_ = false;
-		scene_->DrawEditorImGui();
-		// 共通ツールバーとステージパターン操作を最後に描き、シーン固有パネルより前面に表示します。
-		DrawEditorImGui();
+		if (!demoDirector_.IsActive()) {
+			scene_->DrawEditorImGui();
+			// 共通ツールバーとステージパターン操作を最後に描き、シーン固有パネルより前面に表示します。
+			DrawEditorImGui();
+		}
 	}
 }
 
 void SceneManager::UpdateDemoPlay() {
 	Input* input = Input::GetInstance();
 	if (input && input->TriggerKey(DIK_F1)) {
-		isDemoPlayActive_ = !isDemoPlayActive_;
-		demoSceneElapsed_ = 0.0f;
-		demoObservedSceneName_.clear();
-		if (isDemoPlayActive_) {
-			// デモ開始時はエディターの停止状態を解除し、検証ステージと先頭キャラクターへ揃える。
-			isScenePlaying_ = true;
-			GameTime::SetPaused(false);
-			SetSelectedGameplayStageId(kDemoStageId);
-			demoPlayerTypeNames_ = LoadPlayerTypeNames();
-			demoPlayerTypeNames_.erase(
-				std::remove(demoPlayerTypeNames_.begin(), demoPlayerTypeNames_.end(), "Default"),
-				demoPlayerTypeNames_.end());
-			demoPlayerTypeIndex_ = 0;
-			if (!demoPlayerTypeNames_.empty()) {
-				SetSelectedPlayerTypeName(demoPlayerTypeNames_.front());
-			}
-			isDemoRestartRequested_ = true;
+		demoToggleRequested_ = !demoToggleRequested_;
+	}
+	if (transitionPhase_ != TransitionPhase::Idle || nextScene_) return;
+
+	if (demoToggleRequested_) {
+		demoToggleRequested_ = false;
+		isScenePlaying_ = true;
+		GameTime::SetPaused(false);
+		if (demoDirector_.Toggle()) {
+			stageBeforeDemo_ = selectedGameplayStageId_;
+			SetSelectedGameplayStageId("stage2");
 		} else {
-			isDemoRestartRequested_ = false;
-		}
-	}
-	if (!isDemoPlayActive_) {
-		return;
-	}
-
-	if (demoObservedSceneName_ != currentSceneName_) {
-		demoObservedSceneName_ = currentSceneName_;
-		demoSceneElapsed_ = 0.0f;
-		isDemoAdvancePresentationStarted_ = false;
-	}
-
-	// 遷移中は表示時間へ含めず、既に予約されたシーン切り替えとも競合させない。
-	if (transitionPhase_ != TransitionPhase::Idle || nextScene_) {
-		return;
-	}
-	if (isDemoRestartRequested_) {
-		isDemoRestartRequested_ = false;
-		if (currentSceneName_ != "PLAYER_SELECT") {
-			ChangeScene("PLAYER_SELECT", SceneTransitionType::FadeWhite);
+			SetSelectedGameplayStageId(stageBeforeDemo_);
+			ChangeScene("TITLE", SceneTransitionType::Fade);
 			return;
 		}
 	}
-
-	demoSceneElapsed_ += GameTime::GetUnscaledDeltaTime();
-	if (currentSceneName_ == "PLAYER_SELECT") {
-		if (!isDemoAdvancePresentationStarted_ && demoSceneElapsed_ >= kDemoPlayerSelectSeconds) {
-			const std::string& demoPlayerType = demoPlayerTypeNames_.empty()
-				? selectedPlayerTypeName_
-				: demoPlayerTypeNames_[demoPlayerTypeIndex_];
-			SetSelectedPlayerTypeName(demoPlayerType);
-			if (PlayerSelectScene* playerSelectScene = dynamic_cast<PlayerSelectScene*>(scene_.get())) {
-				isDemoAdvancePresentationStarted_ = playerSelectScene->BeginDemoPlayerConfirmation(demoPlayerType);
-			}
-		}
-		return;
+	if (demoDirector_.ShouldStartGameplay(currentSceneName_, GameTime::GetUnscaledDeltaTime())) {
+		ChangeScene("GAMEPLAY", SceneTransitionType::Fade, 0.35f, 0.35f);
 	}
-	if (currentSceneName_ == "GAMEPLAY") {
-		if (!isDemoAdvancePresentationStarted_ && demoSceneElapsed_ >= kDemoGameplaySeconds) {
-			if (GamePlayScene* gamePlayScene = dynamic_cast<GamePlayScene*>(scene_.get())) {
-				// 時間切れで直接シーンを飛ばさず、通常と同じ専用アニメーション・霧・暗転を見せる。
-				isDemoAdvancePresentationStarted_ = gamePlayScene->BeginDemoDefeatPresentation();
-			}
-		}
-		return;
-	}
-	if (currentSceneName_ == "RESULT") {
-		if (demoSceneElapsed_ >= kDemoResultSeconds) {
-			SetSelectedGameplayStageId(kDemoStageId);
-			if (!demoPlayerTypeNames_.empty()) {
-				demoPlayerTypeIndex_ = (demoPlayerTypeIndex_ + 1) % demoPlayerTypeNames_.size();
-				SetSelectedPlayerTypeName(demoPlayerTypeNames_[demoPlayerTypeIndex_]);
-			}
-			ChangeScene("PLAYER_SELECT", SceneTransitionType::FadeWhite);
-		}
-		return;
-	}
-
-	// 想定外のシーンへ移った場合も、次のループをキャラクター選択から再開する。
-	ChangeScene("PLAYER_SELECT", SceneTransitionType::FadeWhite);
 }
 
 /// <summary>
@@ -565,7 +393,7 @@ void SceneManager::Draw2D() {
 }
 
 void SceneManager::DrawDemoPlayGuide() {
-	if (!isDemoPlayActive_ || !demoGuideBackgroundSprite_ || !demoGuideTextObject_) {
+	if (!demoDirector_.IsActive() || !demoGuideBackgroundSprite_ || !demoGuideTextObject_) {
 		return;
 	}
 	DirectXCommon* dxCommon = SpriteCommon::GetInstance()->GetDxCommon();
@@ -574,10 +402,12 @@ void SceneManager::DrawDemoPlayGuide() {
 	}
 
 	const float screenWidth = static_cast<float>(dxCommon->GetRenderWidth());
+	const float screenHeight = static_cast<float>(dxCommon->GetRenderHeight());
 	const float panelWidth = 330.0f;
 	const float panelHeight = 46.0f;
 	const float panelX = (std::max)(16.0f, screenWidth - panelWidth - 20.0f);
-	constexpr float panelY = 18.0f;
+	const bool isGameplay = currentSceneName_ == "GAMEPLAY";
+	const float panelY = isGameplay ? (std::max)(18.0f, screenHeight - panelHeight - 56.0f) : 18.0f;
 	SpriteCommon::GetInstance()->SetDraw(kBlendModeNormal);
 	SceneUiUtility::DrawColorSprite(
 		demoGuideBackgroundSprite_.get(), panelX, panelY, panelWidth, panelHeight,
@@ -585,6 +415,56 @@ void SceneManager::DrawDemoPlayGuide() {
 	demoGuideTextObject_->GetTransform().translate = {
 		panelX + panelWidth * 0.5f, panelY + panelHeight * 0.5f, 0.0f};
 	demoGuideTextObject_->Draw2D();
+
+	if (!isGameplay || !demoParticleGuideTextObject_) {
+		return;
+	}
+
+	const auto describeParticleLocation = [](const std::string& groupName) -> std::string {
+		if (groupName == "MagatamaGlow") return "飛んでいる勾玉の周囲（発光）";
+		if (groupName == "RuntimePlayerHitSpark") return "攻撃が敵に命中した位置";
+		if (groupName == "EnemyDeathBurst") return "敵・ボスを倒した位置";
+		if (groupName == "RuntimeDropSparkle") return "ドロップアイテムの周囲";
+		if (groupName == "RuntimeTornadoWispParticle") return "竜巻攻撃の軌道";
+		if (groupName == "RuntimeSelfDestructCore") return "自爆敵の中心（閃光）";
+		if (groupName == "RuntimeSelfDestructFlame") return "自爆敵の周囲（爆炎）";
+		if (groupName == "RuntimeSelfDestructSpark") return "自爆敵から外向き（火花）";
+		if (groupName == "RuntimeSelfDestructShockwave") return "自爆地点の地面（衝撃波）";
+		if (groupName.rfind("GlowBillboard_", 0) == 0) return "発光オブジェクトの位置";
+		return groupName;
+	};
+
+	const auto activeGroups = ParticleManager::GetInstance()->GetActiveParticleGroups();
+	std::string guideText = "パーティクル使用箇所  /  発生中\n";
+	if (activeGroups.empty()) {
+		guideText += "・発生待ち（攻撃・命中・撃破時に表示）";
+	} else {
+		constexpr size_t kMaxGuideGroups = 5;
+		const size_t groupCount = (std::min)(activeGroups.size(), kMaxGuideGroups);
+		for (size_t index = 0; index < groupCount; ++index) {
+			guideText += "・" + describeParticleLocation(activeGroups[index].first) +
+				"  ×" + std::to_string(activeGroups[index].second);
+			if (index + 1 < groupCount) guideText += "\n";
+		}
+	}
+	if (const auto* gameplay = dynamic_cast<const IDemoGameplayControl*>(scene_.get())) {
+		guideText += "\n";
+		guideText += gameplay->GetDemoParticleCue();
+	}
+
+	constexpr float particlePanelX = 20.0f;
+	constexpr float particlePanelY = 70.0f;
+	constexpr float particlePanelWidth = 520.0f;
+	const float particlePanelHeight = 76.0f + static_cast<float>((std::min)(activeGroups.size(), size_t{5})) * 25.0f;
+	SceneUiUtility::DrawColorSprite(
+		demoParticleGuideBackgroundSprite_.get(), particlePanelX, particlePanelY,
+		particlePanelWidth, particlePanelHeight, {0.015f, 0.035f, 0.075f, 0.88f});
+	TextComponent* guideTextComponent = demoParticleGuideTextObject_->GetComponent<TextComponent>();
+	guideTextComponent->SetText(guideText);
+	guideTextComponent->SetLayoutBounds(particlePanelWidth - 32.0f, particlePanelHeight - 24.0f);
+	demoParticleGuideTextObject_->GetTransform().translate = {
+		particlePanelX + 16.0f, particlePanelY + 12.0f, 0.0f};
+	demoParticleGuideTextObject_->Draw2D();
 }
 
 /// <summary>
@@ -749,14 +629,13 @@ void SceneManager::DrawEditorImGui() {
 		const std::string& newPrerequisite = prerequisiteIds[prerequisiteIndex];
 		if (newPrerequisite.empty()) {
 			// 対応表から削除されたステージは、IsGameplayStageUnlockedで常時開放として扱われる。
-			stageUnlockPrerequisites_.erase(selectedGameplayStageId_);
+			stageUnlockCatalog_.RemoveStagePrerequisite(selectedGameplayStageId_);
 			SaveStageUnlockConditions();
 			gameplayStageMessage_ = "Always unlocked: " + selectedGameplayStageId_;
-		} else if (WouldCreateStageUnlockCycle(selectedGameplayStageId_, newPrerequisite)) {
+		} else if (!stageUnlockCatalog_.SetStagePrerequisite(selectedGameplayStageId_, newPrerequisite)) {
 			gameplayStageMessage_ = "Unlock condition would create a cycle.";
 		} else {
 			// 編集結果は決定したフレームで保存し、ゲーム再起動後も同じルールを使用する。
-			stageUnlockPrerequisites_[selectedGameplayStageId_] = newPrerequisite;
 			SaveStageUnlockConditions();
 			gameplayStageMessage_ = "Unlock " + selectedGameplayStageId_ + " after clearing " + newPrerequisite;
 		}
@@ -879,15 +758,17 @@ void SceneManager::SetSelectedGameplayStageId(const std::string& stageId) {
 }
 
 std::string SceneManager::GetGameplayStageDisplayName(const std::string& stageId) const {
-	// 配置ファイルやセーブデータではdefault IDを維持し、画面表示だけを日本語名へ置き換える。
-	return stageId == "default" ? "平原" : stageId;
+	// 配置ファイルやセーブデータでは内部IDを維持し、画面表示だけを日本語名へ置き換える。
+	if (stageId == "default") return "平原";
+	if (stageId == "stage2") return "里";
+	return stageId;
 }
 
 std::vector<std::string> SceneManager::GetSelectableGameplayStageIds() const {
 	std::vector<std::string> selectableStageIds;
 	selectableStageIds.reserve(gameplayStageIds_.size());
 	for (const std::string& stageId : gameplayStageIds_) {
-		if (stageId != kDemoStageId) {
+		if (stageId.rfind(kDemoStageIdPrefix, 0) != 0) {
 			selectableStageIds.push_back(stageId);
 		}
 	}
@@ -895,6 +776,9 @@ std::vector<std::string> SceneManager::GetSelectableGameplayStageIds() const {
 }
 
 std::string SceneManager::GetGameplayStageJsonPath(const std::string& stageId) const {
+	if (demoDirector_.IsActive() && stageId == "stage2") {
+		return "Resources/Data/Scenes/GAMEPLAY_demo_stage2_objects.json";
+	}
 	if (stageId.empty() || stageId == "default") {
 		return "Resources/Data/Scenes/GAMEPLAY_objects.json";
 	}
@@ -1000,7 +884,7 @@ void SceneManager::QueueNextScene(const std::string& sceneName) {
 		RefreshGameplayStagePatterns();
 		ApplyGameplayStagePath(nextScene_.get(), selectedGameplayStageId_);
 		// 配置JSONに保存されたPlayer設定より、選択画面で決定したタイプを優先させる。
-		nextScene_->SetPlayerTypeOverride(selectedPlayerTypeName_);
+		nextScene_->SetPlayerTypeOverride(demoDirector_.IsActive() ? "巫女" : selectedPlayerTypeName_);
 	}
 }
 

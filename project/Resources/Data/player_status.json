@@ -17,16 +17,6 @@
                 "attack": "",
                 "enabled": false,
                 "level": "1"
-            },
-            {
-                "attack": "",
-                "enabled": false,
-                "level": "1"
-            },
-            {
-                "attack": "",
-                "enabled": false,
-                "level": "1"
             }
         ],
         "attackSpeed": 100.0,
@@ -40,19 +30,10 @@
         "isAnimationModel": false,
         "level": 1,
         "model": "sphere.obj",
+        "modelDirectory": "/",
         "name": "Default",
         "speed": 100.0,
         "statusSlots": [
-            {
-                "enabled": false,
-                "level": "1",
-                "status": ""
-            },
-            {
-                "enabled": false,
-                "level": "1",
-                "status": ""
-            },
             {
                 "enabled": false,
                 "level": "1",
@@ -71,22 +52,12 @@
         ]
     },
     "巫女": {
-        "attack": 155.0,
+        "attack": 185.0,
         "attackSize": 100.0,
         "attackSlots": [
             {
-                "attack": "勾玉",
+                "attack": "ArcHoming",
                 "enabled": true,
-                "level": "1"
-            },
-            {
-                "attack": "",
-                "enabled": false,
-                "level": "1"
-            },
-            {
-                "attack": "",
-                "enabled": false,
                 "level": "1"
             },
             {
@@ -100,31 +71,29 @@
                 "level": "1"
             }
         ],
-        "attackSpeed": 100.0,
-        "baseHealth": 180.0,
-        "baseSpeed": 0.18000002205371857,
+        "attackSpeed": 115.0,
+        "baseHealth": 260.0,
+        "baseSpeed": 0.20000003278255463,
         "damageInvincibilityDuration": 1.0,
-        "defense": 16.0,
+        "defense": 22.0,
+        "entrancePresentationStyle": "shrine_descent",
         "experience": 0,
         "experienceCorrection": 100.0,
+        "gameplayDefeatAnimation": "力尽きる完全_巫女",
+        "gameplayStartAnimation": "ゲーム開始_巫女",
         "health": 100.0,
         "isAnimationModel": true,
         "level": 1,
         "model": "miko.gltf",
+        "modelDirectory": "/human",
         "name": "巫女",
+        "rightHandEquipmentDirectory": "/",
+        "rightHandEquipmentModel": "",
+        "selectionEntranceAnimation": "選択登場_巫女",
+        "selectionEntranceDuration": 1.600000023841858,
         "sizeScale": 0.45500001311302185,
         "speed": 100.0,
         "statusSlots": [
-            {
-                "enabled": false,
-                "level": "1",
-                "status": ""
-            },
-            {
-                "enabled": false,
-                "level": "1",
-                "status": ""
-            },
             {
                 "enabled": false,
                 "level": "1",
@@ -143,7 +112,7 @@
         ]
     },
     "烏天狗": {
-        "attack": 155.0,
+        "attack": 185.0,
         "attackSize": 120.0,
         "attackSlots": [
             {
@@ -160,43 +129,31 @@
                 "attack": "",
                 "enabled": false,
                 "level": "1"
-            },
-            {
-                "attack": "",
-                "enabled": false,
-                "level": "1"
-            },
-            {
-                "attack": "",
-                "enabled": false,
-                "level": "1"
             }
         ],
-        "attackSpeed": 100.0,
-        "baseHealth": 130.0,
-        "baseSpeed": 0.3399999737739563,
+        "attackSpeed": 115.0,
+        "baseHealth": 210.0,
+        "baseSpeed": 0.35999995470046997,
         "damageInvincibilityDuration": 1.0,
-        "defense": 8.0,
+        "defense": 14.0,
+        "entrancePresentationStyle": "aerial_dash",
         "experience": 0,
         "experienceCorrection": 100.0,
+        "gameplayDefeatAnimation": "力尽きる完全_烏天狗",
+        "gameplayStartAnimation": "ゲーム開始_烏天狗",
         "health": 100.0,
         "isAnimationModel": true,
         "level": 1,
         "model": "doppelganger.gltf",
+        "modelDirectory": "/doppelganger",
         "name": "烏天狗",
-        "sizeScale": 0.47,
+        "rightHandEquipmentDirectory": "/brade",
+        "rightHandEquipmentModel": "brade.obj",
+        "selectionEntranceAnimation": "選択登場_烏天狗",
+        "selectionEntranceDuration": 1.4500000476837158,
+        "sizeScale": 0.4699999988079071,
         "speed": 100.0,
         "statusSlots": [
-            {
-                "enabled": false,
-                "level": "1",
-                "status": ""
-            },
-            {
-                "enabled": false,
-                "level": "1",
-                "status": ""
-            },
             {
                 "enabled": false,
                 "level": "1",
@@ -215,7 +172,7 @@
         ]
     },
     "猫": {
-        "attack": 175.0,
+        "attack": 205.0,
         "attackSize": 100.0,
         "attackSlots": [
             {
@@ -232,43 +189,31 @@
                 "attack": "",
                 "enabled": false,
                 "level": "1"
-            },
-            {
-                "attack": "",
-                "enabled": false,
-                "level": "1"
-            },
-            {
-                "attack": "",
-                "enabled": false,
-                "level": "1"
             }
         ],
-        "attackSpeed": 130.0,
-        "baseHealth": 200.0,
-        "baseSpeed": 0.24000005424022675,
+        "attackSpeed": 145.0,
+        "baseHealth": 280.0,
+        "baseSpeed": 0.2600000500679016,
         "damageInvincibilityDuration": 1.0,
-        "defense": 12.0,
+        "defense": 18.0,
+        "entrancePresentationStyle": "cat_jump",
         "experience": 0,
         "experienceCorrection": 100.0,
+        "gameplayDefeatAnimation": "力尽きる完全_猫",
+        "gameplayStartAnimation": "ゲーム開始_猫",
         "health": 100.0,
         "isAnimationModel": true,
         "level": 1,
         "model": "neko.gltf",
+        "modelDirectory": "/cat",
         "name": "猫",
+        "rightHandEquipmentDirectory": "/",
+        "rightHandEquipmentModel": "",
+        "selectionEntranceAnimation": "選択登場_猫",
+        "selectionEntranceDuration": 1.75,
         "sizeScale": 0.48500001430511475,
         "speed": 100.0,
         "statusSlots": [
-            {
-                "enabled": false,
-                "level": "1",
-                "status": ""
-            },
-            {
-                "enabled": false,
-                "level": "1",
-                "status": ""
-            },
             {
                 "enabled": false,
                 "level": "1",

@@ -1,13 +1,13 @@
 #pragma once
 #include "../../collision/CollisionPrimitive.h"
-#include "core/Component.h"
-#include "core/GameObject.h"
+#include "core/EntityComponent.h"
+#include "core/Entity.h"
 #include "../../math/MathConstants.h"
 #include "LineDrawer.h"
 #include <algorithm>
 #include <cmath>
 
-class SphereColliderComponent : public Component {
+class SphereColliderComponent : public EntityComponent {
 public:
 	/// <summary>
 	/// デバッグ表示が有効な場合、球コライダーを線で描画します。

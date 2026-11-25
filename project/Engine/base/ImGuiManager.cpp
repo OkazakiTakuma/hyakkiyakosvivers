@@ -1,5 +1,6 @@
 #include "ImGuiManager.h"
 #include "StringUtility.h"
+#include "FontManager.h"
 #include <algorithm>
 #include <cmath>
 
@@ -169,19 +170,23 @@ void ImGuiManager::LoadGameFonts() {
 		registerFont(name, io.Fonts->AddFontFromFileTTF(path, 32.0f, &fontConfig, io.Fonts->GetGlyphRangesJapanese()));
 	}
 
-	const std::filesystem::path fontDirectory = StringUtility::Utf8ToPath("Resources/Fonts");
-	if (std::filesystem::exists(fontDirectory)) {
-		for (const auto& entry : std::filesystem::recursive_directory_iterator(fontDirectory)) {
-			if (!entry.is_regular_file()) {
-				continue;
-			}
-			const std::string extension = StringUtility::PathToUtf8(entry.path().extension());
-			if (extension != ".ttf" && extension != ".otf" && extension != ".ttc") {
-				continue;
-			}
-			const std::string name = StringUtility::PathToUtf8(entry.path().stem());
-			const std::string path = StringUtility::PathToUtf8(entry.path());
-			registerFont(name, io.Fonts->AddFontFromFileTTF(path.c_str(), 32.0f, &fontConfig, io.Fonts->GetGlyphRangesJapanese()));
+	// TextComponentの選択肢にはDirectWriteが認識するファミリー名を使う。
+	auto* collection = FontManager::GetInstance()->GetCollection();
+	if (!collection) return;
+	for (UINT32 index = 0; index < collection->GetFontFamilyCount(); ++index) {
+		Microsoft::WRL::ComPtr<IDWriteFontFamily> family;
+		Microsoft::WRL::ComPtr<IDWriteLocalizedStrings> familyNames;
+		if (FAILED(collection->GetFontFamily(index, &family)) || FAILED(family->GetFamilyNames(&familyNames))) continue;
+		UINT32 nameIndex = 0;
+		BOOL found = FALSE;
+		familyNames->FindLocaleName(L"en-us", &nameIndex, &found);
+		if (!found) nameIndex = 0;
+		UINT32 length = 0;
+		if (FAILED(familyNames->GetStringLength(nameIndex, &length))) continue;
+		std::wstring name(length + 1, L'\0');
+		if (SUCCEEDED(familyNames->GetString(nameIndex, name.data(), length + 1))) {
+			name.resize(length);
+			fontNames_.push_back(StringUtility::PathToUtf8(std::filesystem::path(name)));
 		}
 	}
 #endif

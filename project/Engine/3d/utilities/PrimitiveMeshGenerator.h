@@ -15,5 +15,7 @@ struct MeshData {
 };
 
 MeshData GenerateCylinder(float radius, float height, uint32_t subdivision, bool createTopCap, bool createBottomCap);
+/// <summary>XY平面上に、表裏どちらからも見える板ポリゴンを生成します。</summary>
+MeshData GeneratePlane(float width, float height);
 
 } // 名前空間 PrimitiveMeshGenerator

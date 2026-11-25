@@ -12,8 +12,9 @@
 #include <array>
 #include <cmath>
 #include <filesystem>
+#include <iomanip>
 #include <limits>
-#include <random>
+#include <sstream>
 #include <unordered_set>
 #include <Xinput.h>
 #ifdef USE_IMGUI
@@ -22,33 +23,96 @@
 #include "base_scene/details/BaseSceneRuntimeDetails.h"
 
 namespace {
-constexpr float kMoneyItemDropChance = 0.20f;
-constexpr int kMoneyDropMinimum = 5;
-constexpr int kMoneyDropMaximum = 15;
+constexpr const char* kPlayerHitSparkGroup = "RuntimePlayerHitSpark";
+constexpr const char* kPlayerHitSparkTexture = "Resources/circle.png";
 
-constexpr int kBossRewardRollMinimum = 1;
-constexpr int kBossRewardRollMaximum = 100;
-constexpr int kBossRewardSingleUpgradeThreshold = 70;
-constexpr int kBossRewardTripleUpgradeThreshold = 95;
-constexpr int kBossRewardSingleUpgradeCount = 1;
-constexpr int kBossRewardTripleUpgradeCount = 3;
-constexpr int kBossRewardRareUpgradeCount = 5;
-
-int GetBossRewardUpgradeCount(int rewardRoll) {
-	if (rewardRoll <= kBossRewardSingleUpgradeThreshold) {
-		return kBossRewardSingleUpgradeCount;
+Vector4 GetPlayerHitSparkColor(PlayerAttackEntityMotionType motionType) {
+	switch (motionType) {
+	case PlayerAttackEntityMotionType::Magatama:
+		return {1.0f, 0.72f, 0.24f, 0.96f};
+	case PlayerAttackEntityMotionType::Orbit:
+		return {0.24f, 0.72f, 1.0f, 0.96f};
+	case PlayerAttackEntityMotionType::PoisonCloud:
+		return {0.45f, 1.0f, 0.18f, 0.90f};
+	case PlayerAttackEntityMotionType::FlameField:
+		return {1.0f, 0.24f, 0.03f, 0.96f};
+	case PlayerAttackEntityMotionType::SkyLaser:
+		return {0.58f, 0.88f, 1.0f, 1.0f};
+	case PlayerAttackEntityMotionType::Boomerang:
+		return {1.0f, 0.92f, 0.62f, 0.96f};
+	case PlayerAttackEntityMotionType::Ricochet:
+		return {0.74f, 1.0f, 0.18f, 0.96f};
+	case PlayerAttackEntityMotionType::ClawSlash:
+		return {1.0f, 0.30f, 0.72f, 0.96f};
+	case PlayerAttackEntityMotionType::Linear:
+	default:
+		return {1.0f, 0.86f, 0.30f, 0.96f};
 	}
-	if (rewardRoll <= kBossRewardTripleUpgradeThreshold) {
-		return kBossRewardTripleUpgradeCount;
-	}
-	return kBossRewardRareUpgradeCount;
-}
 }
 
-GameObject* BaseScene::FindNearestEnemy(const Vector3& position) const {
-	GameObject* nearest = nullptr;
+/// <summary>命中点から短い光条を散らし、ダメージ成立を即座に伝えます。</summary>
+void EmitPlayerHitSpark(Entity* projectileObject, Entity* enemyObject, bool enemyDefeated) {
+	PlayerAttackEntityComponent* projectile =
+		projectileObject ? projectileObject->GetComponent<PlayerAttackEntityComponent>() : nullptr;
+	EnemyComponent* enemy = enemyObject ? enemyObject->GetComponent<EnemyComponent>() : nullptr;
+	if (!projectile || !enemy) {
+		return;
+	}
+
+	ParticleManager* particleManager = ParticleManager::GetInstance();
+	if (!particleManager->HasGroup(kPlayerHitSparkGroup)) {
+		particleManager->CreateParticleGroup(
+			kPlayerHitSparkGroup, kPlayerHitSparkTexture, kMeshTypeQuad);
+		particleManager->SetGroupBlendMode(kPlayerHitSparkGroup, kBlendModeAdd);
+	}
+
+	Vector3 attackDirection = projectile->GetDirection();
+	if (Length(attackDirection) <= MathConstants::kDirectionEpsilon) {
+		attackDirection = enemyObject->GetTransform().translate - projectileObject->GetTransform().translate;
+	}
+	attackDirection.y = 0.0f;
+	if (Length(attackDirection) > MathConstants::kDirectionEpsilon) {
+		attackDirection = Normalize(attackDirection);
+	} else {
+		attackDirection = {0.0f, 0.0f, 1.0f};
+	}
+
+	const float enemyScale = (std::max)(0.5f, enemy->GetStats().sizeScale);
+	const float sparkLength = (std::clamp)(0.10f + projectile->GetSize() * 0.07f, 0.11f, 0.24f);
+	const PlayerAttackEntityMotionType motionType = projectile->GetMotionType();
+	const bool isSustainedArea =
+		motionType == PlayerAttackEntityMotionType::PoisonCloud ||
+		motionType == PlayerAttackEntityMotionType::FlameField;
+
+	ParticleEmitParam param{};
+	// 横長のQuadをランダム回転し、丸い発光ではなく放射状の火花として見せる。
+	param.scale = {sparkLength, sparkLength * 0.22f, 1.0f};
+	param.endScale = {sparkLength * 0.12f, sparkLength * 0.03f, 1.0f};
+	param.randomScaleRange = {sparkLength * 0.32f, sparkLength * 0.05f, 0.0f};
+	param.baseVelocity = {attackDirection.x * 0.010f, 0.010f, attackDirection.z * 0.010f};
+	param.randomVelocityRange = {0.035f, 0.022f, 0.035f};
+	param.randomPositionRange = {0.07f * enemyScale, 0.10f * enemyScale, 0.07f * enemyScale};
+	param.lifeTime = isSustainedArea ? 0.16f : 0.22f;
+	param.randomRotateRange = {0.0f, 0.0f, MathConstants::kPi};
+	param.isRandomRotate = true;
+	param.color = GetPlayerHitSparkColor(motionType);
+	param.endColor = {param.color.x, param.color.y * 0.55f, param.color.z * 0.35f, 0.0f};
+	// 継続ダメージと撃破パーティクルには重ねすぎず、通常命中だけ最も強く見せる。
+	param.count = isSustainedArea ? 3u : enemyDefeated ? 4u : 7u;
+	param.isBillboard = true;
+
+	const Vector3 impactPosition =
+		enemyObject->GetTransform().translate +
+		Vector3{-attackDirection.x * 0.18f * enemyScale, 0.32f * enemyScale,
+		        -attackDirection.z * 0.18f * enemyScale};
+	particleManager->Emit(kPlayerHitSparkGroup, impactPosition, param.count, param);
+}
+} // namespace
+
+Entity* BaseScene::FindNearestEnemy(const Vector3& position) const {
+	Entity* nearest = nullptr;
 	float nearestDistance = 0.0f;
-	for (const auto& object : sceneObjects_) {
+	for (Entity* object : sceneObjects_.GetEntitiesWith<EnemyComponent>()) {
 		EnemyComponent* enemy = object->GetComponent<EnemyComponent>();
 		if (!enemy || !enemy->IsEnabled() || enemy->GetCurrentHealth() <= 0.0f) {
 			continue;
@@ -56,14 +120,103 @@ GameObject* BaseScene::FindNearestEnemy(const Vector3& position) const {
 
 		const float distance = Length(object->GetTransform().translate - position);
 		if (!nearest || distance < nearestDistance) {
-			nearest = object.get();
+			nearest = object;
 			nearestDistance = distance;
 		}
 	}
 	return nearest;
 }
 
-GameObject* BaseScene::CreateRuntimePlayerAttackEntity(const PlayerAttackShotRequest& request) {
+void BaseScene::CreateDamageNumber(
+	float damage, const Vector3& enemyPosition, float enemySizeScale) {
+	if (damage <= 0.0f) {
+		return;
+	}
+
+	// 同時ヒットが続いてもGPU用テキストリソースを際限なく保持しない。
+	constexpr size_t kMaximumPopupCount = 96;
+	if (damageNumberPopups_.size() >= kMaximumPopupCount) {
+		damageNumberPopups_.erase(damageNumberPopups_.begin());
+	}
+
+	std::ostringstream damageText;
+	const float roundedDamage = std::round(damage);
+	if (std::fabs(damage - roundedDamage) < 0.05f) {
+		damageText << static_cast<int>(roundedDamage);
+	} else {
+		damageText << std::fixed << std::setprecision(1) << damage;
+	}
+
+	auto textObject = std::make_unique<Entity>();
+	textObject->SetName("DamageNumber");
+	TextComponent* text = textObject->AddComponent<TextComponent>();
+	text->SetText(damageText.str());
+	text->SetFontSize(30.0f);
+	text->SetAnchor(TextComponent::Anchor::BottomCenter);
+	text->SetColor({1.0f, 0.82f, 0.18f, 1.0f});
+
+	DamageNumberPopup popup;
+	popup.textObject = std::move(textObject);
+	// sizeScaleに合わせて通常敵・大型ボスのどちらでもモデル上端付近から表示する。
+	popup.worldPosition = enemyPosition +
+		Vector3{0.0f, (std::max)(0.9f, enemySizeScale * 1.15f), 0.0f};
+	const int offsetStep = static_cast<int>(nextDamageNumberIndex_++ % 5) - 2;
+	popup.horizontalOffset = static_cast<float>(offsetStep) * 9.0f;
+	damageNumberPopups_.push_back(std::move(popup));
+}
+
+void BaseScene::UpdateDamageNumbers() {
+	constexpr float kDisplayDuration = 0.9f;
+	const float deltaTime = GameTime::GetDeltaTime();
+	for (DamageNumberPopup& popup : damageNumberPopups_) {
+		popup.elapsedSeconds += deltaTime;
+	}
+	damageNumberPopups_.erase(
+		std::remove_if(
+			damageNumberPopups_.begin(), damageNumberPopups_.end(),
+			[](const DamageNumberPopup& popup) {
+				return popup.elapsedSeconds >= kDisplayDuration;
+			}),
+		damageNumberPopups_.end());
+}
+
+void BaseScene::DrawDamageNumbers() {
+	constexpr float kDisplayDuration = 0.9f;
+	Camera* camera = Object3dCommon::GetInstance()
+		? Object3dCommon::GetInstance()->GetDefaultCamera()
+		: nullptr;
+	if (!camera) {
+		return;
+	}
+
+	const float screenWidth = static_cast<float>(Input::GetInstance()->GetClientWidth());
+	const float screenHeight = static_cast<float>(Input::GetInstance()->GetClientHeight());
+	for (DamageNumberPopup& popup : damageNumberPopups_) {
+		Vector3 ndc{};
+		if (!popup.textObject || !ProjectToNdc(camera, popup.worldPosition, ndc) ||
+			ndc.z < 0.0f || ndc.z > 1.0f ||
+			ndc.x < -1.1f || ndc.x > 1.1f || ndc.y < -1.1f || ndc.y > 1.1f) {
+			continue;
+		}
+
+		const float progress = (std::clamp)(popup.elapsedSeconds / kDisplayDuration, 0.0f, 1.0f);
+		EulerTransform& transform = popup.textObject->GetTransform();
+		transform.translate.x = (ndc.x + 1.0f) * 0.5f * screenWidth + popup.horizontalOffset;
+		transform.translate.y = (1.0f - ndc.y) * 0.5f * screenHeight - 16.0f - 54.0f * progress;
+		transform.translate.z = 0.0f;
+
+		if (TextComponent* text = popup.textObject->GetComponent<TextComponent>()) {
+			// 前半は読みやすく保持し、後半だけ滑らかに透明化する。
+			const float alpha = progress <= 0.35f
+				? 1.0f
+				: 1.0f - (progress - 0.35f) / 0.65f;
+			text->SetColor({1.0f, 0.82f, 0.18f, (std::max)(0.0f, alpha)});
+		}
+		popup.textObject->Draw2D();
+	}
+}
+
+Entity* BaseScene::CreateRuntimePlayerAttackEntity(const PlayerAttackShotRequest& request) {
 	if (request.motionType == PlayerAttackEntityMotionType::PoisonCloud) {
 		// 五行結界はプレイヤーへ追従する持続型フィールドなので、攻撃間隔ごとに新規生成すると
 		// 生存中の五芒星が同じ場所へ重なり続ける。既存の結界が消えるまでは1個だけ維持する。
@@ -76,7 +229,7 @@ GameObject* BaseScene::CreateRuntimePlayerAttackEntity(const PlayerAttackShotReq
 		}
 	}
 
-	auto object = std::make_unique<GameObject>();
+	auto object = std::make_unique<Entity>();
 	object->SetName(MakeUniqueObjectName(request.attackName.empty() ? "PlayerAttack" : request.attackName));
 	object->SetEditorType("PlayerAttackEntity");
 	object->GetTransform().translate = request.position;
@@ -91,12 +244,14 @@ GameObject* BaseScene::CreateRuntimePlayerAttackEntity(const PlayerAttackShotReq
 	projectile->SetSize(request.size);
 	projectile->SetLifeTime(request.lifeTime);
 	projectile->SetPierceCount(request.pierceCount);
+	projectile->SetKnockback(request.knockback);
 	projectile->SetInfinitePierce(request.infinitePierce);
 	projectile->SetRepeatHitInterval(request.repeatHitInterval);
 	projectile->SetHomingEnabled(request.homing);
 	projectile->SetHomingAccuracy(request.homingAccuracy);
 	projectile->SetMotionType(request.motionType);
 	projectile->SetMotionAnchor(request.motionAnchor);
+	projectile->SetSourceOwner(request.sourceOwner);
 	projectile->SetOrbitAngleRadians(request.orbitAngleRadians);
 	projectile->SetOrbitRadius(request.orbitRadius);
 	projectile->SetOrbitHeight(request.orbitHeight);
@@ -113,7 +268,7 @@ GameObject* BaseScene::CreateRuntimePlayerAttackEntity(const PlayerAttackShotReq
 		projectile->SetHomingTarget(FindNearestEnemy(request.position));
 	}
 	if (presentation.aimAtNearestEnemyOnSpawn) {
-		if (GameObject* target = FindNearestEnemy(request.position)) {
+		if (Entity* target = FindNearestEnemy(request.position)) {
 			Vector3 toTarget = target->GetTransform().translate - request.position;
 			toTarget.y = 0.0f;
 			if (Length(toTarget) > MathConstants::kDirectionEpsilon) {
@@ -122,7 +277,7 @@ GameObject* BaseScene::CreateRuntimePlayerAttackEntity(const PlayerAttackShotReq
 		}
 	}
 
-	if (request.attackName == "Straight" && request.motionType == PlayerAttackEntityMotionType::Linear) {
+	if (request.visualId == "straight_slash" && request.motionType == PlayerAttackEntityMotionType::Linear) {
 		// 共通の弾パラメーター設定後に描画だけを差し替え、他の攻撃のモデル・軌跡には影響させない。
 		// 球モデルと直線のトレイルを使わず、初フレームから完成した斬撃を表示する。
 		object->AddComponent<StraightSlashVisualComponent>(request.lifeTime);
@@ -149,6 +304,10 @@ GameObject* BaseScene::CreateRuntimePlayerAttackEntity(const PlayerAttackShotReq
 		object3d->SetModel("sphere.obj");
 	}
 	object3d->SetEnabled(presentation.modelVisible);
+	if (!presentation.modelVisible) {
+		// 専用エフェクトへ差し替えた非表示モデルは、別の影描画経路からも影を残さない。
+		object3d->SetShadowEnabled(false);
+	}
 	if (request.motionType == PlayerAttackEntityMotionType::Boomerang) {
 		// 大幣は一枚のテクスチャで無理に色分けせず、柄・紙垂・結び目を同じTransformの
 		// 別モデルとして重ねる。これにより紙垂を白く保ったまま柄を木色にできる。
@@ -168,6 +327,41 @@ GameObject* BaseScene::CreateRuntimePlayerAttackEntity(const PlayerAttackShotReq
 		Object3dComponent* tie = object->AddComponent<Object3dComponent>();
 		tie->SetModel(kTieModel);
 		tie->SetColor({0.72f, 0.035f, 0.025f, 1.0f});
+	}
+	if (request.motionType == PlayerAttackEntityMotionType::Ricochet) {
+		// 生成りのお札本体へ朱色の印面モデルを少し浮かせて重ね、反射中も球ではなく
+		// 一枚の護符として読めるようにする。黄緑色は軌跡へ残して攻撃の識別色を維持する。
+		object3d->SetColor({1.00f, 0.92f, 0.68f, 1.0f});
+
+		constexpr const char* kOfudaMarkModel = "ricochet_ofuda_mark.obj";
+		if (!ModelManager::GetInstance()->FindModel(kOfudaMarkModel)) {
+			ModelManager::GetInstance()->LoadModel(kOfudaMarkModel);
+		}
+		Object3dComponent* ofudaMark = object->AddComponent<Object3dComponent>();
+		ofudaMark->SetModel(kOfudaMarkModel);
+		ofudaMark->SetColor({0.82f, 0.035f, 0.018f, 1.0f});
+		ofudaMark->SetShadowEnabled(false);
+	}
+	if (request.motionType == PlayerAttackEntityMotionType::Orbit) {
+		// アイコンと同じ白地と朱色の陰陽模様にし、青は水の霊気、赤は炎として軌跡へ使う。
+		object3d->SetColor({1.00f, 0.96f, 0.82f, 1.0f});
+		object3d->SetShadowEnabled(false);
+
+		constexpr const char* kYinYangDarkModel = "orbit_yinyang_dark.obj";
+		if (!ModelManager::GetInstance()->FindModel(kYinYangDarkModel)) {
+			ModelManager::GetInstance()->LoadModel(kYinYangDarkModel);
+		}
+		Object3dComponent* yinYangDark = object->AddComponent<Object3dComponent>();
+		yinYangDark->SetModel(kYinYangDarkModel);
+		yinYangDark->SetColor({0.82f, 0.018f, 0.012f, 1.0f});
+		yinYangDark->SetShadowEnabled(false);
+
+		// 編隊全体の環は一発目だけが描画を担当し、弾数分の重複描画を避ける。
+		if (request.colorIndex == 0) {
+			object->AddComponent<OrbitFormationVisualComponent>(
+			    request.lifeTime, request.motionAnchor, request.orbitHeight, request.orbitRadius,
+			    request.level == "super");
+		}
 	}
 	if (request.motionType == PlayerAttackEntityMotionType::PoisonCloud ||
 	    request.motionType == PlayerAttackEntityMotionType::FlameField) {
@@ -205,8 +399,19 @@ GameObject* BaseScene::CreateRuntimePlayerAttackEntity(const PlayerAttackShotReq
 			trail->SetHeadColor(headColor);
 			trail->SetTailColor(GetMagatamaTrailTailColor(request.colorIndex));
 		} else if (presentation.overrideTrailColors) {
-			trail->SetHeadColor(presentation.trailHeadColor);
-			trail->SetTailColor(presentation.trailTailColor);
+			if (request.motionType == PlayerAttackEntityMotionType::Orbit) {
+				// 隣り合う陰陽玉で炎と水を交互にし、通常アイコンの赤青の輪郭へ合わせる。
+				const bool fireTrail = (request.colorIndex % 2) == 0;
+				trail->SetHeadColor(fireTrail
+				    ? Vector4{1.00f, 0.20f, 0.02f, 0.92f}
+				    : Vector4{0.08f, 0.62f, 1.00f, 0.92f});
+				trail->SetTailColor(fireTrail
+				    ? Vector4{0.72f, 0.01f, 0.00f, 0.0f}
+				    : Vector4{0.01f, 0.12f, 0.82f, 0.0f});
+			} else {
+				trail->SetHeadColor(presentation.trailHeadColor);
+				trail->SetTailColor(presentation.trailTailColor);
+			}
 		}
 		if (presentation.addCoreTrail) {
 			// 細い白熱線を外光へ重ね、一本ごとの切っ先を読み取りやすくする。
@@ -254,7 +459,7 @@ GameObject* BaseScene::CreateRuntimePlayerAttackEntity(const PlayerAttackShotReq
 		glowParam.count = 2;
 		glowParam.isBillboard = true;
 		glowEmitter->SetParam(glowParam);
-		// Component::Update より前に即時発生させるため、初回分も弾の生成位置へ同期しておく。
+		// EntityComponent::Update より前に即時発生させるため、初回分も弾の生成位置へ同期しておく。
 		glowEmitter->SetTranslate(request.position);
 		glowEmitter->Emit();
 	}
@@ -265,25 +470,69 @@ GameObject* BaseScene::CreateRuntimePlayerAttackEntity(const PlayerAttackShotReq
 	return sceneObjects_.back().get();
 }
 
+/// <summary>プレイヤー弾と敵の精密判定を行い、命中時の副作用を一度だけ適用します。</summary>
+PlayerProjectileHitResult CombatSystem::ResolvePlayerProjectileHit(
+	Entity* projectileObject,
+	Entity* enemyObject) {
+	PlayerProjectileHitResult result;
+	// 無効な組み合わせと同じ弾による再命中を、距離計算より前に除外する。
+	PlayerAttackEntityComponent* projectile =
+		projectileObject ? projectileObject->GetComponent<PlayerAttackEntityComponent>() : nullptr;
+	EnemyComponent* enemy = enemyObject ? enemyObject->GetComponent<EnemyComponent>() : nullptr;
+	if (!projectile || !projectile->IsEnabled() || projectile->IsExpired() ||
+		!enemy || !enemy->IsEnabled() || enemy->GetCurrentHealth() <= 0.0f ||
+		projectile->HasHitObject(enemyObject)) {
+		return result;
+	}
+
+	++collisionDebugStats_.playerProjectileNarrowPhaseTests;
+	const PlayerAttackEntityPresentation presentation = projectile->GetMotionPresentation();
+	// 縦長攻撃は高さを無視したXZ平面、通常弾は3次元距離で判定する。
+	float distance = Length(enemyObject->GetTransform().translate - projectileObject->GetTransform().translate);
+	float hitRadius = projectile->GetSize() + 0.5f * enemy->GetStats().sizeScale;
+	if (presentation.usesVerticalHitArea) {
+		Vector3 horizontalDifference =
+			enemyObject->GetTransform().translate - projectileObject->GetTransform().translate;
+		horizontalDifference.y = 0.0f;
+		distance = Length(horizontalDifference);
+		hitRadius = projectile->GetSize() * 0.35f + 0.5f * enemy->GetStats().sizeScale;
+	}
+	if (distance > hitRadius) {
+		return result;
+	}
+
+	// 命中が確定してから副作用を適用し、最後に再命中防止対象として登録する。
+	float outgoingDamage = projectile->GetAttack();
+	if (Entity* sourceOwner = projectile->GetSourceOwner()) {
+		if (PlayerComponent* player = sourceOwner->GetComponent<PlayerComponent>()) {
+			Vector3 sourceToEnemy =
+				enemyObject->GetTransform().translate - sourceOwner->GetTransform().translate;
+			sourceToEnemy.y = 0.0f;
+			outgoingDamage *= player->GetOutgoingDamageMultiplier(Length(sourceToEnemy));
+		}
+	}
+	const float healthBeforeHit = enemy->GetCurrentHealth();
+	enemy->TakeDamage(outgoingDamage);
+	result.damageDealt = healthBeforeHit - enemy->GetCurrentHealth();
+	if (projectile->GetKnockback() > 0) {
+		Vector3 knockbackDirection =
+			enemyObject->GetTransform().translate - projectileObject->GetTransform().translate;
+		knockbackDirection.y = 0.0f;
+		if (Length(knockbackDirection) <= MathConstants::kDirectionEpsilon) {
+			knockbackDirection = projectile->GetDirection();
+			knockbackDirection.y = 0.0f;
+		}
+		enemy->ApplyKnockback(knockbackDirection, projectile->GetKnockback());
+	}
+	projectile->RegisterHitObject(enemyObject);
+	result.hit = true;
+	result.enemyDefeated = enemy->GetCurrentHealth() <= 0.0f;
+	return result;
+}
+
 void BaseScene::UpdatePlayerAttackEntityHits() {
-	struct ExperienceDropRequest {
-		EnemyStats stats;
-		Vector3 position;
-		GameObject* target = nullptr;
-	};
-	struct BossUpgradeDropRequest {
-		// 生成する報酬は常に1個で、upgradeCountだけが抽選結果に応じて変化する。
-		Vector3 position;
-		GameObject* target = nullptr;
-		int upgradeCount = 1;
-	};
-	struct ItemDropRequest {
-		ItemDropType type = ItemDropType::Health;
-		Vector3 position;
-		GameObject* target = nullptr;
-		float healAmount = 0.0f;
-		int moneyAmount = 0;
-	};
+	CollisionSpatialGrid& collisionSpatialGrid_ = combatSystem_.GetSpatialGrid();
+	CombatSystem::DebugStats& collisionDebugStats_ = combatSystem_.GetDebugStats();
 	std::vector<ExperienceDropRequest> experienceDropRequests;
 	std::vector<BossUpgradeDropRequest> bossUpgradeDropRequests;
 	// sceneObjects_の走査中に要素を追加すると反復子が無効になるため、生成要求を一旦蓄積する。
@@ -330,10 +579,12 @@ void BaseScene::UpdatePlayerAttackEntityHits() {
 		}
 
 		// 障害物との反射は弾を球として扱い、衝突面の法線から反射ベクトルを求める。
+		// PushBack は「そのコライダー自身を動かすか」の設定なので、静的な壁では false になる。
+		// プレイヤーを押し戻す有効コライダーは PushBack の値にかかわらず反射面として扱う。
 		SphereColliderShape projectileSphere{position, projectile->GetSize()};
 		for (const auto& obstacleObject : sceneObjects_) {
 			if (obstacleObject.get() == projectileObject.get() ||
-			    obstacleObject->GetComponent<Player>() ||
+			    obstacleObject->GetComponent<PlayerComponent>() ||
 			    obstacleObject->GetComponent<EnemyComponent>() ||
 			    obstacleObject->GetComponent<PlayerAttackEntityComponent>()) {
 				continue;
@@ -343,12 +594,12 @@ void BaseScene::UpdatePlayerAttackEntityHits() {
 			float penetration = 0.0f;
 			bool collided = false;
 			if (OBBColliderComponent* obstacle = obstacleObject->GetComponent<OBBColliderComponent>();
-			    obstacle && obstacle->IsEnabled() && obstacle->GetPushBackEnabled()) {
+			    obstacle && obstacle->IsEnabled()) {
 				collided = BaseSceneCollisionHelpers::CalculateOBBSpherePushBack(obstacle->GetWorldOBB(), projectileSphere, surfaceNormal, penetration);
 			}
 			if (!collided) {
 				if (SphereColliderComponent* obstacle = obstacleObject->GetComponent<SphereColliderComponent>();
-				    obstacle && obstacle->IsEnabled() && obstacle->GetPushBackEnabled()) {
+				    obstacle && obstacle->IsEnabled()) {
 					Vector3 projectileToObstacle{};
 					collided = BaseSceneCollisionHelpers::CalculateSphereSpherePushBack(projectileSphere, obstacle->GetWorldSphere(), projectileToObstacle, penetration);
 					surfaceNormal = -1.0f * projectileToObstacle;
@@ -399,83 +650,38 @@ void BaseScene::UpdatePlayerAttackEntityHits() {
 		const float projectileQueryRadius = presentation.usesVerticalHitArea
 			? projectile->GetSize() * 0.35f
 			: projectile->GetSize();
-		const std::vector<GameObject*> enemyCandidates = collisionSpatialGrid_.Query(
+		const std::vector<Entity*> enemyCandidates = collisionSpatialGrid_.Query(
 			CollisionSpatialGrid::FromCenterRadius(
 				projectileObject->GetTransform().translate, projectileQueryRadius));
 		collisionDebugStats_.playerProjectileCandidates += enemyCandidates.size();
 
-		for (GameObject* enemyObject : enemyCandidates) {
+		for (Entity* enemyObject : enemyCandidates) {
+			const PlayerProjectileHitResult hitResult =
+				combatSystem_.ResolvePlayerProjectileHit(projectileObject.get(), enemyObject);
+			if (!hitResult.hit) {
+				continue;
+			}
 			EnemyComponent* enemy = enemyObject->GetComponent<EnemyComponent>();
-			if (!enemy || !enemy->IsEnabled() || enemy->GetCurrentHealth() <= 0.0f) {
-				continue;
-			}
-			if (projectile->HasHitObject(enemyObject)) {
-				continue;
-			}
-			++collisionDebugStats_.playerProjectileNarrowPhaseTests;
-
-			float distance = Length(enemyObject->GetTransform().translate - projectileObject->GetTransform().translate);
-			float hitRadius = projectile->GetSize() + 0.5f * enemy->GetStats().sizeScale;
-			if (presentation.usesVerticalHitArea) {
-				Vector3 horizontalDifference = enemyObject->GetTransform().translate - projectileObject->GetTransform().translate;
-				horizontalDifference.y = 0.0f;
-				distance = Length(horizontalDifference);
-				hitRadius = projectile->GetSize() * 0.35f + 0.5f * enemy->GetStats().sizeScale;
-			}
-			if (distance <= hitRadius) {
-				enemy->TakeDamage(projectile->GetAttack());
-				if (enemy->GetCurrentHealth() <= 0.0f) {
-					// 生存中の敵だけがこの分岐へ入るため、1体につき一度だけ加算される。
-					++defeatedEnemyCount_;
-					experienceDropRequests.push_back({enemy->GetStats(), enemyObject->GetTransform().translate, enemy->GetTarget()});
-					static std::mt19937 itemDropRandomEngine(std::random_device{}());
-					std::uniform_real_distribution<float> itemDropDistribution(0.0f, 1.0f);
-					const EnemyStats& enemyStats = enemy->GetStats();
-					// 各アイテムを独立して抽選するため、同じ敵から複数種類が同時に落ちる場合がある。
-					if (itemDropDistribution(itemDropRandomEngine) < enemyStats.healthItemDropChance) {
-						itemDropRequests.push_back({
-							ItemDropType::Health, enemyObject->GetTransform().translate,
-							enemy->GetTarget(), enemyStats.healthItemHealAmount
-						});
-					}
-					if (itemDropDistribution(itemDropRandomEngine) < enemyStats.collectExperienceItemDropChance) {
-						itemDropRequests.push_back({
-							ItemDropType::CollectAllExperience, enemyObject->GetTransform().translate,
-							enemy->GetTarget(), 0.0f
-						});
-					}
-					if (itemDropDistribution(itemDropRandomEngine) < kMoneyItemDropChance) {
-						std::uniform_int_distribution<int> moneyDistribution(kMoneyDropMinimum, kMoneyDropMaximum);
-						itemDropRequests.push_back({
-							ItemDropType::Money, enemyObject->GetTransform().translate,
-							enemy->GetTarget(), 0.0f, moneyDistribution(itemDropRandomEngine)
-						});
-					}
-					const std::string& enemyTypeName = enemy->GetEnemyTypeName();
-					// 通常敵を除外し、途中の中ボスと各ステージの最終ボスだけを強化報酬の対象にする。
-					const bool dropsBossUpgradeReward =
-					    enemyTypeName == "MidBoss" ||
-					    enemyTypeName == "ChaserMidBoss" ||
-					    enemyTypeName == "ShooterMidBoss" ||
-					    enemyTypeName == "ChargerMidBoss" ||
-					    enemyTypeName == "Stage2GaleMidBoss" ||
-					    enemyTypeName == "Stage2Boss";
-					if (dropsBossUpgradeReward) {
-						static std::mt19937 bossRewardRandomEngine(std::random_device{}());
-						std::uniform_int_distribution<int> rewardRollDistribution(
-							kBossRewardRollMinimum, kBossRewardRollMaximum);
-						const int rewardRoll = rewardRollDistribution(bossRewardRandomEngine);
-						const int upgradeCount = GetBossRewardUpgradeCount(rewardRoll);
-						bossUpgradeDropRequests.push_back({
-							enemyObject->GetTransform().translate,
-							enemy->GetTarget(),
-							upgradeCount
-						});
-					}
+			EmitPlayerHitSpark(projectileObject.get(), enemyObject, hitResult.enemyDefeated);
+			CreateDamageNumber(
+				hitResult.damageDealt,
+				enemyObject->GetTransform().translate,
+				enemy->GetStats().sizeScale);
+			if (hitResult.enemyDefeated) {
+				// 生存中の敵だけがこの分岐へ入るため、1体につき一度だけ加算される。
+				gameplaySession_.RecordEnemyDefeat();
+				if (sceneManager_ && sceneManager_->IsDemoPlayActive()) break;
+				// 走査中にsceneObjects_へ追加しないよう、抽選結果を生成要求として一旦蓄積する。
+				const LootDropResult loot = lootDropService_.Roll(
+					*enemy, enemyObject->GetTransform().translate);
+				experienceDropRequests.push_back(loot.experience);
+				itemDropRequests.insert(
+					itemDropRequests.end(), loot.items.begin(), loot.items.end());
+				if (loot.hasBossUpgrade) {
+					bossUpgradeDropRequests.push_back(loot.bossUpgrade);
 				}
-				projectile->RegisterHitObject(enemyObject);
-				break;
 			}
+			break;
 		}
 	}
 
@@ -492,7 +698,7 @@ void BaseScene::UpdatePlayerAttackEntityHits() {
 
 void BaseScene::CleanupExpiredPlayerAttackEntities() {
 	sceneObjects_.erase(
-	    std::remove_if(sceneObjects_.begin(), sceneObjects_.end(), [](const std::unique_ptr<GameObject>& object) {
+	    std::remove_if(sceneObjects_.begin(), sceneObjects_.end(), [](const std::unique_ptr<Entity>& object) {
 		    PlayerAttackEntityComponent* projectile = object->GetComponent<PlayerAttackEntityComponent>();
 		    if (projectile) {
 			    // 弾全体が画面端を抜けてから消えるよう、表示サイズを余白へ反映する。
@@ -521,9 +727,7 @@ void BaseScene::CleanupExpiredPlayerAttackEntities() {
 	    }),
 	    sceneObjects_.end()
 	);
-	if (selectedObjectIndex_ >= static_cast<int>(sceneObjects_.size())) {
-		selectedObjectIndex_ = static_cast<int>(sceneObjects_.size()) - 1;
-	}
+	sceneEditorState_.ClampSelection(sceneObjects_.size());
 }
 
 
